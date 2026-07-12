@@ -25,4 +25,8 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 ## Registered scopes
 
-`self-check` (the meta-harness), `agent-kit`. More come online phase by phase (doc 14).
+`self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`. More come online phase by
+phase (doc 14).
+
+`schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
+needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).

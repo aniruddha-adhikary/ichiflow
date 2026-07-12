@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NullabilityProbe.json",
+    "type": "object",
+    "properties": {
+        "required": {
+            "type": "string",
+            "description": "Must be present and a string."
+        },
+        "optional": {
+            "type": "string",
+            "description": "May be absent entirely, but if present must be a string (not null)."
+        },
+        "nullable": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "null"
+                }
+            ],
+            "description": "Must be present, but may be an explicit JSON null."
+        }
+    },
+    "required": [
+        "required",
+        "nullable"
+    ],
+    "description": "Nullability: required-present, absent-allowed (optional), and explicit-null-allowed (nullable)."
+}
