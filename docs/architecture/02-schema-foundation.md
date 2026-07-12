@@ -414,6 +414,10 @@ metadata:
   version: 4.3.0                       # semver; breaking row/schema changes gated like any contract
   governanceState: released           # draft | in-review | released | deprecated
   effective: { from: 2026-08-01, to: null }
+  owner:                               # ownership is BOTH metadata here AND an authz relation (doc 06 Part 4)
+    team: trade-policy-team            # owning Team — drives who may view/edit/approve this CodeSet
+    stewards: [ "u:steward-ap" ]       # named steward(s) accountable for the rows
+  governance: { level: full, routeApprovalBy: owning-team-role }   # per-artifact override of the Workspace/tier dial (doc 03 §5.6, §5.8)
 schema: contracts/jsonschema/ConditionCode.json    # the row shape (§9.2)
 rows:
   - code: PRESENT_FOR_INSPECTION
@@ -432,6 +436,17 @@ rows:
       plainLanguage:
         en: "Keep your supporting documents for five years in case of an audit."
 ```
+
+**Ownership is first-class on every CodeSet.** The `owner` block names an **owning Team** and its
+**stewards** — the same ownership model applied uniformly to every governed Workspace artifact (Schemas,
+DecisionModels, Flows, uischemas, policies), specified once in
+[06-identity-and-access.md](06-identity-and-access.md) Part 4. Ownership is *both* metadata on the artifact
+(above) *and* an `owned_by`/`steward` relation in the authz model, so "who may edit or approve this table"
+is answered by the same PDP that guards runtime data (doc 06 Part 4). A CodeSet may also carry a
+per-artifact `governance` override (level + approval routing), so a high-stakes reference table can run
+`full` governance inside an otherwise `light` Workspace ([03-decision-layer.md](03-decision-layer.md)
+§5.6, §5.8). CodeSets are **interdependent** — a row in one CodeSet can reference a row in another — and
+that referential integrity is validated at publish across versions and effective dates (§9.4).
 
 ### 9.2 Standard code-row shape with per-audience display metadata
 
@@ -496,6 +511,53 @@ layers that own them ([04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5
 [03-decision-layer.md](03-decision-layer.md) §2.3); this document only fixes their **shape** as canonical,
 $ref-able contracts so the same typed outcome travels through Decisions, Flows, outbound Adapters
 ([05-adapters.md](05-adapters.md) §4.1), the UI, and the DecisionRecord without divergence.
+
+### 9.4 CodeSet interdependencies, cross-version referential integrity, and the dependency graph
+
+Reference data is not a set of flat, isolated lookup tables — CodeSets are **living, interdependent
+assets**. A row in one CodeSet can reference a row in another via a **`codeRef` column** — a
+foreign-key-like field typed as the canonical **`CodeRef`** shape (§9.3, `{ code, codeSet }`) pointing at
+a pinned `id@version` of another CodeSet. For example, a `natures-covered` CodeSet whose rows each carry a
+`country` `codeRef` into a `countries` CodeSet:
+
+```yaml
+# natures-covered — rows reference the countries CodeSet by codeRef (illustrative)
+kind: CodeSet
+metadata:
+  id: natures-covered
+  version: 2.0.0
+  owner: { team: trade-policy-team, stewards: [ "u:steward-ap" ] }
+schema: contracts/jsonschema/NatureCode.json
+rows:
+  - code: NC_TEMP_IMPORT
+    country: { code: XA, codeSet: countries@2026.2.0 }   # codeRef → another governed CodeSet, version-pinned
+    display: { technical: "TIMP", professionalLabel: "Temporary import", plainLanguage: { en: "…" } }
+```
+
+**Referential integrity is validated at publish time, across versions and effective dates.** A CodeSet
+cannot be released while any of its `codeRef` columns dangle. The publish gate enforces, for every
+`codeRef`:
+
+- **Resolution** — the referenced `codeSet@version` exists and contains a **live (non-deprecated)** row
+  with the referenced `code`;
+- **Effective-window compatibility** — the referenced row's `effective` window (§9.1) **covers** the
+  referencing row's effective window, so a code can never point at a target that is not yet, or no longer,
+  in force on the dates it is used. Because both sides are `id@version`-pinned and effective-dated, the
+  check is bitemporal, not just "does the id exist today."
+
+**Deprecating a referenced row triggers impact analysis, not a silent break.** When a CodeSet publish
+would **deprecate or remove** a row that other CodeSets (or Decisions/Flows/UI) reference, the publish
+gate runs an **impact analysis** over the dependency graph and either **blocks the publish** or **forces a
+review of every dependent** — routed as a reference-data change Flow to the dependents' owning-team
+approvers ([03-decision-layer.md](03-decision-layer.md) §5.8). A referenced row cannot vanish out from
+under a live dependent without a governed, audited decision.
+
+**The dependency graph is first-class and queryable.** ichiflow maintains a directed graph of
+CodeSet→CodeSet (and Decision/Flow/UI→CodeSet) references, answering **"what depends on this code / this
+CodeSet version?"** for humans in the authoring UI and for agents via `ichiflow-mcp` (BRIEF §12). The same
+graph drives publish-time impact analysis (above) and per-audience **code rendering** — resolving a
+`codeRef` to the referenced CodeSet's display metadata follows the graph
+([07-ui-and-portals.md](07-ui-and-portals.md) §4.1).
 
 ---
 

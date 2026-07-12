@@ -400,7 +400,9 @@ layers** and lets a deployment dial how strictly they are enforced:
 - **the *why* API** ([`08-audit-and-observability.md`](08-audit-and-observability.md)) as the
   read path — inspect production by querying structured lineage, not by shelling into it;
 - the **human support/ops console** ([`07-ui-and-portals.md`](07-ui-and-portals.md) §7.2) as the
-  mediated human write path (the human PEP over the same Tier-2 actuators an agent uses);
+  mediated human write path (the human PEP over the same Tier-2 actuators an agent uses) — **not built
+  as a UI in v1**: the v1 human path is those Tier-2 actuators in Claude Code + `ichiflow-mcp`, with the
+  console a post-v1 builder surface (ADR-0024; doc 12 class D3);
 - **`ichiflow-mcp` guardrail tiers** ([`10-ai-native-experience.md`](10-ai-native-experience.md) §3.3)
   as the mediated agent path (read-only / sandbox / prod-with-JIT+approval);
 - **environment promotion as the artifact write path** — a change reaches prod by promoting a

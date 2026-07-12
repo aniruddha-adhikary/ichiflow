@@ -15,7 +15,9 @@ and **what may they do here, now, on this resource** (authorization). It specifi
   end-state (ADR-0010). One entitlements model
   ("features and attributes") and the rule that *one* PDP decision shapes both generated APIs and UIs.
 - **Governance** — policy authoring/testing in the Workspace, authz decision logs that feed the
-  DecisionRecord, multi-tenancy, and **non-human identities** (AI agents as first-class principals).
+  DecisionRecord, multi-tenancy, the **Team model** (teams/departments/partner-orgs as sub-org structure
+  driving design-time *and* runtime access through one PDP), and **non-human identities** (AI agents as
+  first-class principals).
 
 ## Position in the system
 
@@ -141,7 +143,7 @@ never re-authenticates.
 {
   "sub": "u:9f3c…",                 // stable subject id (broker-scoped)
   "portal": "customer",             // which audience/edge authenticated this principal
-  "tenant": "acme",                 // resolved tenant (drives multi-tenancy §4)
+  "tenant": "acme",                 // resolved tenant (drives multi-tenancy, Part 3)
   "idp": "acme-saml",               // which upstream IdP established the identity
   "kind": "human",                  // human | service | agent  (agents are first-class, §5)
   "roles": ["applicant"],           // coarse RBAC gating only
@@ -442,7 +444,92 @@ scope propagate together — a service B invoked for tenant `acme` receives a to
 
 ---
 
-## Part 4 — Non-human identities: AI agents as first-class principals
+## Part 4 — Teams, membership & roles (sub-org structure, not multi-tenancy)
+
+One ichiflow deployment serves **one organization** (Part 3; locked decision §11, ADR-0017). But that one
+org is **not flat**: people belong to **departments, lines-of-business, and partner organizations**, and a
+single deployment routinely mixes staff from several of them plus outside partners on one system. ichiflow
+models these as first-class **Teams** — **sub-structures *within* the single org/tenant, not tenants
+themselves.** This is the crucial distinction: a Team is not a tenancy boundary (Part 3's `tenant` still
+resolves to the one deployed org, with B2B2C partner sub-populations inside it); a Team is an *ownership
+and role* boundary that decides **who may view / modify / approve** — both **design-time** (Workspace
+artifacts) and **run time** (Cases, Tasks, entity rows). The multi-tenant seams (Part 3, ADR-0017) are
+what let *many orgs* share a deployment later; Teams are how *one org's* sub-populations are structured
+now, and the two do not collide.
+
+### 4.1 The model — Team, membership, and role-as-relation
+
+- **Team** — a department, line-of-business, or partner organization. Teams **nest** (a department has
+  sub-teams) and a partner org is just a Team whose members federate through a partner IdP (§1.5).
+- **Membership** — a user is a `member` of one or more Teams (transitively, through sub-teams).
+- **Role within a Team is a *relation*, not a coarse RBAC string** — `steward`, `approver`, `editor`,
+  `viewer` are relations on the Team, so "approver **of the trade-policy team**" is expressible where a
+  global `role: approver` is not. This is what keeps roles scoped to the Team that grants them and avoids
+  role explosion (§2.2).
+- **Ownership is a relation** — every governed artifact and every runtime resource carries an `owner`
+  relation to a Team. Design-time artifacts (CodeSets, Schemas, DecisionModels, Flows, uischemas,
+  policies) are `owned_by` a Team with named stewards (the `owner` metadata block on the artifact,
+  [02-schema-foundation.md](02-schema-foundation.md) §9.1); runtime resources (Cases, Tasks, entity rows)
+  are `owned_by` a Team too, and view/modify inherit from that ownership plus per-resource assignment.
+
+### 4.2 Design-time and runtime authz go through the *same* PDP
+
+There is **no separate "admin authz" for the Workspace**. The question "may this principal **edit** this
+CodeSet / **approve** this DecisionModel change" is answered by the **same central PDP** (Part 2) that
+answers "may this principal **view** this Case row / **resolve** this Task" — one relation vocabulary, one
+decision path, one decision log into the DecisionRecord (§2.4). Design-time is simply the `artifact` object
+type; runtime is the `case`/entity object types; both root under the owning Team and, above it, the tenant
+(Part 3). This is why "ownership is metadata on the artifact **and** relations in the authz model"
+(doc 02 §9.1) is not redundancy: the metadata declares intent, the relations enforce it, and enforcement
+is the ordinary PDP — the same one the generated API and UI already call.
+
+### 4.3 Compact OpenFGA relation sketch
+
+v1 authz is **OpenFGA only** (§2.1, ADR-0010), so Teams, membership, roles, and ownership are expressed as
+OpenFGA relations — no ABAC engine required for the Team model:
+
+```
+model
+  schema 1.1
+
+type organization              # the single deployed org (Part 3) — the tenancy root
+  relations
+    define member: [user]
+
+type team                      # department | line-of-business | partner org (nests)
+  relations
+    define parent:   [organization, team]      # departments nest; a partner org is a team
+    define member:   [user, team#member]       # membership, transitive through sub-teams
+    define steward:  [user]                     # named steward(s), accountable
+    define approver: [user, team#member]
+    define editor:   [user, team#member]
+    define viewer:   [user, team#member]
+
+type artifact                  # design-time: CodeSet | Schema | DecisionModel | Flow | uischema | policy
+  relations
+    define owner:       [team]                              # owning Team (the ownership relation)
+    define can_approve: approver from owner or steward from owner
+    define can_edit:    steward from owner or editor from owner or can_approve
+    define can_view:    viewer from owner or member from owner or can_edit
+
+type case                      # runtime: a Case (entity rows follow the same owner-from-team shape)
+  relations
+    define owner:      [team]
+    define assignee:   [user]
+    define can_modify: assignee or editor from owner
+    define can_view:   assignee or viewer from owner or member from owner or can_modify
+```
+
+The reference-data **approval routing Decision** (§5.8 in [03-decision-layer.md](03-decision-layer.md))
+resolves its approver set from exactly these relations — `approver`/`steward from owner` on the artifact's
+owning Team — so a CodeSet change routes to the right people without hard-wiring names. Partner-org
+isolation rides the same graph: a partner Team's members reach only artifacts/cases their Team owns or is
+assigned, and the ReBAC filter set (§2.3) is inherently Team- and tenant-scoped, so cross-team leakage is
+impossible by construction, not by convention.
+
+---
+
+## Part 5 — Non-human identities: AI agents as first-class principals
 
 AI agents (Claude Code at build time and run time) are **principals**, not a side channel. `kind: agent`
 on the canonical Principal (§1.4) is the hinge. This section is the identity/access half of the AI-native

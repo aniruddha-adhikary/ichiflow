@@ -118,6 +118,18 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     write path, break-glass that is loud and logged), and each org **configures its posture** —
     e.g. `zero-direct-access` / `agents-mediated-humans-conventional` / `custom` — rather than
     inheriting one forced default (ADR-0020).
+19. **LLM-only internal surfaces for v1**: v1 keeps its **human-built UI surface to the absolute
+    minimum** — it builds human UI **only for the generated end-user Portals** (customer/partner
+    forms + status, and the **back-office manual-review** Task inbox + Case/review view), because
+    *generating those Portals is the product*. **Every internal / operator / builder / admin surface**
+    (support/ops console, Decision governance/approval, Design Kit playground + component workbench,
+    admin/config, standalone auditor query, Copilot UIs) is served **LLM-first** — Claude Code +
+    `ichiflow-mcp` + the `ichiflow` CLI + chat — with **live previews as read-only rendered artifacts**
+    (an `ichiflow preview` dev-server URL, not an interactive app). This is a *prove-it-fast* posture
+    **and** an LLM-first bet. The **capability to add builder-style surfaces later is preserved**: the
+    underlying typed APIs / MCP tools **are** the seam, so a post-v1 UI is just another client of a
+    contract v1 already ships — **only the v1 phasing of surfaces changes, never a seam or contract**
+    (ADR-0024; surface inventory in doc 12).
 
 ## Core vocabulary (use these names consistently)
 
@@ -163,7 +175,11 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   live-preview playground is THE designer surface** (prompt-first, rapid low-fi exploration against
   real schemas/mock data). **Figma is optional**: it imports brand tokens/variables *in* (the DTCG
   pipeline stays) and exports rendered screens/specs *out* for stakeholder review — there is **no
-  two-way hi-fi round-trip / Code-Connect-class bridge** (ADR-0019 amendment).
+  two-way hi-fi round-trip / Code-Connect-class bridge** (ADR-0019 amendment). **v1 phasing (ADR-0024):
+  the workbench and playground are not built as interactive apps in v1** — the designer's v1 surface is
+  **chat + a read-only `ichiflow preview` URL** that renders real screens/stories from the canonical
+  artifacts; the interactive Design Kit apps are a **post-v1** builder surface (the DTCG token
+  pipeline, the uischema/viewschema/pageschema/copyset artifacts, and the CI checks are all v1).
 - **pageschema / copyset** — first-class **governed designer artifact classes** (see doc 07 §13):
   `pageschema` composes multiple uischema/viewschema regions into a screen; `copyset` is a
   translator-friendly, i18n-keyed microcopy catalog referenced by key (sharing the CodeSet

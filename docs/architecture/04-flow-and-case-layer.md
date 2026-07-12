@@ -341,6 +341,12 @@ code. It is a **decision-eval** step against an assignment **DecisionModel** ([B
 assignee/queue; routing rules are governed, simulated, and explained like any other DMN Decision,
 and their output lands in the DecisionRecord.
 
+The same "routing is a Decision" pattern governs **design-time** approvals too: a **reference-data
+(CodeSet) change** opens an approval Case (approval is itself a Flow) whose reviewers are routed **by role
+within the artifact's owning Team**, again as a Decision — see
+[03-decision-layer.md](./03-decision-layer.md) §5.8 and [06-identity-and-access.md](./06-identity-and-access.md)
+Part 4.
+
 ### 5.4 Task inbox contract (consumed by Portals)
 
 The module exposes a schema'd **task inbox contract** (TypeSpec-authored → OpenAPI/JSON Schema,
