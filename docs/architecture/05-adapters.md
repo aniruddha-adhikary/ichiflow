@@ -208,6 +208,7 @@ the EIP vocabulary verbatim so architects and AI agents share one language:
 | **Idempotent Receiver** | Dedup at the inbound edge (idempotency-key store) |
 | **Guaranteed Delivery + Dead Letter Channel** | Transactional outbox + retry + DLQ on both edges |
 | **Correlation Identifier** | Ties async responses / request-reply and every message to `case_id` |
+| **Request-Reply (+ Return Address)** | The **delegation** round-trip an `external-task` rides ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.8): a request carrying a correlation id (and a return address where the transport needs one), answered by a later correlated reply message (§11) |
 
 - **Inbound:** external message → decode → **translate to a canonical command/event** → dedup →
   publish to the bus (ack the source only after the outbox commit). A canonical *command* typically
@@ -413,6 +414,76 @@ the loan Case ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §6). Ev
 
 ---
 
+## 11. Request-reply & delegation transport profiles
+
+The Flow layer's **`external-task`** step ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.8)
+delegates a unit of work to an external system and durably awaits its reply. The Adapter layer supplies
+the substrate under it: a **correlation contract** plus a set of **transport profiles**, all under the
+**one** Adapter interface (§1–§2) and the **one** reliability stance (§5). This is the classic
+**Request-Reply** Enterprise Integration Pattern — a request message carrying a **Correlation Identifier**
+(and, where the transport needs one, a **Return Address**), answered by a later correlated reply (§4).
+ichiflow names it verbatim so a flow author and an AI agent share one vocabulary. The delegation *step
+semantics* (submit → await → validate → resume/timeout/escalate/compensate) live in doc 04 §2.8; the
+*transport-and-correlation mechanics* live here.
+
+### 11.1 The correlation contract (declarative, per transport)
+
+An `external-task` binds an **outbound** submit Adapter to an **inbound** reply Adapter through a
+**declarative correlation contract** — never code:
+
+- **Inject** — how the correlation id is placed on the outbound request (a header, a body field, a
+  filename token, a manifest entry), derived by a JSONata/FEEL expression (typically from `case_id` +
+  step id).
+- **Extract** — how the correlation id is read back off the inbound reply, as a JSONata/FEEL expression
+  over the decoded response (e.g. `response.correlationId`). The extracted id matches the reply to the
+  waiting `external-task` instance; an unmatchable reply is a routing failure surfaced to the DLQ.
+- **At-least-once + Idempotent Receiver.** Submission is **at-least-once** (§5): the external system is
+  expected to be an **Idempotent Receiver** keyed on the delegation's idempotency key, and inbound
+  replies are **deduped on `(correlation-id, response messageId)`** so a duplicated reply applies once.
+- **Record-level correlation for batches.** When the request submits a set of records and the reply is a
+  batch of per-record results, the contract declares a **record-level** correlation key so each result
+  matches its request record (doc 04 §2.8 `batch` mode) — partial batches resolve per record, not
+  all-or-nothing.
+- **Response-schema validation.** The decoded reply is validated against the response schema at the
+  boundary (like every adapter, §1); a schema-invalid reply is a **malformed** failure → DLQ + Case
+  surfacing (doc 04 §2.8 taxonomy), never silent state.
+
+### 11.2 The five transport profiles (adapter bindings under one interface)
+
+The transport a delegation uses is an **Adapter binding** selected by `channel.protocol` (§2), *not* a
+new step kind — so a delegation re-homes across transports by configuration and the `external-task` step
+is unchanged. Five profiles are enumerated; **(a)–(d) ride existing v1 adapter bindings** (REST/webhook +
+Camel-on-Quarkus MQ, §2), **(e) is a design obligation now, implemented post-v1**:
+
+| Profile | Mechanics | Correlation | v1 |
+|---|---|---|---|
+| **(a) HTTP sync** | degenerate case: reply returns on the same request/response — an immediate synchronous answer | trivial (same connection); no durable await needed | ✅ |
+| **(b) HTTP async callback / webhook** | submit via outbound REST → reply arrives later on an **inbound webhook** Adapter (DMZ, §8) | correlation id echoed in the callback body/header; extracted per §11.1 | ✅ |
+| **(c) HTTP polling** | submit → receive a job handle → **poll** an outbound status endpoint until ready (a scheduled/`loop` step, doc 04 §2.4/§2.3, drives the poll) | correlation via the returned job handle | ✅ |
+| **(d) Message-queue request-reply** | classic EIP: submit to a request queue with **reply-to (Return Address) + correlation-id headers**; consume the correlated reply from a reply queue | correlation-id header (JMS/AMQP/MQ); resolves the "Request-reply over MQ" open question below | ✅ |
+| **(e) SFTP / file round-trip** | **submit a file drop, await a response file**: place a request file (or batch) in an outbound directory; a response file appears in an inbound directory later | **naming-convention / manifest** correlation; **record-level** correlation for batch files; response-file **schema-validated** at the boundary | **design-only, post-v1** |
+
+**On (e), the SFTP file round-trip.** The SFTP *transport* itself already exists (§2 heavy/legacy
+binding, §2.1 legacy structured-message profile, §8 inbound AS2/SFTP). What is **designed now and built
+post-v1** is the **request-reply orchestration over it** as a delegation profile: submit-file → await
+correlated response-file, with **naming-convention or manifest correlation** (a request file
+`req-<corr>.xml` answered by `resp-<corr>.xml`, or a manifest listing correlation ids), **record-level
+correlation inside batch files** so each row's result matches its request row, and **response-file schema
+validation** before the flow resumes. The interface is fixed here so a v1 flow can *declare* an
+SFTP-round-trip delegation against a stable contract; only the binding implementation lands later.
+
+### 11.3 Failure, DLQ, and zones
+
+The delegation **failure taxonomy** (doc 04 §2.8) maps onto this layer's machinery: **no-response
+timeout** is the flow's SLA expiry (doc 04 §5.7); **negative-ack** is a typed reject outcome the flow
+branches/compensates on; a **malformed response** and an **unmatchable/poison reply** land in the
+**DLQ** (§5) with triage/replay **and** surface on the Case, never a stuck flow. **Zone placement** rides
+the **one-way relay** (§8): the request egresses through a controlled **outbound** Adapter and the reply
+re-enters through an **inbound DMZ** Adapter that relays one-way to the core, correlated to the waiting
+`external-task` — no synchronous callback from intranet into DMZ.
+
+---
+
 ## Open questions
 
 - **Adapter host packaging.** Is the adapter host one process embedding both Camel-Quarkus and the
@@ -430,9 +501,12 @@ the loan Case ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §6). Ev
 - **Mapping generation trust boundary.** How much AI-generated mapping (JSONata/XSLT) ships without
   human review vs. requiring sign-off, and what property/parity tests gate it, given mappings can
   silently corrupt data.
-- **Request-reply over MQ.** Synchronous SOAP-over-MQ / request-reply correlation (Correlation
-  Identifier + reply-queue lifecycle) needs a concrete pattern beyond the fire-and-forward inbound
-  case shown here.
+- **Request-reply over MQ — now specified (§11.2 profile (d)).** Request-reply correlation over MQ
+  (reply-to Return Address + correlation-id headers, consumed from a reply queue) is the message-queue
+  transport profile for `external-task` delegations (§11; [04-flow-and-case-layer.md](./04-flow-and-case-layer.md)
+  §2.8). The residual open detail is the **reply-queue lifecycle** for high-concurrency delegation —
+  temporary/exclusive reply queues vs. a shared correlated reply queue — and its interaction with the
+  per-key ordering stance (§5), an implementation-tuning question, not a design gap.
 - **CDC as an adapter vs. a migration mechanism.** Debezium CDC appears both as an inbound adapter
   protocol here and as a coexistence mechanism in migration ([BRIEF.md](./BRIEF.md) §13); the
   boundary between "CDC adapter" and "migration Ring 1" needs to be drawn explicitly.

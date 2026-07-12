@@ -261,6 +261,18 @@ correctness is the whole layer's correctness.
   output). Fixtures: boundary fuzz corpora + golden I/O pairs. The **same** contract-test shape covers
   the unified code-activity everywhere it appears (decision feature-function, adapter code-transform),
   since it is one primitive.
+- **External-task (delegation) conformance vectors.** The `external-task` step
+  ([04](04-flow-and-case-layer.md) §2.8) ships its vectors first, driven against a **mock external
+  system** (a WireMock/mock-broker double, §2.d, generated from the port's contract — no live external
+  system): **`submit`** (request encoded, correlation id injected per the correlation contract,
+  [05](05-adapters.md) §11.1), **`response`** (a correlated reply validates against the response schema →
+  the flow resumes), **`timeout`** (no correlated reply within the SLA → the escalation path fires, under
+  time-skip), **`dup-response`** (a duplicated correlated reply is deduped once — Idempotent Receiver,
+  [05](05-adapters.md) §11.1), and **`malformed`** (a schema-invalid reply → DLQ + Case surfacing, *not* a
+  stuck flow). Each transport profile ([05](05-adapters.md) §11.2) with a v1 binding runs the same vector
+  set against its mock (the SFTP file round-trip is design-only/post-v1, so its vectors land with the
+  binding). Fixtures: request/reply corpora + duplicate/timeout/malformed sequences. Verdict:
+  `delegation_vectors_green / total`.
 
 ### 2.d Adapters — contract tests, mapping golden files, idempotency/DLQ vectors
 
