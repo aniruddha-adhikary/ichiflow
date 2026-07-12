@@ -54,7 +54,10 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    attribute/feature/field-level policy is a **post-v1 capability-profile add-on (open source,
    optional install) behind the same PDP interface** — the PDP contract is unchanged whether one
    engine or two sit behind it; the hybrid
-   OpenFGA + Cedar/OPA model remains the target end-state.
+   OpenFGA + Cedar/OPA model remains the target end-state. Design-time artifact access (who may
+   edit/approve a CodeSet, Schema, DecisionModel, Flow, uischema, policy) runs through the **same
+   PDP** as runtime, via **owning-Team + role-as-relation** ownership (OpenFGA); see doc 06 Part 4,
+   ADR-0025.
 9. **Audit/explainability**: per-case DecisionRecord is a first-class typed domain object
    stitching workflow event history + fired-rule traces + DMN results + human review + AI-agent
    actions into one causal chain, queryable via a "why" API. Event-source the decision/flow
@@ -71,7 +74,9 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     intranet, one-way async relay between zones). **v1 is single-org per deployment**, with
     multi-tenant seams designed in now (tenant_id discipline in schemas/persistence, per-Portal IdP
     isolation already present, entitlement scoping) so hosted multi-tenant can follow later without
-    rework.
+    rework. Within the single-org deployment, **teams/departments/partner-orgs are sub-structures,
+    not tenants** — an ownership/role boundary, distinct from the tenant boundary whose
+    multi-tenant seams remain for later (ADR-0025).
 12. **AI-native surfaces**: in-repo agent kit (AGENTS.md, .claude/ skills, hooks, subagents,
     plugin) + first-party `ichiflow-mcp` runtime MCP server exposing the why/case/flow query
     APIs with three server-enforced guardrail tiers (read-only / sandbox-mutating /
@@ -149,6 +154,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   reference table (reason codes, condition codes, cancellation reasons, field-eligibility rules,
   fee/rate tables) governed like any other contract; Decisions, Flows, and the UI reference a CodeSet
   by `id@version` rather than inlining its rows. Each row carries per-audience display metadata.
+  CodeSets are **interdependent** — a row may carry `codeRef` columns (foreign-key-like references
+  to a row in another `CodeSet@version`), whose cross-version, effective-dated **referential
+  integrity is validated at publish** and whose **dependency graph** is queryable ("what depends on
+  this code?") by humans and `ichiflow-mcp`; deprecating a referenced row triggers publish-time
+  impact analysis (blocked publish or forced dependent review). Every CodeSet has an **owning Team +
+  named stewards** and may override the governance dial per artifact.
 - **Flow** — declarative long-running process definition interpreted on Temporal.
 - **Compute step / code activity** — the unified typed-code extension primitive: a versioned,
   schema'd-at-the-boundary, trace-emitting Kotlin/TS unit (`ref: <lang>://<module>/<Name>@<version>`
@@ -167,6 +178,13 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   SOAP, webhook, CDC. Inbound → canonical command/event; outbound from canonical.
 - **Portal** — an audience-scoped UI + BFF (back-office, customer, partner) with its own IdP
   config and entitlements.
+- **Team** — a first-class sub-structure *within* the single deployed org (department,
+  line-of-business, or partner organization; teams nest) — **not** a tenant. Membership and
+  **role-as-relation** (steward / approver / editor / viewer) plus artifact/resource **ownership**
+  relations drive who may **view / modify / approve**, at **design time** (Workspace artifacts) and
+  **run time** (Cases, Tasks, entity rows), through the **same PDP** (§8). Every governed artifact
+  (CodeSets, Schemas, DecisionModels, Flows, uischemas, policies) is **owned by a Team** with named
+  stewards (ADR-0025).
 - **Design Kit** — the first-party UX-designer toolchain (parallel to the AI-native agent kit):
   a DTCG design-token pipeline, a component workbench, a live playground (real screens over
   schema-driven mocks), and a designer-facing safety contract (see doc 07). uischema/viewschema

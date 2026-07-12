@@ -59,13 +59,13 @@ B2B** map directly onto ichiflow's audience model. Isolation is *by construction
 
 **Zitadel is the documented alternate/co-primary** for deployments where B2B2C tenant isolation and
 event-sourced audit are the top priorities, and specifically where a *single tenant needs multiple
-upstream IdPs* — native in Zitadel, per-connection in Keycloak (see §1.5, §4.2). The broker is selected
+upstream IdPs* — native in Zitadel, per-connection in Keycloak (see §1.5, Part 3). The broker is selected
 per deployment; nothing above the broker SPI (§1.3) depends on which one is chosen.
 
 Commercial brokers (WorkOS/Stytch/Auth0) are the **"buy" escape hatch** when a deployment cannot
 self-host or needs turnkey self-service SSO onboarding. They bind the same `AuthBroker` SPI. Note the
 known WorkOS *one-IdP-per-organization* constraint — a reason to keep the tenant→IdP mapping in
-ichiflow's own model rather than the broker's (§4.2).
+ichiflow's own model rather than the broker's (§1.5, Part 3).
 
 ### 1.2 TS-edge session layer (Better Auth pattern)
 
