@@ -45,6 +45,7 @@ present tense and mark phasing (v1 vs later) where it matters.
 | [11 — Migration In and Out](architecture/11-migration-in-and-out.md) | "Map first, migrate last": the three-ring brownfield model, decision parity testing, and the migration-out/exit story. |
 | [12 — System Map & v1 Surfaces](architecture/12-system-map-and-v1-surfaces.md) | Complete inventory of every human-facing surface (build / LLM-only / integrated third-party / post-v1), the system map, and the per-capability placement classification table (ADR-0033 §6). |
 | [13 — Agent Harness Loops](architecture/13-agent-harness-loops.md) | Harness-first construction: how every subsystem ships a deterministic verification harness before its implementation; `ichiflow verify`, the verdict schema, and the per-subsystem harness catalogue. |
+| [14 — The Build Plan](architecture/14-build-plan.md) | The concrete harness-first construction plan for v1: the chunking doctrine, ten ordered phases with per-chunk tables (deliverable / harness exit / depends-on / effort / risk), the critical path and parallelizable work, de-risking spikes, the first-week chunks with verify commands, and what is deliberately deferred to post-v1 (with triggers). |
 
 ## Architecture Decision Records
 

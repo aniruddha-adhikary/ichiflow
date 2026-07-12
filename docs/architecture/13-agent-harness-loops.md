@@ -687,6 +687,11 @@ ichiflow is built in dependency order, and **each phase's exit criterion is its 
 The harness for a phase is written first (red), the phase's implementation turns it green, and only
 then does the next phase begin. This is the founder ask applied to ichiflow's own construction.
 
+> The DAG below is the **skeleton**; its concrete elaboration — explicit chunks with per-chunk
+> deliverable / harness-exit / depends-on / effort / risk tables, the critical path, parallelizable
+> work, de-risking spikes, the first-week chunks, and the post-v1 deferral list — is
+> [`14-build-plan.md`](14-build-plan.md).
+
 ### 4.1 The build-order DAG
 
 ```mermaid
