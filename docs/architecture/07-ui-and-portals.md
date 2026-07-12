@@ -22,8 +22,12 @@ covers —
 - **app-level i18n** alongside per-audience code rendering;
 - the **Design Kit** — the first-party designer toolchain (DTCG token pipeline, component
   workbench, live playground) and the **designer safety contract**;
-- first-class **governed designer artifacts** beyond uischema (**pageschema**, **copyset**) and the
-  **mock-first** (schema-driven MSW) design-time workflow;
+- first-class **governed designer artifacts** beyond uischema (**pageschema**, **copyset**, and the
+  **`doctemplate`** document-rendering artifact, §15) and the **mock-first** (schema-driven MSW)
+  design-time workflow;
+- **document rendering** — the **`doctemplate`** artifact class, the pluggable **rendering-engine SPI**
+  (Typst default), and how issued **`Document`**s (doc 04 §2.9) are authored, previewed, and fetched
+  PDP-scoped (§15);
 - where **fully custom frontends** plug in (headless APIs, BFF contract) so the UI layer stays
   optional.
 
@@ -551,6 +555,13 @@ skill):
   validation-error copy, and consistency with CodeSet `plainLanguage`; **`copyset` is a distinct
   governed artifact class that shares the CodeSet `plainLanguage` i18n substrate and tooling** (§4.2),
   rather than a separate parallel i18n stack.
+- **`doctemplate` (document rendering).** A screen is not the only thing a designer owns: an approval
+  **issues a Document** — a permit, certificate, licence, grant Letter of Offer (doc 04 §2.9) — whose layout
+  is a designer artifact too. A **`doctemplate`** (same versioned/CI-gated/register DNA) binds schema'd
+  fields → a print/PDF layout, is authored via AI chat and judged in a read-only preview like every other
+  designer artifact, and renders through a pluggable engine. It is the print/PDF sibling of the screen
+  artifacts above; its full treatment — the rendering-engine SPI, i18n, accessibility, and PDP-scoped
+  fetch — is **§15**.
 - **Presentation mode.** Single-page / wizard / stepper / accordion is a top designer control and must
   not require code. Make **presentation mode a declared uischema-level option** the playground can flip.
 - **Declared empty / loading / error / partial states.** Make these **declared** per screen/region
@@ -582,6 +593,134 @@ and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
   from the Schema + CodeSets + a Flow (incl. per-field PDP verdicts), reusing the seeded-data /
   `reproduce_case` machinery in [10-ai-native-experience.md](10-ai-native-experience.md) §3.2, so the
   playground shows believable screens rather than lorem-ipsum.
+
+---
+
+## 15. Document rendering — `doctemplate` and the rendering-engine SPI
+
+A screen is not the only thing generated from the schema. An approval **issues a Document** — a Customs
+Clearance Permit, an operating licence, a grant **Letter of Offer**, a decision certificate, a ballot-result
+notice (doc 04 §2.9). The **layout of that instrument is a designer artifact** exactly as a screen is, and
+ichiflow gives it a first-class governed class — **`doctemplate`** — that rides the same
+register/reference/version DNA as `uischema`/`pageschema`/`copyset` (§13). The runtime issuance semantics
+(number allocation, lifecycle, verification, storage) live in doc 04 §2.9 and
+[08-audit-and-observability.md](08-audit-and-observability.md) §1.6; **this section owns the *authoring and
+rendering* half** — the template artifact, the pluggable engine, i18n, accessibility, and PDP-scoped fetch.
+
+### 15.1 `doctemplate` — a governed designer artifact class
+
+A **`doctemplate`** is a **versioned template** binding **schema'd fields → a print/PDF layout**, checked
+into the Workspace (`contracts/ui/doctemplates/*.doctemplate.*`), registered in Apicurio, and gated by the
+same regenerate-and-diff / oasdiff CI machinery as any other contract (doc 02 §4.3, §6.2). Its shape mirrors
+the other designer artifacts:
+
+```yaml
+kind: doctemplate
+metadata:
+  id: customs-clearance-permit
+  version: 2.1.0                          # semver; breaking layout/binding changes gated like any contract
+  governanceState: released
+  owner: { team: trade-policy-team, stewards: [ "u:steward-ap" ] }   # owned + PDP-guarded (doc 06 Part 4)
+binds:                                    # schema'd fields → template slots (the render's data snapshot)
+  holder:      "${case.applicant.fullName}"
+  outcome:     "${case.outcome}"          # conditions render per-audience via CodeSet display (§4.1, doc 02 §9.2)
+  permitNo:    "${issue.referenceNumber}" # the allocated number (doc 04 §2.9.1)
+  qr:          "${issue.verificationUrl}" # public verification endpoint (doc 04 §2.9.4)
+copyset: trade-correspondence@3.0.0       # translator-friendly microcopy + i18n (§13)
+engine: typst                             # rendering-SPI binding (§15.3); default is typst
+accessibility: { pdfua: true, pdfa: "PDF/A-2b" }   # §15.4
+```
+
+- **Designer-ownable via the Design Kit.** A `doctemplate` is authored the framework way (ADR-0019; doc 00
+  "Chat to author, preview to judge"): the designer **describes the letter/permit in chat**, the AI (UI/
+  Design Copilot, post-v1) authors the `doctemplate`, and the **rendered document is the read-only preview**
+  the designer judges — no WYSIWYG document canvas, the same non-goal as the uischema visual builder (§11.3).
+  The preview renders against **sample-Case fixtures** (§14) so a designer sees a believable permit before
+  any Case exists.
+- **Composition reuse.** Coded content (`Outcome` reasons/conditions) renders through the **same per-audience
+  CodeSet display metadata** as screens (§4.1) — a permit and the Portal that shows its status say the same
+  thing in the same words — and microcopy comes from a **`copyset`** by key (§13), not inline strings, so the
+  document is translator-friendly on the shared i18n substrate (§4.2, doc 02 §9.2).
+
+### 15.2 Authoring vs runtime — one snapshot, a derived binary
+
+The load-bearing contract (doc 04 §2.9.3): the **canonical truth is the data snapshot + the pinned
+`doctemplate` version**, from which the binary **deterministically re-renders**. The designer owns the
+*template* (data → layout); the runtime `issue-document` step owns the *snapshot + allocation + lifecycle*.
+Because the binary is derived, a `doctemplate` change **never mutates already-issued Documents** — they stay
+pinned to the version they were issued under and re-render byte-stable — while new issuances pick up the new
+template version, exactly the version-pinning discipline the rest of the framework uses (doc 02 §6.3).
+
+### 15.3 The rendering-engine SPI (pluggable; Typst default)
+
+Rendering is a **declared SPI** (BRIEF §21, "closed core, declared extension points"): the `doctemplate`
+declares `engine:`, and the engine is swappable without touching the step, the artifact class, or any Flow.
+The v1 default and the alternatives, chosen under the licensing-hygiene lens (BRIEF §14/§15 — prefer
+Apache-2.0/MIT, avoid source-available/paid substrates):
+
+| Engine | License | Role | Why |
+|---|---|---|---|
+| **Typst** (default) | **Apache-2.0** | v1 default binding | Deterministic compiler with a **fixed-creation-timestamp reproducible-output** mode and embedded fonts → *same snapshot + template version → normalized-identical bytes* (the §15.5 harness property) essentially for free; **native PDF/UA-1 + PDF/A** (all four parts) as of Typst 0.14 (2025); small, self-contained Rust binary (air-gap-friendly, doc 09). Cleanest licensing + strongest determinism/a11y story. |
+| **WeasyPrint** | **BSD-3-Clause** | alternative binding (v1-capable) | For teams whose designers author documents in **HTML/CSS**; mature, deterministic enough, PDF/UA + PDF/A support (v57+/69.0, 2026). The HTML-native option behind the same SPI. |
+| **Playwright / Chromium print-to-PDF** | Apache-2.0 (drives Chromium) | available, **non-default** | Only where a document genuinely needs a full browser engine. Explicitly not default: a **bundled headless Chromium** is heavy (footprint, air-gap cost), its output is **harder to make byte-deterministic** (timestamps/font hinting), and its **PDF/UA** story is weakest — three strikes against the determinism + licensing-hygiene + accessibility bar. |
+
+**Recommended default: Typst**, because it satisfies three ichiflow requirements at once that the others
+satisfy only partially — **determinism** (reproducible fixed-timestamp output is the render-determinism
+harness, §15.5, not a bolt-on), **licensing hygiene** (Apache-2.0, no source-available caveat), and
+**accessibility** (native PDF/UA-1). WeasyPrint is the sanctioned HTML/CSS-native alternative; Chromium is a
+last-resort binding, never the default. Adding a fourth engine is a new SPI binding + its harness vectors,
+not a framework change (§15.6).
+
+### 15.4 Accessibility (PDF/UA) and i18n
+
+- **PDF/UA.** Issued Documents are correspondence to the public, so **PDF/UA** (tagged, accessible PDF) is a
+  first-class target, declared per `doctemplate` (`accessibility.pdfua`) and **verified in the harness**
+  (§15.5) — the document analogue of the screen-side WCAG 2.2 AA gate (§12). The default engine (Typst)
+  emits PDF/UA-1 natively; a binding that cannot meet the declared level fails the check rather than shipping
+  an inaccessible instrument.
+- **i18n.** Locale resolves from the recipient Principal / Case (§4.2); coded content renders per-audience
+  from CodeSet display metadata (§4.1) and microcopy from the `doctemplate`'s `copyset` (§13) — so a permit
+  issued to a customer renders in their locale with plain-language condition text, while the same instrument
+  to a back-office audience can render professional labels, from **one** governed source.
+
+### 15.5 Design-Kit safety contract for documents (harness-backed)
+
+`doctemplate` extends the designer safety contract (§12) with document-specific checks, all surfaced as
+Design-Kit preview verdicts and enforced in CI ([13-agent-harness-loops.md](13-agent-harness-loops.md)
+§2.k):
+
+- **Binding-scope lint** — every `${…}` binding resolves against the current data schema + `Outcome` shape
+  (the doc analogue of the uischema scope lint, §3); a dangling binding fails the build.
+- **Render determinism** — *same snapshot + template version → normalized-identical output* across two runs
+  (fonts embedded, timestamp fixed); non-determinism is a harness defect, not a retry (doc 13 §3.6).
+- **PDF/UA + contrast** — tagged-PDF/accessibility and token-contrast checks on the rendered artifact.
+- **Preview-per-change** — a `doctemplate` PR renders a before/after document preview against sample-Case
+  fixtures, the review artifact being the rendered permit, not a template diff (§12, §14).
+
+### 15.6 Fetching Documents — API-first and PDP-scoped
+
+Issued Documents are **API-first**: a Case exposes its Documents through the generated API (list/fetch by
+`case_id`), the binary streams from the object-storage SPI (doc 02 §11), and both are guarded by the **same
+central PDP** as every other surface (§6, BRIEF §8). The consequence that matters for multi-party casework:
+
+- **PDP-scoped fetch.** An external org (a partner Portal, a workshop, an applicant) sees **only its own
+  Documents** — the ReBAC row filter (§6) returns exactly the Documents the Principal may see, so a partner
+  never enumerates another party's instruments. This is the same row-filter mechanism as the case list, not
+  a bespoke document ACL.
+- **Portal delivery** is a Document fetch behind that filter; **notification delivery** (doc 05 §4.2) sends a
+  link resolved through the same PDP, never the binary in the clear to the wrong audience.
+- **Public verification** (doc 04 §2.9.4) is the deliberate exception: a **data-minimal, unauthenticated**
+  status endpoint (authenticity + `issued|superseded|revoked|accepted`) that exposes **no Case data**, so a
+  presenter checks a permit is genuine without any entitlement to the Case behind it.
+- **`ichiflow-mcp`** exposes `get_case_documents` (Tier-0, read-only) and `reissue_document` /
+  `revoke_document` (Tier-2, JIT + approval + audit) over the same API
+  ([10-ai-native-experience.md](10-ai-native-experience.md) §3.2).
+
+**v1 phasing (ADR-0024, ADR-0029).** The `doctemplate` **artifact class, the rendering-engine SPI (Typst
+default), the deterministic render, and the CI/a11y/determinism checks are all v1** — issuing governed
+Documents is core casework. What is **post-v1** is the *interactive* Design-Kit document authoring app; the
+v1 designer surface for a `doctemplate` is **chat + a read-only rendered preview** (§11), the same posture as
+every other designer artifact.
 
 ---
 
@@ -621,3 +760,8 @@ and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
 8. **Visual-regression gating.** Whether Chromatic-class pixel-diff snapshots become a **required** CI
    gate on token/renderer changes (vs opt-in/local) has real cost (snapshot infra, flaky-diff triage,
    the BRIEF §14 licensing lens) and is deferred.
+9. **`doctemplate` primary authoring language (§15.3).** Typst is the default engine for its determinism +
+   licensing + PDF/UA story, but whether the **designer-facing** template language is Typst markup, an
+   HTML/CSS subset (WeasyPrint-aligned), or an engine-neutral layout DSL the SPI lowers per engine — so a
+   `doctemplate` is not silently coupled to one engine's syntax — needs settling. The render-determinism and
+   binding-scope contracts (§15.5) hold regardless of the surface chosen.

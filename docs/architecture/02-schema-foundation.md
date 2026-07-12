@@ -623,9 +623,10 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
 - **A machine-readable artifact-type catalog for discovery.** An agent onboarding to a Workspace can
   enumerate *every* governed artifact class in one call: `ichiflow artifacts list --json` (and the
   MCP Tier-0 `list_artifact_types`) returns each class — Schema, DecisionModel, CodeSet, Flow,
-  compute-step/code-activity, uischema, viewschema, pageschema, copyset, Entitlement, Portal, Adapter,
-  tokens, Harness — with its canonical JSON Schema, its authoring surfaces, and its declared extension
-  seams (the `x-`/SPI points of BRIEF §21). This complements the per-CodeSet dependency graph (§9.4,
+  compute-step/code-activity, uischema, viewschema, pageschema, copyset, **doctemplate** (the
+  document-rendering template, [07-ui-and-portals.md](07-ui-and-portals.md) §15), Entitlement, Portal,
+  Adapter, tokens, Harness — with its canonical JSON Schema, its authoring surfaces, and its declared
+  extension seams (the `x-`/SPI points of BRIEF §21). This complements the per-CodeSet dependency graph (§9.4,
   "what depends on this code?") with a *global* artifact-type index, so an agent discovers what it can
   author without reading the docs first (cross-ref [10-ai-native-experience.md](10-ai-native-experience.md) §2.2).
 
@@ -656,7 +657,22 @@ module (ADR-0018), because the generated List/Detail/Form/CRUD screens ([07-ui-a
 - **Entity ↔ Case relationship.** An entity is referenced by `case_id`; entity lifecycle and Case
   lifecycle are **distinct** — an entity can precede or outlive any single Case that touches it.
 - **PDP-shaped access.** The same central PDP that guards the API guards entity queries: ReBAC supplies
-  the row-filter set for list/search, the generated UI renders exactly what the API would return.
+  the row-filter set for list/search, the generated UI renders exactly what the API would return. This is
+  the mechanism that scopes issued **`Document`** fetches to the owning party
+  ([07-ui-and-portals.md](07-ui-and-portals.md) §15.6).
+
+**Binary large objects behind an object-storage SPI.** Most entities are pure rows, but some carry a
+**derived binary** — the canonical case is an issued **`Document`** (a rendered permit/certificate/licence
+PDF, doc 04 §2.9): its *metadata* (reference number, version, lifecycle, verification hash, data-snapshot
+reference, `doctemplate` pin) is an ordinary schema-defined entity row, while its *binary* rides an
+**object-storage SPI** (PostgreSQL large-object / local filesystem default at Dev/Team; an S3-compatible
+object store at Enterprise). The invariant that keeps this clean: **the binary is a cache, not the truth** —
+canonical truth is the *data snapshot + pinned template version*, from which the binary deterministically
+re-renders (doc 04 §2.9.3), so the object store holds a re-derivable artifact and **crypto-shredding**
+(purge the binary + destroy the snapshot's per-subject key) reconciles immutability with GDPR erasure
+([08-audit-and-observability.md](08-audit-and-observability.md) §1.6). The SPI is the same "PostgreSQL-first,
+pluggable-later" shape as the other storage SPIs
+([08-audit-and-observability.md](08-audit-and-observability.md) §2.4).
 
 The **ORM / data-access choice (jOOQ vs Exposed vs plain SQL)** is an explicit **Open question**
 (below): this section fixes the entity store's *presence, generation, and query/pagination/search

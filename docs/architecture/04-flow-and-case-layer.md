@@ -117,6 +117,7 @@ fork to the raw Temporal SDK.
 | **signal / event-wait** | Block until an external signal or a canonical event arrives (with optional timeout) | Temporal signal / inbound canonical event correlated by `case_id` |
 | **condition-gate** | Block a downstream Flow segment until a named **blocking Condition** reaches `fulfilled` (or is waived) — analogous to `signal/event-wait` but keyed to a Condition (§5.5) | Temporal await on the Condition's fulfilment signal / canonical event; the transition is recorded |
 | **external-task** | **Delegate** a unit of work to an **external system**: submit a schema'd request through an outbound Adapter, durably **await a correlated response** through an inbound Adapter, validate it, and resume (or take timeout/escalation/compensation paths) — the machine analog of `human-task` (§2.8, §5.8) | Outbound **adapter-call** to submit + **await-signal** on the correlated inbound response, raced by a pausable **SLA timer** with an escalation chain, keyed by a declared correlation contract ([05-adapters.md](./05-adapters.md) §11) |
+| **issue-document** | **Issue** an immutable, versioned **Document** — a permit/certificate/licence/offer — from a data snapshot + the Case **Outcome** via a governed **doctemplate**: allocate a reference number, render deterministically, record lifecycle, and deliver to a Portal and/or an outbound notification Adapter (§2.9) | Interpreter-owned **number allocation + Document-lifecycle mutation** (idempotent on replay) + a pure **render** dispatched through the rendering SPI ([07-ui-and-portals.md](./07-ui-and-portals.md) §15); an optional **acceptance** facet reuses the `human-task`/signal await machinery (§5.2) |
 
 FEEL expressions (the DMN expression language) are the DSL's expression sublanguage for guards,
 routing predicates, and data mapping, so business users use one expression syntax across Decisions
@@ -382,6 +383,151 @@ correlated by Z, and it replied W at time T" is answerable through the *why* API
 the reply re-enters through an inbound DMZ Adapter that relays one-way to the core, correlated to the
 waiting `external-task` — no synchronous callback from intranet into DMZ.
 
+### 2.9 The `issue-document` step — issue a governed Document
+
+An approval does not merely *resolve* a Case; it commonly **produces the governed instrument the approval
+entitles** — a Customs Clearance Permit, an operating licence, a grant **Letter of Offer**, a decision
+certificate, a ballot-result notice. A Flow **issues** that instrument with an `issue-document` step: it
+generates an **immutable, versioned `Document`** from a **data snapshot + the Case `Outcome`** (its reason
+codes and conditions rendered per-audience via the referenced CodeSet display metadata, §5.5, doc 02 §9.2),
+rendered through a governed **`doctemplate`** ([07-ui-and-portals.md](./07-ui-and-portals.md) §15), stamped
+with an allocated **reference number**, given a **verification hash**, and delivered to a Portal and/or an
+outbound notification Adapter ([05-adapters.md](./05-adapters.md) §4.2). Where `human-task` and
+`external-task` are the two *await* steps (§5.8), `issue-document` is the **issuance** step.
+
+The `Document` an `issue-document` produces **is** the **versioned governed output artifact** a Case emits
+(§5.1): a reissue or variation supersedes the prior version, version-linked, with the **DecisionRecord
+spanning all versions** (§7). Post-submission Case operations (§5.6) act on it — a `cancel`/clawback
+**revokes** it, an `amend`/`correct` **reissues** a new version.
+
+**Why `issue-document` is a *canonical* step type, not a *compute*-variant (§2.6/§2.7).** The canonical bar
+(§2.8) is that the **interpreter must understand the step's control-flow semantics to replay them
+deterministically**; an extension type is admissible only when the new kind reduces to a **compute-variant**
+on the generic code-activity path. `issue-document` fails that reduction on two independent counts — and the
+part of it that *is* pure is dispatched beneath it exactly as transport is dispatched beneath `external-task`:
+
+- **Reference-number allocation is a side effect, not a computation.** Allocating "the next Customs Clearance
+  Permit number" **consumes a monotonic counter** — it is not pure (`compute` steps are pure and re-runnable,
+  §2.6: same input → same output). On replay the interpreter must **not** mint a *second* number nor emit a
+  second `issued` event; it **memoizes** the allocation and the lifecycle mutation keyed by `(case_id,
+  step.id)`, exactly-once-ish under at-least-once execution. That durable side-effect memoization is
+  interpreter machinery, not something a pure activity can host.
+- **Lifecycle mutation and the acceptance facet are interpreter control-flow.** Issuing transitions a
+  `Document` `issued`, and an **offer-type** Document (grant Letter of Offer, §2.9.2) then makes the flow
+  **await** the holder's `accept`/`decline` — the same durable await-with-signal shape as `human-task`
+  (§5.2) that only the interpreter can replay deterministically. A compute-variant runs to completion; it
+  cannot suspend for acceptance under a clock.
+- **What *is* pure — the render — is dispatched through the rendering SPI beneath the one step.** *Data
+  snapshot + template version → PDF/UA bytes* is a **deterministic, re-runnable render**
+  ([07-ui-and-portals.md](./07-ui-and-portals.md) §15); the canonical step **owns** allocation + lifecycle +
+  delivery + audit and **dispatches** the render as an ordinary activity — the same shape as `external-task`
+  owning correlation/SLA/audit while transport is a pluggable Adapter binding beneath it (ADR-0029).
+
+```yaml
+# an issue-document step — issue a permit (no acceptance) and, elsewhere, an offer (with acceptance)
+- id: issue-permit
+  type: issue-document
+  template: customs-clearance-permit@2.1.0          # doctemplate ref (doc 07 §15)
+  binding:                                           # schema'd fields → template; the DATA SNAPSHOT source
+    holder:         "${case.applicant}"
+    outcome:        "${case.outcome}"                # conditions render per-audience via CodeSet display (§5.5)
+    decisionRecord: "${case.decisionRecord}"
+  numberAllocation: allocation://customs/clearance-permit   # governed number-allocation contract (§2.9.1)
+  lifecycle: { acceptance: none }                    # none | offer
+  verification: { endpoint: public, hash: sha256 }   # verification hash + optional QR/public endpoint (§2.9.4)
+  delivery:
+    - portal: customer                               # portal link — PDP-scoped fetch (doc 07 §15)
+    - notify: adapter://notify/email-applicant       # outbound notification Adapter (doc 05 §4.2)
+
+# an OFFER-type Document — issued → accepted/declined participates in the Flow (the grants case)
+- id: issue-letter-of-offer
+  type: issue-document
+  template: grant-letter-of-offer@1.0.0
+  binding: { offer: "${case.outcome}", applicant: "${case.applicant}" }
+  numberAllocation: allocation://grants/offer-ref
+  lifecycle:
+    acceptance: offer                                # issued → await accept/decline (reuses §5.2 await + §5.7 clock)
+    onAccepted:  chain/grant-activate                # authored steps, like a human-task resolution
+    onDeclined:  chain/grant-withdraw
+    sla: { budget: P30D, onTimeout: chain/offer-lapsed }
+  delivery: [ { portal: applicant }, { notify: adapter://notify/grant-email } ]
+```
+
+**Step declaration.** An `issue-document` declares, all as schema-validated data:
+
+- **template** — the governed **`doctemplate`** (`id@version`, [07-ui-and-portals.md](./07-ui-and-portals.md)
+  §15) that binds schema'd fields → layout; the version is **pinned into the Document** so the binary is
+  re-derivable.
+- **binding** — the **field binding** that assembles the **data snapshot** (Case data + `Outcome` +
+  DecisionRecord references) the template renders. The snapshot — *not* the rendered bytes — is the canonical
+  truth (§2.9.3).
+- **numberAllocation** — the **number-allocation contract** (§2.9.1) the reference number is drawn from.
+- **lifecycle** — `acceptance: none` (a plain issued Document) or `acceptance: offer` (issued → accepted /
+  declined participates in the Flow, §2.9.2).
+- **verification** — the **verification hash** algorithm and whether a **public verification endpoint**
+  (QR-linkable) is exposed (§2.9.4).
+- **delivery** — one or more sinks: a **Portal link** (fetched PDP-scoped, doc 07 §15) and/or an **outbound
+  notification Adapter** (email/SMS, doc 05 §4.2). Delivery **composes with** the notification layer; it does
+  not reinvent it.
+
+**2.9.1 Number allocation — gap-free vs gapped semantics.** A reference number is drawn from a **governed
+number-allocation contract** — a declared, versioned config artifact (owned by a Team like any governed
+artifact, doc 06 Part 4) whose two semantics are legally material:
+
+- **`gapped`** (default) — numbers may **skip** on abort/rollback (a monotonic sequence; cheap,
+  high-concurrency). Correct when the number is a handle, not a count.
+- **`gap-free`** — a **contiguous** sequence with **no** holes (statutory receipt/permit registers, invoice
+  numbers): every allocated number is either **consumed** or **explicitly voided with an audited
+  void-reason**, never silently lost. This costs serialized allocation + a void ledger, so it is declared
+  only where the register's continuity is a compliance requirement.
+
+The contract also declares scope/format (per-year reset, prefix, check-digit). Allocation is the
+side-effecting, exactly-once-memoized operation the step owns (above); the void ledger and every allocation
+land in the DecisionRecord.
+
+**2.9.2 Document lifecycle.** A `Document` is **immutable** once issued; change is expressed as **new
+versions and lifecycle transitions**, each an audited DecisionRecord event (§7,
+[08-audit-and-observability.md](./08-audit-and-observability.md) §1.6):
+
+- `issued → superseded` — a **reissue** or **variation** (§5.6 amend/correct) mints a **new version** that
+  **supersedes** its predecessor; the reference number either carries with a version suffix or a new number
+  is allocated, per the contract.
+- `issued → revoked` — a **cancellation/clawback** (§5.6 cancel) terminates the Document with a
+  `cancellation-reasons` codeRef.
+- **Acceptance facet (offer-type, optional):** `issued → accepted | declined`. The flow **awaits** the
+  holder's decision (portal action or inbound canonical event, correlated by `case_id`), raced by a
+  **pausable SLA** (§5.7) whose expiry follows an authored `onTimeout` chain (`offer-lapsed`). This is the
+  facet the **grants** Letter-of-Offer needs, and it is why the step is canonical rather than a compute-variant.
+
+**2.9.3 The binary is derived — determinism, storage, redaction.** The **canonical truth is the data
+snapshot + the pinned template version**, from which the binary **deterministically re-renders**; the PDF
+is a **derived** artifact, not the source of record. This yields three properties:
+
+- **Determinism.** *Same snapshot + same template version → normalized-identical output* — the property the
+  render-determinism harness checks ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.k), bought
+  by a deterministic rendering engine (fixed creation timestamp, embedded fonts; doc 07 §15).
+- **Storage.** The `Document` (metadata: reference number, version, lifecycle, hash, snapshot ref, template
+  pin) is a schema-defined **entity** in the entity store (doc 02 §11); the **binary** rides an
+  **object-storage SPI** (doc 02 §11) as a cache of a re-derivable artifact, not the truth.
+- **Redaction (immutability vs GDPR).** Because the binary is derived, GDPR erasure reconciles with
+  immutability via **crypto-shredding** ([08-audit-and-observability.md](./08-audit-and-observability.md)
+  §1.6): PII in the data snapshot is encrypted per-subject; erasure destroys the key, so the snapshot's PII —
+  and any re-render — is unrecoverable, while the Document's **structural** record (reference number, status,
+  hash, lifecycle events) survives for audit-chain integrity. The cached binary is purged from object
+  storage; it can no longer be re-derived.
+
+**2.9.4 Verification.** A Document carries a **verification hash** over its canonical snapshot + template
+pin, and may expose an optional **public verification endpoint** (QR-linkable on the rendered artifact). A
+presenter (a border officer, a landlord, a bank) scans the code and the endpoint confirms **authenticity +
+current status** — `issued | superseded | revoked | accepted` and the issue date — **without exposing Case
+data** ([08-audit-and-observability.md](./08-audit-and-observability.md) §1.6). It is deliberately
+**data-minimal**: the response proves the instrument is genuine and current, not what is inside the Case.
+
+**Audit.** Every `issue-document` emits DecisionRecord events (§7) — **allocated / issued / delivered**, and
+later **superseded / revoked / accepted / declined** — each with the snapshot reference, the template pin,
+the resolved reference number, the verification hash, and the delivery outcome, so "what instrument did we
+issue, from which data, under which template, and what is its status now" is answerable through the *why* API.
+
 ---
 
 ## 3. Flow interpretation architecture (diagram)
@@ -468,9 +614,10 @@ priority, SLA envelope).
   obligations are all fulfilled/waived/expired. (Equivalently, an obligation may spawn a durable child
   timer/Task that outlives the parent Case; §5.5.)
 - **Case ↔ artifact versioning.** The governed output artifact a Case produces (its "permit/decision"
-  record) is **versioned**. Amendment and correction (§5.6) produce a **new version** of that artifact,
-  version-linked to its predecessors, with the **DecisionRecord spanning all versions** — so the audit
-  chain survives amendments ([08-audit-and-observability.md](./08-audit-and-observability.md) §1).
+  record) is **versioned**. That artifact is a **`Document`** issued by an `issue-document` step (§2.9):
+  amendment and correction (§5.6) produce a **new version** that supersedes its predecessors, version-linked,
+  with the **DecisionRecord spanning all versions** — so the audit chain survives amendments
+  ([08-audit-and-observability.md](./08-audit-and-observability.md) §1).
 
 ### 5.2 Manual review = await-signal + SLA timer + escalation
 
@@ -711,6 +858,10 @@ actions into one causal chain. The Flow layer is its primary feeder:
 - **external-task** delegations (§2.8) attach a **submitted / ack'd / responded / timed-out** trace with
   request/response payloads snapshotted per audit policy, the resolved correlation id, both Adapter I/O
   snapshots, and the provider-selection Decision — the delegation's full round-trip on the causal chain.
+- **issue-document** steps (§2.9) attach an **allocated / issued / delivered** trace — and later
+  **superseded / revoked / accepted / declined** — with the data-snapshot reference, the `doctemplate` pin,
+  the allocated reference number, and the verification hash, so the issued instrument's full lifecycle is on
+  the causal chain ([08-audit-and-observability.md](./08-audit-and-observability.md) §1.6).
 
 The DecisionRecord is a **projection** of this history (event-source the decision/flow core;
 [BRIEF.md](./BRIEF.md) §9), so the *why* API can re-derive "this case took path X because Decision D
@@ -787,6 +938,11 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
   delegation as "done" — needs a declared, replay-safe shape (a declared completion marker vs. a per-record
   quorum), and how a partially-completed batch surfaces on the Case (some records resolved, some timed out)
   interacts with the failure taxonomy (§2.8) and the composite-clock model (§5.7).
+- **Document reissue numbering + gap-free allocation under replay.** For `issue-document` (§2.9) the residual
+  detail is the **reference-number policy on reissue/variation** — carry the original number with a version
+  suffix vs. mint a fresh number — likely per number-allocation contract; and how **gap-free** allocation
+  (§2.9.1) stays exactly-once under interpreter replay and continue-as-new checkpointing (§long-history) so a
+  contiguous statutory register never double-allocates nor holes. Tracked in ADR-0029.
 - **Case aggregate vs Flow instance cardinality.** §5.6 establishes that post-decision operations
   (appeal / correct / withdraw) spawn **correlated child Cases**, so a Case is *not* strictly 1:1 with a
   root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows

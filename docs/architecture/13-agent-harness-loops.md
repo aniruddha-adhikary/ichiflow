@@ -273,6 +273,11 @@ correctness is the whole layer's correctness.
   set against its mock (the SFTP file round-trip is design-only/post-v1, so its vectors land with the
   binding). Fixtures: request/reply corpora + duplicate/timeout/malformed sequences. Verdict:
   `delegation_vectors_green / total`.
+- **Issue-document (issuance) vectors.** The `issue-document` step
+  ([04](04-flow-and-case-layer.md) §2.9) likewise ships its vectors first — allocation, issued/delivered,
+  and (offer-type) the acceptance await under time-skip — plus **replay idempotency** (no double-allocation /
+  no second `issued` event on replay). Render determinism, verification-endpoint, and full lifecycle
+  conformance are catalogued together in **§2.k**.
 
 ### 2.d Adapters — contract tests, mapping golden files, idempotency/DLQ vectors
 
@@ -402,6 +407,42 @@ inner ones, and **decomposed into milestone checkpoints an agent can pass increm
 
 **v1 is accepted only when both top-level harnesses are green in CI** — the definition of done for the
 whole kernel, expressed as a verdict, not a judgement call.
+
+### 2.k Document issuance — render determinism, verification vectors, lifecycle conformance
+
+The `issue-document` step ([04](04-flow-and-case-layer.md) §2.9) issues an immutable, versioned **`Document`**
+from a data snapshot + `doctemplate`, allocates a reference number, and drives a lifecycle — a subsystem that
+spans Flow, the rendering SPI ([07](07-ui-and-portals.md) §15), and the DecisionRecord
+([08](08-audit-and-observability.md) §1.6), so it carries its own harness. The load-bearing property is that
+**the binary is derived** (snapshot + template version → deterministic bytes), which makes issuance *provable*
+rather than eyeballed.
+
+- **Render determinism.** *Same snapshot + same `doctemplate` version → normalized-identical output* across
+  two runs, per rendering-SPI binding (Typst v1 default; WeasyPrint; [07](07-ui-and-portals.md) §15.3). Fonts
+  are embedded and the creation timestamp is fixed; normalization strips only non-semantic noise. Any
+  divergence is a harness defect, never a retry (§3.6). Fixtures: snapshot + template + golden normalized
+  output. Verdict: `render_deterministic: pass|fail` per binding.
+- **Binding-scope + a11y checks.** Every `${…}` binding resolves against the current data schema + `Outcome`
+  shape (the document analogue of the uischema scope lint, §2.e); **PDF/UA** tagging and token-contrast hold
+  at the declared level ([07](07-ui-and-portals.md) §15.4). A dangling binding or an unmet accessibility
+  level fails.
+- **Verification-endpoint vectors.** A genuine reference resolves to the **correct current status**
+  (`issued|superseded|revoked|accepted`) and hash match; a **tampered or unknown** reference is rejected; the
+  response is **data-minimal** — a vector asserts **no Case data leaks** through the public endpoint
+  ([04](04-flow-and-case-layer.md) §2.9.4, [07](07-ui-and-portals.md) §15.6). Fixtures: genuine / superseded /
+  revoked / tampered / unknown reference corpora.
+- **Lifecycle + replay-idempotency conformance.** Vectors drive **reissue → supersedes prior version**,
+  **cancel → revoked**, and the **offer** facet **issued → accepted|declined** (under time-skip for the
+  acceptance SLA). The critical one: **replay idempotency** — re-executing the step on interpreter replay
+  **does not double-allocate a reference number nor emit a second `issued` event** (exactly-once-ish,
+  [04](04-flow-and-case-layer.md) §2.9), and a **gap-free** allocation stays contiguous with its void ledger
+  while a **gapped** one may skip ([04](04-flow-and-case-layer.md) §2.9.1). Fixtures: lifecycle sequences +
+  replayed histories. Verdict: `lifecycle_vectors_green / total`, `replay_idempotent: pass|fail`,
+  `allocation: {gapfree_contiguous: pass, gapped_ok: pass}`.
+
+The step's flow-control vectors (submit-shaped issuance in a graph) ride the flow-interpreter suite (§2.c),
+its render checks ride the UI harness (§2.e), and its audit events feed the DecisionRecord completeness
+harness (§2.g) — §2.k is the issuance-specific composition of all three (ADR-0029).
 
 ---
 
