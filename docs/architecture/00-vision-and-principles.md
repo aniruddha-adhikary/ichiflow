@@ -153,7 +153,19 @@ lints uischema scopes against the data schema.
 Every Copilot (Domain Modeling, Migration, Rule Authoring) is an *assistant over deterministic
 tools*, never a code generator writing to production. The LLM proposes; a deterministic tool
 plans/lints/validates (Atlas/pgroll for migrations, DMN validators for rules, oasdiff for
-contracts); a human approves; a harness verifies. Provenance is recorded for every proposal.
+contracts); a human approves; a harness verifies. Provenance is recorded for every proposal. (The
+Copilots themselves are **post-v1**; in v1 their inputs are authored as plain declarative data under
+the doctrine below — [`03-decision-layer.md`](03-decision-layer.md), ADR-0017.)
+
+### "Chat to author, preview to judge."
+Every persona — business user, designer, developer — authors the **same way**: the AI writes the
+artifact from a **conversation**, and the human steers in chat and judges via **live preview**. There
+is **no drag-and-drop or visual-builder canvas** anywhere. Previews — flow diagrams, decision-table
+views, rendered screens, simulation/what-if results — are **read-only projections rendered *from* the
+canonical artifacts**, never a second editable representation that could drift from them. The approval
+surface is the **diff (AI-explained in plain language) + preview/simulation** pair. Direct editing of
+the canonical artifact stays available to developers (it is text under version control). This is the
+same "AI proposes; humans dispose" contract, stated as the interaction model (ADR-0019).
 
 ### "Every decision can explain itself."
 Provenance is a first-class **DecisionRecord** domain object, not a logging side effect. It
@@ -176,8 +188,9 @@ canonical flow format is CNCF-Serverless-Workflow-aligned, not any engine's nati
 ### "Pluggable by SPI, batteries included."
 Rule engine, orchestration, persistence, identity broker, and authorization are all behind
 SPIs — but every SPI ships a supported default (Apache KIE/Drools, Temporal, PostgreSQL,
-Keycloak, OpenFGA+Cedar/OPA). A newcomer is productive with zero plugin choices; an enterprise
-can swap any layer without forking.
+Keycloak, OpenFGA). A newcomer is productive with zero plugin choices; an enterprise
+can swap any layer without forking. (**v1 authz is OpenFGA only**; Cedar/OPA ABAC is a post-v1 /
+Enterprise add-on behind the same PDP interface — ADR-0010, ADR-0017.)
 
 ### "Same code from laptop to zoned HA."
 There is one application codebase. The Dev tier (single binary, embedded store), Team tier
@@ -210,6 +223,27 @@ enforcement boundary.
 - **G8** — Deep, bitemporal auditability sufficient for regulated decisioning (FCRA/ECOA/GDPR
   Art. 22-class requirements).
 
+## 5.1 Phasing overview — v1 kernel · v1-optional · post-v1
+
+Not everything ships at once. ichiflow has an explicit, ruthless **v1 kernel**, a **v1-optional** ring
+(ships, off by default, behind SPIs), and a **post-v1** ring (ADR-0017). Each deep-dive doc carries a
+phasing table aligned to this overview.
+
+- **v1 kernel** — the schema core (TypeSpec→OpenAPI/JSON Schema) · Decisions (DMN/Drools behind the
+  SPI) · Flows/Cases (interpreter, human-task/SLA/escalation) · the **domain entity store**
+  (ADR-0018) · **one Portal** archetype (back-office) · **basic Adapters** (native REST, one message
+  broker, webhook) · DecisionRecord / *why* API · the Dev tier. Governance defaults **off** at Dev.
+- **v1-optional** — ships but off by default, behind SPIs: Apicurio registry, Keycloak broker,
+  Cedar/OPA ABAC layer, Camel-on-Quarkus heavy adapters, Debezium CDC, immudb ledger.
+- **post-v1** — GoRules ZEN second engine, Zitadel, self-service SSO/SCIM, Atlas/pgroll Ring-2, all
+  **Copilots** (Domain Modeling, Migration, Rule Authoring, UI/Design — Ring-0 mapping ships as
+  declarative data without the Copilot), MCP Tier-2 prod-mutating, and the **Enterprise compliance
+  pack** (OpenLineage/BCBS-239 lineage, wide-event store, trigger-based bitemporal history).
+
+**Governance scales with tier, not by fiat:** the governance-level dial defaults to **off** (Dev),
+**light** (Team), **full** (Enterprise) — ADR-0017, [`03-decision-layer.md`](03-decision-layer.md)
+§5.6.
+
 ## 6. Non-goals (explicit)
 
 - **Not a general-purpose PaaS or app builder.** ichiflow is opinionated about the enterprise-
@@ -231,6 +265,10 @@ enforcement boundary.
   storage SPIs; ichiflow does not assume one warehouse or ledger.
 - **Not a low-code black box.** Declarative does not mean opaque: every artifact is human- and
   agent-legible text under version control.
+- **Not a visual/drag-and-drop authoring tool.** There is no visual-builder canvas for flows,
+  decisions, or screens. Authoring is AI-chat-first; previews are read-only projections of the
+  canonical artifacts, and developers edit those artifacts directly ("Chat to author, preview to
+  judge"; ADR-0019).
 
 ## 7. Positioning — one honest paragraph each
 
@@ -285,9 +323,10 @@ window onto.
 
 - **How close to Decision Center must v1 get?** The governance/simulation layer is the hardest
   and most differentiating build. What is the minimum viable governance surface for v1 vs later?
-  The **governance-level dial** (off/light/full) in [`03-decision-layer.md`](03-decision-layer.md)
-  §5.6 is the first answer — governance ceremony scales with tier rather than being a fixed
-  constant; the residual question is the *default* level per tier.
+  The **governance-level dial** (off/light/standard/full) in
+  [`03-decision-layer.md`](03-decision-layer.md) §5.6 answers this: governance ceremony scales with
+  tier, and the **defaults are now decided — Dev=off, Team=light, Enterprise=full** (ADR-0017). The
+  residual question is only *how close the `full` surface gets to Decision Center*, not the dial.
 - **Second rule engine timing.** DMN is canonical and Drools is the reference engine; when does
   the GoRules ZEN (TS/edge) engine become a supported tier rather than a planned one?
 - **Managed offering.** Non-goal for now — but the boundary between "self-hosted framework" and

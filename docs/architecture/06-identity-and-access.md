@@ -8,9 +8,11 @@ and **what may they do here, now, on this resource** (authorization). It specifi
 - **AuthN** — a *broker-per-audience* identity architecture (Keycloak primary; Zitadel for B2B2C
   multi-IdP-per-tenant), a thin TS-edge session layer, a pluggable strategy SPI, and OAuth2 Token
   Exchange (RFC 8693) for identity propagation to downstream services.
-- **AuthZ** — a central Policy Decision Point (PDP) built from a hybrid of OpenFGA (relationship
-  backbone) and Cedar/OPA (attribute/feature/field-level policy), an entitlements model ("features and
-  attributes"), and the rule that *one* PDP decision shapes both generated APIs and generated UIs.
+- **AuthZ** — a central Policy Decision Point (PDP) whose contract is fixed regardless of engine mix;
+  **v1 runs OpenFGA only** (relationship backbone + list-filtering + simple attribute conditions), with
+  the **Cedar/OPA ABAC** layer (rich attribute/feature/field-level policy) a post-v1/Enterprise add-on
+  behind the same interface — the hybrid being the target end-state (ADR-0010). One entitlements model
+  ("features and attributes") and the rule that *one* PDP decision shapes both generated APIs and UIs.
 - **Governance** — policy authoring/testing in the Workspace, authz decision logs that feed the
   DecisionRecord, multi-tenancy, and **non-human identities** (AI agents as first-class principals).
 
@@ -263,20 +265,27 @@ sit DMZ-side and never hold sensitive core state.
 Authorization is externalized into a **central Policy Decision Point (PDP)** — a thin ichiflow "authz
 gateway" that both the generated API layer and the generated UI layer call with
 `(principal, action, resource, context)` and receive `allow | deny + reason` (`BRIEF.md` §8,
-`../research/04` B.2). No single authz model wins, so the PDP is a **hybrid** of two engines behind one
-facade:
+`../research/04` B.2). The **PDP contract is fixed regardless of how many engines sit behind it**
+(ADR-0010, amended), and the engine mix is **phased**:
 
-| Concern | Engine | Why |
+| Concern | Engine | Phase |
 |---|---|---|
-| **Relationships / ReBAC** — "who is related to this record/tenant", "list every resource I can see" | **OpenFGA** (Zanzibar-style, Apache-2.0, CNCF) | Reverse-index "list objects" queries — exactly what a generated list view/API needs; multi-tenant member-of hierarchies |
-| **Attributes / features / field-level — ABAC** | **Cedar** (Apache-2.0, formally analyzable) primary; **OPA/Rego** as the single-engine alternative | Feature/attribute entitlements, row/field masks; deterministic, explainable-by-design decisions with diagnostics |
-| **Coarse gating — RBAC** | expressed *within* Cedar/OPA over `principal.roles` | Portal/job-function gating without a third engine |
+| **Relationships / ReBAC** — "who is related to this record/tenant", "list every resource I can see"; row-level "who can see this"; multi-tenant member-of hierarchies; **coarse RBAC** (roles as relationships) and **simple attribute conditions** (OpenFGA conditional relationships) | **OpenFGA** (Zanzibar-style, Apache-2.0, CNCF) | **v1** (v1-kernel authz) |
+| **Rich attributes / features / field-level masking — ABAC**; formal analysis | **Cedar** (Apache-2.0, formally analyzable) primary; **OPA/Rego** alternative | **post-v1 / Enterprise add-on** |
 
-**OpenFGA supplies the *filter set*** ("which rows/objects"); **Cedar/OPA supplies the *field masks and
-feature gates*** ("which columns/actions/features"). The PDP composes them into one answer. OPA/Rego is
-an acceptable *single-engine substitute* where a team prefers one policy language and values its
-best-in-class decision-log maturity; the engine choice is a `PolicyEngine` SPI binding, not an
-architectural fork. Casbin is reserved for isolated in-process enforcement only.
+- **v1 = OpenFGA only.** ReBAC backbone + list-filtering + simple attribute conditions cover v1's
+  relationships, multi-tenancy, row-level access, coarse RBAC, and simple attribute gates. Field-level
+  masking in v1 is limited to what OpenFGA relationships can express.
+- **Cedar/OPA ABAC = post-v1 / Enterprise add-on**, introduced **behind the same PDP facade** for rich
+  attribute/feature/field-level policy and formal analysis. Adding it is a `PolicyEngine` SPI binding,
+  **not a day-one dual-engine composition** — v1 does not run two engines or compose
+  filter-set ∩ field-masks across them.
+
+**The hybrid two-engine model remains the target end-state.** In that end-state OpenFGA supplies the
+*filter set* ("which rows/objects") and Cedar/OPA supplies the *field masks and feature gates* ("which
+columns/actions/features"), and the PDP composes them into one answer; OPA/Rego is the acceptable
+single-engine ABAC substitute where a team prefers one policy language. Casbin is reserved for isolated
+in-process enforcement only.
 
 The PDP is the **Policy Decision Point**; the generated API and UI are **Policy Enforcement Points
 (PEPs)**. OpenFGA's relationship tuples are a stateful graph that must stay in sync with business data —
@@ -465,7 +474,7 @@ bespoke path (`../research/07` §5.2–5.3).
 |---|---|---|
 | Broker per audience (Keycloak), realm-per-Portal | ✅ | Zitadel binding for heavy B2B2C multi-IdP |
 | TS-edge session (Better Auth), `AuthStrategy` SPI, legacy-wrap | ✅ | Richer strategy catalog (passkey/mTLS breadth) |
-| Central PDP: OpenFGA + Cedar; API+UI enforcement; decision logs | ✅ | OPA/Rego as alternate engine binding at parity |
+| Central PDP: **OpenFGA only** (ReBAC + list-filtering + simple attribute conditions); API+UI enforcement; decision logs | ✅ | **Cedar/OPA ABAC** layer (rich attribute/feature/field-level, formal analysis) behind the *same* PDP interface — Enterprise/post-v1 (ADR-0010) |
 | Token exchange (RFC 8693), delegation/impersonation logging | ✅ | Cross-trust-domain chaining tooling for M&A |
 | Policy versioning + golden tests + simulation in Workspace | ✅ | Cedar formal-analysis property proofs in CI |
 | Agent NHI: JIT, short-lived, owner, kill switch, per-action audit | ✅ | Risk-scored JIT duration automation; governance-profile mapping |
@@ -475,10 +484,11 @@ bespoke path (`../research/07` §5.2–5.3).
 
 ## Open questions
 
-1. **Cedar vs OPA as the default ABAC engine.** Cedar wins on formal analyzability and safety; OPA wins on
-   decision-log maturity and one-language infra+app policy. Ship both behind the `PolicyEngine` SPI, but
-   which is the *documented default* for the reference distribution? (Leaning Cedar for explainability;
-   revisit with a policy-authoring UX study.)
+1. **Cedar vs OPA as the default ABAC engine (post-v1).** Since the ABAC layer is a post-v1/Enterprise
+   add-on behind the PDP interface (§2.1, ADR-0010), this is now a *post-v1* decision. Cedar wins on
+   formal analyzability and safety; OPA wins on decision-log maturity and one-language infra+app policy.
+   Ship both behind the `PolicyEngine` SPI; which is the *documented default* when the ABAC layer lands?
+   (Leaning Cedar for explainability; revisit with a policy-authoring UX study.)
 2. **ReBAC tuple sync mechanism.** Write-through from the mutating transaction vs CDC (Debezium) tailing
    the WAL — the former is simpler to reason about, the latter decouples but adds lag. Confirm the default
    and the latency budget for "list what I can see" at target scale.

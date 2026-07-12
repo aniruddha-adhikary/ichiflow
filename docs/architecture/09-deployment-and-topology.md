@@ -185,9 +185,9 @@ bundled, and which are deferred to Team+:
 | **Decision core / Drools (KIE)** | JVM library, **in-process** behind the Decision Engine SPI |
 | **Flow interpreter (TS) + Case services (Kotlin)** | **in-process — but two runtimes** (Node + JVM); see the note below |
 | **Schema pipeline (TypeSpec→OpenAPI/JSON Schema), JSON Forms, generated types** | **file-based**, build-time; no server |
-| **Cedar / OPA (ABAC)** | **embedded** (a library, not a server), in-process |
+| **OpenFGA (ReBAC) — v1 authz engine** | **bundled dev-server** started by the binary (in-memory / SQLite store), like Temporal — v1 authz is OpenFGA only (ADR-0010) |
+| **Cedar / OPA (ABAC)** | **not in v1**; the ABAC layer is a post-v1 / Enterprise add-on behind the same PDP interface (embeddable as a library when it lands) |
 | **Keycloak (IdP broker)** | **deferred to Team+**; dev uses a **built-in dev IdP** (static users) behind the identity SPI |
-| **OpenFGA (ReBAC)** | **deferred to Team+** (a server); see the flagged authz note below |
 | **Apicurio (registry)** | **deferred to Team+**; dev uses **file-based** schema artifacts |
 | **Camel-on-Quarkus (heavy adapters)** | **deferred to Team+**; dev uses **native REST/webhook** paths |
 | **Debezium (CDC)** | **deferred to Team+** |
@@ -196,16 +196,19 @@ bundled, and which are deferred to Team+:
 Two honest admissions follow. (1) The core is genuinely **two runtimes** — a JVM (Kotlin activities,
 Drools, domain services) and Node (the TS interpreter workflow + BFFs) — so "single binary" means
 "single launch + embedded store," *not* "one runtime"; the JVM/Node split is a permanent operational
-and debugging cost, not hidden by the dev packaging. (2) Server-shaped components (Keycloak, OpenFGA,
-Apicurio, Camel-on-Quarkus, Debezium) **cannot run in-process** in the dev binary and are Team+
-bindings behind their SPIs; the dev tier substitutes lighter in-process defaults (built-in dev IdP,
-embedded Cedar/OPA, file-based schema artifacts, native adapter paths).
+and debugging cost, not hidden by the dev packaging. (2) Server-shaped components (Keycloak, Apicurio,
+Camel-on-Quarkus, Debezium) **cannot run in-process** in the dev binary and are Team+ bindings behind
+their SPIs; the dev tier substitutes lighter defaults (built-in dev IdP, file-based schema artifacts,
+native adapter paths). **OpenFGA** is the exception among the servers: because it is the **v1 authz
+engine**, the dev binary bundles an OpenFGA **dev-server** (as it bundles Temporal), so ReBAC
+row-filtering behaves the *same* in dev as in Enterprise.
 
-**Flagged, not decided here.** These substitutions mean "same app code, config only" carries
-**bounded exceptions** — e.g. OpenFGA ReBAC relationship-based row-filtering is simply absent in a
-single-engine dev tier, so a list view that relies on it behaves differently in dev than in
-Enterprise. Whether to formalize those exceptions (and whether v1 collapses authz to a single engine
-with OpenFGA as a Team+ opt-in) is a founder decision, not resolved by this table.
+**Authz exception — resolved.** The previously-flagged tension is settled (ADR-0010, ADR-0017):
+**v1 authz is OpenFGA only**, bundled in dev, so there is no single-engine-vs-dual mismatch and no
+"row-filtering absent in dev" gap. The **Cedar/OPA ABAC** layer (rich attribute/feature/field-level
+policy) is a **post-v1 / Enterprise add-on behind the same PDP interface**; its absence in v1 is a
+phasing boundary, not a dev-vs-prod behavioural exception. "Same app code, config only" holds for the
+v1 authz surface.
 
 ### 3.2 Team tier — docker compose / small K8s + Postgres
 

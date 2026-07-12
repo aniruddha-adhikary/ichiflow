@@ -77,9 +77,11 @@ uischemas, Adapters, policies. Its structure is deliberately optimized for agent
 "declare, don't code" synergy):
 
 - **Declarative artifacts are the source of truth, not code.** A Schema is TypeSpec →
-  OpenAPI/JSON Schema; a Decision is DMN; a Flow is CNCF-Serverless-Workflow-aligned YAML; an
-  Adapter is an AsyncAPI/OpenAPI-described port (locked decisions §2, §5). These are **data an agent
-  can propose and a human can diff** — the same rationale as contract-first APIs.
+  OpenAPI/JSON Schema; a Decision is DMN; a Flow is CNCF-Serverless-Workflow-aligned **canonical
+  JSON** — which an agent authors as **typed TS/Kotlin flow-builder code (compiled one-way to the
+  canonical JSON), YAML, or via AI chat** (doc 04 §2.5, ADR-0004), with `authored-in` provenance on the
+  result; an Adapter is an AsyncAPI/OpenAPI-described port (locked decisions §2, §5). These are **data
+  an agent can propose and a human can diff** — the same rationale as contract-first APIs.
 - **Generated types are checked in.** Fabrikt (Kotlin) and hey-api/orval (TS) outputs are committed
   to the repo (locked decision §5), so an agent sees the full typed surface without a build step and
   a reviewer diffs generated changes alongside the artifact that produced them.
@@ -109,8 +111,9 @@ guaranteed automation · MCP = external services · Plugin = the packaging unit.
 | **SessionStart hook + `ichiflow verify` skill** | Hooks/Skills | ensure a fresh session can build, run tests, launch the dev server | Productive in minute one (esp. Claude Code on the web / CI) |
 
 The five **core build-time skills** map one-to-one onto the declarative artifacts: `add-schema`
-(TypeSpec + regenerate), `add-decision` (DMN authoring + simulate), `add-flow` (Serverless-Workflow
-YAML), `add-adapter` (AsyncAPI/OpenAPI port + boundary validation), `run-parity-tests` (decision
+(TypeSpec + regenerate), `add-decision` (DMN authoring + simulate), `add-flow` (typed flow-builder code
+or Serverless-Workflow YAML → canonical JSON, with a `compute` step for typed computation, doc 04
+§2.5–§2.6), `add-adapter` (AsyncAPI/OpenAPI port + boundary validation), `run-parity-tests` (decision
 parity harness, research 06 §A.6.3 — legacy-vs-migrated DMN over a golden dataset).
 
 ### 2.3 Headless CI recipes
@@ -282,14 +285,22 @@ verification is against the real failing Case. ichiflow **integrates** with on-c
 
 ---
 
-## 7. The governed Copilots — framework features
+## 7. The governed Copilots — framework features (post-v1)
 
 The Copilots are **framework features with hard guardrails**, not a chat bolt-on (locked decision
-§12, §13; research 06). All obey **"AI proposes; deterministic tools + humans dispose,"** with
-**provenance on every proposal**. The three core Copilots (BRIEF vocabulary) target the business
-user and the migrator; a fourth, **design-facing** Copilot rides the identical guardrail DNA to give
-the UX-designer persona an AI on-ramp that is peer to the business user's (its omission would be a
-tell that designers are second-party):
+§12, §13; research 06). **All Copilots are post-v1** (ADR-0017): the packaged Copilot UX ships after
+v1, but — crucially — the artifacts they assist with are **plain declarative data** authorable by a
+human or agent *without* the Copilot (Ring-0 migration mapping is data, DMN and uischema/pageschema are
+authored directly), so greenfield, brownfield, and design on-ramps all survive the deferral. In v1,
+assistance is the **AI-chat-first authoring doctrine** (ADR-0019; "Chat to author, preview to judge"):
+the AI authors the canonical artifact from conversation and the human judges via read-only preview /
+simulation — the Copilots below are that same interaction pattern, packaged and specialized per persona.
+
+All obey **"AI proposes; deterministic tools + humans dispose,"** with **provenance on every
+proposal**. The three core Copilots (BRIEF vocabulary) target the business user and the migrator; a
+fourth, **design-facing** Copilot rides the identical guardrail DNA to give the UX-designer persona an
+AI on-ramp that is peer to the business user's (its omission would be a tell that designers are
+second-party):
 
 | Copilot | Direction | What it does | Deterministic backstop |
 |---|---|---|---|

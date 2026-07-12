@@ -60,7 +60,12 @@ An **Adapter** declaration has three schema'd parts:
      **pure**, **trace-emitting** artifact — validated at the boundary by the same runtime validators
      as every other adapter, emitting a `decisionLog`/trace entry on any branch (§7) exactly like a
      declarative mapping, and carried by a versioned `ref` so a contract bump pairs with a reviewable
-     mapping change (§9).
+     mapping change (§9). It is the **same unified code-activity contract** as a Flow `compute` step
+     ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.6) and a Decision feature-function
+     ([03-decision-layer.md](./03-decision-layer.md) §2.4) — one primitive
+     (`ref: <lang>://<module>/<Name>@<version>` + boundary JSON Schema + trace), not three different
+     hatches (BRIEF vocabulary "compute step / code activity", ADR-0004) — with the **added purity
+     constraint** below, which is specific to mappings.
    - **DataWeave** — import-only, to migrate customers arriving from MuleSoft; not an ichiflow runtime.
    - **JOLT** — **not in v1** (redundant with JSONata on the JVM for structural JSON remaps); revisit
      only if a concrete need appears.

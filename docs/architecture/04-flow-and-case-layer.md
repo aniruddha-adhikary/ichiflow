@@ -8,7 +8,9 @@
 How ichiflow runs long-running business processes and human work: **Flows** (declarative,
 long-running process definitions) and the first-party **Case & Task** module (manual review,
 assignment, SLA, escalation). It covers the durable-execution substrate (Temporal), the ichiflow
-**Flow DSL** and its generic interpreter, the step-type catalogue, the multi-language worker
+**Flow DSL** and its generic interpreter, the step-type catalogue (including the first-class
+**`compute`** code-activity step), the **three authoring surfaces** (typed code | YAML | AI chat) that
+compile to one canonical Flow, the multi-language worker
 topology, the Case/Task contract that Portals consume, how event history feeds the
 **DecisionRecord**, and the testing / evolution / failure semantics for processes that live for
 months.
@@ -103,6 +105,7 @@ deterministic interpreter operation and/or an activity invocation.
 |---|---|---|
 | **decision-eval** | Evaluate a DMN **DecisionModel** and branch/annotate on the result | Activity on the Kotlin rule-eval queue (Decision Engine SPI) |
 | **adapter-call** | Send/request through a declared **Adapter** (outbound port) | Activity on the TS integration queue → canonical bus ([05-adapters.md](./05-adapters.md)) |
+| **compute** | Run a typed **code activity** for computation that is neither a Decision nor an Adapter — inter-step data reshaping, loop accumulation, derived state (§2.6) | Activity on a generic code-activity queue; versioned `ref` + schema'd I/O + trace emission |
 | **human-task** | Raise a **Task**, block until resolved | `createTask` activity + **await-signal** with an **SLA timer** (§5) |
 | **timer / SLA** | Durable wait (wall-clock or business-calendar) | Temporal timer; deterministic in the interpreter |
 | **parallel / branch** | Fan-out concurrent branches; join on all/any/quorum. When branches are per-authority Decisions, the join emits a **`CompositeOutcome`** under a declared composition policy (§5.7), not an ad-hoc FEEL merge | Interpreter child scopes over multiple activities |
@@ -130,15 +133,15 @@ modes are consistent across every workflow DSL that has tried it:
    computed list), not a fixed set of declared branches.
 4. **Error-handling that derives new state** (beyond saga-compensation-as-declared-steps, §10).
 
-Above that line, a well-named unit of **typed Kotlin/TS run behind an activity** (the same kind of
-typed activity as `decision-eval` and `adapter-call`, §2.3 table) is *more* legible and diffable than
-sprawling inline expression — and stays on the audit spine because the activity is schema'd at its
-boundary and emits a trace like any other step. Below the line (a graph of named steps, a fixed set
-of guarded branches) YAML's comprehension/audit/portability advantage dominates and the flow stays
-declarative. The concrete step-level mechanism for arbitrary inter-step computation — a first-class
-code/compute step — is a proposed DSL extension under design (Open questions); today, computation
-that a Decision or Adapter does not own is pushed into a typed activity rather than inline
-FEEL/JSONata.
+Above that line, computation runs in a first-class **`compute` step** (§2.6) — a typed Kotlin/TS
+**code activity** (the same kind of typed activity as `decision-eval` and `adapter-call`, §2.3 table)
+that is *more* legible and diffable than sprawling inline expression, and stays on the audit spine
+because the activity is schema'd at its boundary and emits a trace like any other step. Below the line
+(a graph of named steps, a fixed set of guarded branches) YAML's comprehension/audit/portability
+advantage dominates and the flow stays declarative. The `compute` step is the **step-level** hatch —
+it keeps the declarative graph intact and drops *only the computation* into typed code — so the coarse
+"drop the whole flow to raw Temporal SDK" hatch (ADR-0004) recedes to a last resort for genuinely
+code-shaped *orchestration* only.
 
 ### 2.4 Scheduled and batch triggers
 
@@ -152,6 +155,70 @@ not a bespoke cron job**. Because the trigger resolves to a Temporal Schedule an
 ordinary interpreter steps, scheduled/batch Flows inherit the same durability, replay-audit, and
 DecisionRecord wiring as command-triggered Flows, and respect the same idempotency and per-Case
 version pinning (§2.2) as any other Flow instance.
+
+### 2.5 Flow authoring surfaces (typed code | YAML | AI chat)
+
+A Flow has **three authoring surfaces**, but exactly **one canonical artifact**. The **canonical Flow
+JSON is the single executed, audited, and exported artifact** ([BRIEF.md](./BRIEF.md) §2; ADR-0004);
+the surfaces are ways to *produce* it, not competing representations of it.
+
+- **Typed TS/Kotlin flow builder.** Steps, guards, and event listeners authored as **pure typed code**
+  — IDE autocomplete, refactoring, compile-time step-wiring checks, and host-language loops/conditionals
+  to *generate* the graph. It compiles **one-way** to the canonical Flow JSON, exactly the
+  **TypeSpec→OpenAPI two-layer pattern** ([02-schema-foundation.md](./02-schema-foundation.md) §1): the
+  emitted JSON is checked in and human-primary. **No round-trip is promised** — you do not regenerate
+  the builder from hand-edited JSON — and a single flow is never a persistent mix of hand-YAML and
+  builder output.
+- **YAML.** Simple flows are authored as canonical YAML/JSON directly — the business-user-readable,
+  diffable, portable surface that remains primary for straightforward graphs.
+- **AI chat.** Under the authoring doctrine (ADR-0019; doc 00 "Chat to author, preview to judge"), the
+  AI writes the canonical flow from conversation; the human judges it via the **read-only flow diagram
+  projection** (§6) and scenario **simulation** (§8), and approves the **diff + preview** pair.
+
+Every Flow records **`authored-in: code | yaml | ai-chat`** provenance ([BRIEF.md](./BRIEF.md)
+vocabulary "authored-in"), so a reviewer knows which surface produced the canonical artifact — while
+governance, simulation, versioning, and the interpreter all key off the canonical JSON regardless.
+
+**A visual/drag-and-drop flow builder is a non-goal** (doc 00 non-goals; ADR-0019). The Mermaid flow
+diagram (§6) is a **read-only projection** rendered *from* the canonical Flow, the surface a human
+*judges* a change on — never a second editable canvas that could drift from the artifact.
+
+### 2.6 The `compute` step — first-class typed code activity
+
+The `compute` step (§2.3 catalogue) is the first-class primitive for computation a Decision or Adapter
+does not own. It keeps the flow graph declarative while moving genuine computation off inline
+FEEL/JSONata into typed Kotlin/TS:
+
+```yaml
+# a compute step — keeps the graph declarative, moves computation to typed code
+- id: prepare-underwriting-context
+  type: compute                                   # alongside decision-eval / adapter-call
+  ref: kt://underwriting/PrepareContext@2.1.0     # registered, versioned code activity (Kotlin or TS)
+  input:  { schema: schema://underwriting/PrepareContextInput/1 }    # schema'd at the boundary
+  output: { schema: schema://underwriting/PrepareContextOutput/1 }
+  # runs as an ACTIVITY (determinism-safe); emits a typed trace exactly like decision-eval
+```
+
+Four properties keep it on the audit spine:
+
+- **Schema'd at the boundary** — input/output JSON Schema, validated by the same runtime validators as
+  every adapter/decision ("one schema, no drift").
+- **Declared in the flow** — referenced by versioned `ref`, so the graph stays complete and a reviewer
+  sees "compute step X runs here between the decision and the emit."
+- **Unit-testable** in its native language **and stub-able** at the flow boundary — a scenario test
+  (§8) stubs its output exactly like a decision outcome.
+- **Trace-emitting** — writes a typed trace entry (input snapshot, output, `ref` version, timing) into
+  the DecisionRecord, so it appears in the *why* API alongside `decision-eval`.
+
+Because it is an **activity**, it never threatens the interpreter's determinism (§2.2). This is the
+**same unified code-activity contract** as a Decision **feature-function**
+([03-decision-layer.md](./03-decision-layer.md) §2.4) and an Adapter **code-transform**
+([05-adapters.md](./05-adapters.md) §1) — one primitive
+(`ref: <lang>://<module>/<Name>@<version>` + boundary JSON Schema + trace), not three weaker,
+layer-specific hatches (BRIEF vocabulary "compute step / code activity", ADR-0004). It carries the same
+non-portability discipline as the DRL/feature-function hatch — schema'd I/O + golden datasets so
+behaviour is *specified* even though the code does not port, denting the workspace portability score
+(G6).
 
 ---
 
@@ -530,9 +597,10 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
 - **Long-history mitigation.** Months-long, signal-heavy cases can grow large event histories;
   continue-as-new checkpointing strategy and its interaction with DecisionRecord projection need a
   concrete policy.
-- **A first-class code/compute step for inter-step computation.** §2.3 pushes non-trivial inter-step
-  computation into typed activities rather than inline FEEL/JSONata. Whether to add a first-class
-  `compute` step type — a schema'd, versioned, trace-emitting code activity alongside
-  `decision-eval`/`adapter-call`, so computation is a *declared* graph node rather than the current
-  coarse "drop to raw Temporal SDK for the whole flow" hatch — is a proposed DSL extension pending an
-  ADR.
+- **First-class `compute` step — decided (ADR-0004, amended).** The `compute` step is now a
+  first-class step type (§2.6): a schema'd, versioned, trace-emitting code activity alongside
+  `decision-eval`/`adapter-call`, so inter-step computation is a *declared* graph node and the coarse
+  "drop the whole flow to raw Temporal SDK" hatch recedes to a last resort. It shares one unified
+  code-activity contract with decision feature-functions and adapter code-transforms. The residual
+  detail is the generic code-activity worker's task-queue topology and its cold-start/versioning story
+  under load — an implementation question, not a design one.

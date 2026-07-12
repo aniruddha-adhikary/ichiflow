@@ -33,14 +33,15 @@ one-liners below say what it is and how it plugs into its neighbors. Naming foll
 | Module | What it is | Composes with | Deep dive |
 |---|---|---|---|
 | **Schema foundation** | The canonical typed model. Authored in TypeSpec; emits OpenAPI 3.1 / JSON Schema 2020-12 / AsyncAPI 3.1 as the checked-in contracts. Every type, validator, form, and message payload derives from it. | Feeds *everything* — it is the single source of truth. | [`02-schema-foundation.md`](02-schema-foundation.md) |
+| **Domain entity store** (v1-kernel) | Schema-defined business entities (the `LoanApplication` record itself) persisted PostgreSQL-first via **generated repositories/CRUD services** with a query/pagination/search contract. CRUD + audit-log + outbox — *not* event-sourced. | Consumed by generated Portals (list/detail/form) and Flows; row-filtered by the PDP; referenced by `case_id`. | [`02-schema-foundation.md`](02-schema-foundation.md) §11 |
 | **Decision layer** | Rule-evaluated determinations. Authored as DMN (DRD + FEEL); evaluated by an Engine behind the Decision Engine SPI (Drools reference; ZEN planned). Adds the governance/simulation/explainability layer Drools lacks. | Called by Flows and Adapters; emits fired-rule traces to the DecisionRecord. | [`03-decision-layer.md`](03-decision-layer.md) |
 | **Flow & Case layer** | Declarative long-running processes (JSON/YAML, CNCF-Serverless-Workflow-aligned) interpreted on Temporal. A **Case** is the unit of work carrying `case_id` + DecisionRecord; **Tasks** are human work items (assignment, SLA, escalation); manual review is a first-party module. | Invokes Decisions; drives Portals via Tasks; writes to Audit. | [`04-flow-and-case-layer.md`](04-flow-and-case-layer.md) |
 | **Adapters** | Declared, schema'd, versioned ports in/out: REST, MQ/JMS/Kafka/AMQP, file/SFTP, SOAP, webhook, CDC. Inbound normalizes to a canonical command/event; outbound de-normalizes from canonical. | Bridge the outside world to the canonical bus; never leak broker clients into the core. | [`05-adapters.md`](05-adapters.md) |
-| **Identity & Access** | Identity brokers per audience (Keycloak primary), OIDC/SAML/LDAP/legacy via broker strategies, token exchange for propagation; a central PDP (OpenFGA ReBAC + Cedar/OPA ABAC) whose decisions are themselves explainable logs. | Guards every Adapter, Portal, Flow action, and agent; the *same* PDP drives API and UI. | [`06-identity-and-access.md`](06-identity-and-access.md) |
+| **Identity & Access** | Identity brokers per audience (Keycloak primary), OIDC/SAML/LDAP/legacy via broker strategies, token exchange for propagation; a central PDP (**v1: OpenFGA** ReBAC + simple attribute conditions; Cedar/OPA ABAC is a post-v1/Enterprise add-on behind the same PDP interface) whose decisions are themselves explainable logs. | Guards every Adapter, Portal, Flow action, and agent; the *same* PDP drives API and UI. | [`06-identity-and-access.md`](06-identity-and-access.md) |
 | **Portals / UI** | Audience-scoped UI + BFF (back-office, customer, partner), each with its own IdP config and entitlements. Auto-generated from schemas via the JSON Forms model; designer overrides are durable. | Render Tasks and Cases; enforce field/row-level authz from the PDP. | [`07-ui-and-portals.md`](07-ui-and-portals.md) |
 | **Audit & DecisionRecord** | The per-`case_id` DecisionRecord domain object + the "why" API. Stitches workflow history + rule traces + DMN results + human review + agent actions into one causal, bitemporal chain. | Written to by Decisions, Flows, Portals, agents; read by auditors and `ichiflow-mcp`. | [`08-audit-and-observability.md`](08-audit-and-observability.md) |
 | **AI-native surfaces** | In-repo agent kit (`AGENTS.md`, `.claude/` skills/hooks/subagents/plugin) for build time + the first-party **`ichiflow-mcp`** runtime server exposing the why/case/flow query APIs under three server-enforced guardrail tiers. | Reads the DecisionRecord/Flow APIs; acts as a non-human identity under Identity & Access. | [`10-ai-native-experience.md`](10-ai-native-experience.md) |
-| **Copilots** | Domain Modeling Copilot (greenfield), Migration Copilot (brownfield), Rule Authoring assistance. All follow "AI proposes, deterministic tools + humans dispose," with provenance. | Operate on the Workspace and legacy DBs; gated by human approval + dry-run. | [`11-migration-in-and-out.md`](11-migration-in-and-out.md) |
+| **Copilots** (post-v1) | Domain Modeling Copilot (greenfield), Migration Copilot (brownfield), Rule Authoring assistance, UI/Design Copilot. All follow "AI proposes, deterministic tools + humans dispose," with provenance. **Deferred to post-v1**; in v1 their artifacts (Ring-0 mappings, DMN, uischema) are authored as plain declarative data under the AI-chat doctrine. | Operate on the Workspace and legacy DBs; gated by human approval + dry-run. | [`11-migration-in-and-out.md`](11-migration-in-and-out.md) |
 
 The composition rule that ties them together: **the Schema foundation is the hub, and the
 canonical command/event bus is the spine.** Adapters translate the world into canonical
@@ -70,7 +71,7 @@ flowchart TB
     DEC["Decision layer<br/>(DMN via Engine SPI — Drools)"]
     CASE["Case + Task store<br/>(manual review, SLA, escalation)"]
     AUDIT["Audit & DecisionRecord<br/>(why API, bitemporal)"]
-    PDP["PDP (OpenFGA + Cedar/OPA)"]
+    PDP["PDP (v1: OpenFGA;<br/>Cedar/OPA ABAC post-v1)"]
     BO["Back-office Portal (UI + BFF)"]
   end
 
@@ -233,6 +234,22 @@ Adapters run in the DMZ**, the Decision/Flow/Case **core runs in the intranet**,
 zones communicate only over a **one-way async relay / message replication** (up to hardware
 data-diode strictness for the most regulated adopters). Secrets stay in Vault/ESO; agent
 credentials are non-human identities under the same regime.
+
+---
+
+## 6. Phasing at a glance — v1 kernel · v1-optional · post-v1
+
+ichiflow ships in rings (full rationale in [`00-vision-and-principles.md`](00-vision-and-principles.md)
+§5.1 and ADR-0017); each deep-dive doc carries an aligned phasing table.
+
+| Ring | Contents |
+|---|---|
+| **v1 kernel** | Schema core (TypeSpec→OpenAPI/JSON Schema) · Decisions (DMN/Drools behind the SPI) · Flows/Cases (interpreter, human-task/SLA/escalation) · **Domain entity store** (generated CRUD/list/query, ADR-0018) · **one Portal** (back-office) · **basic Adapters** (native REST, one broker, webhook) · DecisionRecord / *why* API · Dev tier · authz = **OpenFGA only** |
+| **v1-optional** (ships, off by default, SPI-bound) | Apicurio registry · Keycloak broker · **Cedar/OPA ABAC** layer · Camel-on-Quarkus heavy adapters · Debezium CDC · immudb ledger |
+| **post-v1** | GoRules ZEN 2nd engine · Zitadel · self-service SSO/SCIM · Atlas/pgroll Ring-2 · **all Copilots** (Ring-0 mapping ships as declarative data without them) · MCP Tier-2 · **Enterprise compliance pack** (OpenLineage/BCBS-239, wide-event store, trigger-based bitemporal history) |
+
+Governance defaults scale with tier: **Dev=off · Team=light · Enterprise=full** (ADR-0017,
+[`03-decision-layer.md`](03-decision-layer.md) §5.6).
 
 ---
 

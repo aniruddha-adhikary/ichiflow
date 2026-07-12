@@ -9,16 +9,19 @@ MADR-style ADRs recording ichiflow's locked architecture decisions (see
 | [0001](0001-canonical-rule-representation-dmn.md) | Canonical rule representation is DMN 1.6 (DRD + FEEL); engine-native formats are quarantined escape hatches; interchange caveats mitigated | accepted |
 | [0002](0002-pluggable-decision-engine-spi-drools-default.md) | Pluggable Decision Engine SPI; Apache KIE/Drools default (JVM), GoRules ZEN second (TS/edge); vs Drools-monoculture and ODM | accepted |
 | [0003](0003-temporal-durable-execution-substrate.md) | Temporal (MIT) as the durable-execution substrate; vs Camunda 8 licensing, Flowable fallback, Kogito/Restate/DBOS/Conductor | accepted |
-| [0004](0004-declarative-flow-dsl-on-temporal.md) | Declarative CNCF-Serverless-Workflow-aligned Flow DSL interpreted on Temporal; vs raw SDK and BPMN-first | accepted |
+| [0004](0004-declarative-flow-dsl-on-temporal.md) | Declarative CNCF-Serverless-Workflow-aligned Flow DSL interpreted on Temporal; vs raw SDK and BPMN-first; amended with first-class `compute` code-activity step + one-way typed flow builder | accepted (amended 2026-07-12) |
 | [0005](0005-first-party-case-and-human-task-module.md) | First-party Case & Human-Task module; assignment routing is a Decision; vs BPMN engines' built-ins | accepted |
 | [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md) | TypeSpec authoring; emitted OpenAPI 3.1 / JSON Schema 2020-12 are the contract of record; TypeSpec swappable | accepted |
 | [0007](0007-kotlin-core-typescript-edges.md) | Kotlin core, TypeScript edges; generated types both sides; Temporal Kotlin = Java-SDK-extension caveat | accepted |
 | [0008](0008-jsonforms-model-ui-overrides.md) | JSON Forms model: independent uischema + tester/priority renderer registry; vs rjsf, scaffold-then-eject, app builders | accepted |
 | [0009](0009-identity-broker-per-audience.md) | Identity broker per audience (Keycloak primary, Zitadel B2B2C, Better Auth on TS edges, RFC 8693 propagation) | accepted |
-| [0010](0010-hybrid-authorization-openfga-plus-policy.md) | Hybrid authorization: OpenFGA ReBAC backbone + Cedar/OPA ABAC; one PDP for API and UI; decision logs | accepted |
+| [0010](0010-hybrid-authorization-openfga-plus-policy.md) | Hybrid authorization: OpenFGA ReBAC backbone + Cedar/OPA ABAC; one PDP for API and UI; decision logs; amended — v1 = OpenFGA only, Cedar/OPA ABAC is a post-v1/Enterprise add-on behind the same PDP interface | accepted (amended 2026-07-12) |
 | [0011](0011-decisionrecord-and-selective-event-sourcing.md) | Per-case DecisionRecord + "why" API; event-source core only; outbox elsewhere; bitemporal as-of | accepted |
 | [0012](0012-postgresql-first-storage-spis.md) | PostgreSQL-first storage with SPIs for audit/search/analytics; multi-DB correlation via case_id | accepted |
 | [0013](0013-modular-monolith-split-later.md) | Modular monolith by default, async-first boundaries, split later; tier ladder; zone separation from day one | accepted |
 | [0014](0014-map-first-migrate-last.md) | Map first, migrate last: three-ring brownfield model; Migration Copilot guardrails; decision parity testing; exit story | accepted |
 | [0015](0015-first-party-mcp-server-and-agent-kit.md) | First-party ichiflow-mcp server + in-repo agent kit; three server-enforced guardrail tiers; agents as NHIs | accepted |
 | [0016](0016-license-hygiene-policy.md) | License hygiene: Apache-2.0/MIT substrate preference; the specific avoid-list and why; CI license allowlist | accepted |
+| [0017](0017-v1-kernel-and-governance-dial.md) | The v1 kernel cut (schema + decisions + flows/cases + entity store + one portal + basic adapters + why API + dev tier); governance dial defaults (Dev=off / Team=light / Enterprise=full); Copilots + compliance pack post-v1 | accepted |
+| [0018](0018-domain-entity-store.md) | Domain entity store: schema-defined entities, PostgreSQL-first generated repositories + query/pagination/search contract; CRUD+outbox not event-sourced; ORM choice open | accepted |
+| [0019](0019-ai-chat-first-authoring.md) | AI-chat-first authoring for all personas; read-only live-preview projections to judge; no drag-and-drop/visual-builder canvases; direct artifact editing stays for developers | accepted |

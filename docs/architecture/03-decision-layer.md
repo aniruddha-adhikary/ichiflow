@@ -186,6 +186,15 @@ plus golden datasets, so its behaviour is *specified* even though the code does 
 counts against the workspace portability score (G6). CEL is reserved for internal platform-guard use
 (research 01 §3.7), not business logic.
 
+**The feature function is the *same* unified code-activity contract** as a Flow `compute` step
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.6) and an Adapter code-transform
+([05-adapters.md](./05-adapters.md) §1) — one primitive, not three different hatches (BRIEF vocabulary
+"compute step / code activity", ADR-0004). It is referenced by a versioned `ref`
+(`<lang>://<module>/<Name>@<version>`), schema'd at its input/output boundary, unit-testable and
+stub-able in scenario tests, and trace-emitting into the DecisionRecord. So "move computation to typed
+code" means the same governed, audited primitive everywhere it appears, whether the computation feeds
+a Decision, a Flow step, or an Adapter mapping.
+
 ### 2.5 Feature gating is a Decision
 
 Turning a business behaviour on or off for a segment, region, tenant, or time window is **not a code
@@ -367,28 +376,37 @@ required approvals, SLA timers, and escalation. Approvals, reviewers, diffs, and
 are recorded to the append-only DecisionRecord so "who approved this rule change, when, on what
 evidence" is answerable via the why API.
 
-### 5.3 Business-user authoring UX (v1 spans three modes)
+### 5.3 Business-user authoring UX — AI-chat-first, judged by live simulation (v1)
 
-Because BAL-style controlled natural language is materially more approachable than DRL (research 01
-§6.2), ichiflow gives business authors DMN-native surfaces plus AI assistance — never raw DRL.
+Per the authoring doctrine (ADR-0019; doc 00 "Chat to author, preview to judge"), a business user
+authors rules by **describing intent in chat** and **judging the result against live simulation** —
+**not** by manipulating a table-editor canvas. Because BAL-style controlled natural language is
+materially more approachable than DRL (research 01 §6.2) and FEEL's constrained surface makes LLM
+generation comparatively reliable (research 01 §3.1), the v1 loop is: *describe in chat ("decline if
+debt-to-income exceeds 43% unless the co-signer FICO is above 740") → the AI proposes a DMN decision
+table + FEEL → the user judges via a read-only decision-table view and what-if simulation → approve
+the diff.* ichiflow never exposes raw DRL to a business author.
 
-1. **Decision tables** — the primary surface. Boxed DMN decision tables with hit-policy support,
-   completeness/overlap checking (via `validate`), and inline FEEL cells. Spreadsheet
-   (Excel/OpenRules-style) import/export is supported (research 01 §3.6, §8) so analysts can work in
-   the tool they know.
-2. **Guided rules** — a structured, form-driven "when/then" builder that emits DMN + FEEL, giving a
-   BAL-like controlled-natural-language feel without a proprietary language. Business-readable,
-   deterministically compiled to the canonical format.
-3. **Natural-language-assisted authoring (AI, Rule Authoring Copilot)** — an author describes intent
-   in plain language ("decline if debt-to-income exceeds 43% unless the co-signer FICO is above
-   740"); the Copilot proposes a decision table / FEEL expression. This follows the framework-wide
-   contract **"AI proposes, deterministic tools + humans dispose"** (BRIEF vocab, research 06 §A.5):
-   the proposal is type-checked by `validate`, shown as a diff, must be human-approved, and — for any
-   released rule — must pass scenario + parity tests before it is authoritative. FEEL's constrained
-   surface makes LLM generation comparatively reliable (research 01 §3.1).
+- **The decision-table view is a read-only projection.** Boxed DMN with hit-policy, completeness/
+  overlap checking (via `validate`), and FEEL cells — rendered *from* the canonical DMN as the artifact
+  the user reads and diffs, **not a second editable representation** (a rendered view may reuse
+  **dmn-js** for display, but read-only, not as an editable canvas).
+- **Live what-if simulation is how the user judges** (§5.4): run the draft over sample or golden inputs
+  and see outputs + a human-readable trace before release. Simulation results are projections, the
+  business user's judgement surface.
+- **Direct DMN editing stays for developers.** The canonical DMN is text under version control;
+  **spreadsheet (Excel/OpenRules-style) import/export** (research 01 §3.6, §8) remains an *interchange*
+  path for analysts who maintain rate/eligibility tables in a sheet — an import into the canonical DMN,
+  not an in-app canvas.
+- **Guided articulation, not a builder.** A structured "when/then" way to state intent that emits
+  DMN + FEEL remains available as chat-adjacent scaffolding, deterministically compiled to the
+  canonical format — it is not a drag-and-drop builder.
 
-The editor component may embed **dmn-js** (Camunda's Apache/MIT-friendly, de-facto DMN editor) rather
-than building a DMN canvas from scratch (research 01 §3.3, §9).
+Every proposal follows the framework-wide contract **"AI proposes, deterministic tools + humans
+dispose"** (BRIEF vocab, research 06 §A.5): type-checked by `validate`, shown as a diff, human-approved,
+and — for any released rule — passing scenario + parity tests before it is authoritative. The **Rule
+Authoring** capability drives the chat loop; as a *packaged* **Copilot it is post-v1** (ADR-0017), but
+the AI-chat-and-simulate loop itself is the v1 business-user surface.
 
 ### 5.4 Simulation & scenario testing (analyst-facing)
 
@@ -419,16 +437,17 @@ baselines, coverage-threshold CI gates, effective-dating, formal analysis) is ri
 enterprise and crushing for a three-person team. The ceremony is therefore a **governance level**
 configured per Workspace (and defaulting by tier), not a fixed constant:
 
-| Level | Fits | Governance surface |
+| Level | Default tier | Governance surface |
 |---|---|---|
-| **light** | Dev / solo | git *is* the governance: states collapse to `draft`/`released`; approval = PR merge (no approval-Flow); coverage advisory, not gating |
-| **standard** | Team | governance states + PR-based approval; coverage gates optional |
-| **full** | Enterprise / regulated | approval-Flows (§5.2), immutable released baselines (§5.1), coverage thresholds (§6.2), effective-dating, formal analysis |
+| **off** | **Dev / solo (default)** | git is the *whole* surface: no governance states, no gates, no approval-Flow — the framework imposes nothing |
+| **light** | **Team (default)** | states collapse to `draft`/`released`; approval = PR merge (no approval-Flow); coverage advisory, not gating |
+| **standard** | Team (opt-in) | governance states + PR-based approval; coverage gates optional |
+| **full** | **Enterprise / regulated (default)** | approval-Flows (§5.2), immutable released baselines (§5.1), coverage thresholds (§6.2), effective-dating, formal analysis |
 
-Approval-as-a-Flow (§5.2), released baselines, and coverage gating are the **default (full)** posture
-and are unchanged by this dial; the lighter levels are an explicit opt-in for teams that do not need
-them. Which level is the *default per tier* — e.g. whether the Dev tier ships `light` out of the box
-— is deferred (Open questions §7).
+The **defaults per tier are decided (ADR-0017): Dev=off · Team=light · Enterprise=full.**
+Approval-as-a-Flow (§5.2), released baselines, and coverage gating are the **`full`** posture
+(Enterprise default); the lighter levels are the tier-defaulted posture for teams that do not need
+that ceremony, and any Workspace may set its level explicitly.
 
 ### 5.7 Shadow / canary promotion for any rule change
 
@@ -688,6 +707,6 @@ a genuinely clean exit — not "one-click import."**
    dependency (the Decision layer depends on Flows which call Decisions). Confirm the layering is
    acyclic in practice (§5.2). The `light` governance level (§5.6, approval = PR merge) is also the
    clean bootstrap escape when the approval-Flow machinery is not yet available.
-7. **Default governance level per tier.** §5.6 defines the off/light/full dial and keeps
-   approval-as-a-Flow the default (`full`); *which* level ships as the default for the Dev vs Team
-   vs Enterprise tier (e.g. whether Dev defaults to `light`) is deferred to a founder decision.
+7. **Default governance level per tier — decided.** §5.6's dial defaults are now fixed
+   (ADR-0017): **Dev=off · Team=light · Enterprise=full.** The only residual sub-question is the
+   `full`-tier coverage-threshold granularity, tracked in Q5 above.
