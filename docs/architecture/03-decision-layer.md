@@ -240,7 +240,7 @@ returns a **typed key** (a `nucleusKind`, a set of typed COI facts) that the dec
 keeping the **rule in DMN** and the **graph walk in typed code**, on the same feature-function machinery as
 any other derived input (above). The walk's output is snapshotted into the DecisionTrace (§7) like every
 other feature, so the auditor sees the resolved key the table saw. (This is the seam ballot G3 identified:
-[public-housing-ballot §2.3a](../examples/case-studies/public-housing-ballot.md).)
+[public-housing-ballot](../examples/case-studies/public-housing-ballot.md) §2.3.)
 
 **Reviewer / workload-aware assignment — an honesty note.** Assignment-routing Decisions (routing is a
 Decision, §2.3, [04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.3) **may consume

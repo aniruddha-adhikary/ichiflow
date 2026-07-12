@@ -415,8 +415,15 @@ layers** and lets a deployment dial how strictly they are enforced:
   artifacts an environment loads — never a write surface or an authority**: it holds no version that did
   not arrive by git merge and no active-binding not set by a pin commit
   ([02-schema-foundation.md](02-schema-foundation.md) §6.1,
-  [03-decision-layer.md](03-decision-layer.md) §5.7; BRIEF §21). Effective-dating decouples merge-time
-  from activation-time (a version can merge and pin now with a future `effective.from`);
+  [03-decision-layer.md](03-decision-layer.md) §5.7; BRIEF §21). The env-pin write-path **may be
+  partitioned by owning Team** (`environments/prod/<team>.pins.yaml`) so Teams/agencies promote their
+  released bundle versions **independently** while the deployment **composes** the partitions into the
+  effective pin set — still **a git commit per pin** (BRIEF §21a preserved), scoping *activation* to the
+  same ownership boundary that already governs *edit/approve* and removing the serialization where N Teams
+  contend on one pin file, **without crossing the tenancy line** (a Team is **not** a tenant; it shares the
+  deployment's tenancy root, PDP, and audit spine —
+  [03-decision-layer.md](03-decision-layer.md) §5.7, ADR-0025 amended). Effective-dating decouples
+  merge-time from activation-time (a version can merge and pin now with a future `effective.from`);
 - **break-glass that is loud and logged** — a direct-access escape hatch always exists for
   emergencies (an expedited PR, or a genuine break-glass), but every use is conspicuous, time-boxed,
   written to the audit ledger, and **reconciled by a back-filled commit** to the env-pin — so even an
