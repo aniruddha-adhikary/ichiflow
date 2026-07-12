@@ -19,22 +19,24 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 
 ## Commands
 
-| Command                                 | What it does                                                 |
-| --------------------------------------- | ------------------------------------------------------------ |
-| `pnpm install`                          | Install the TS workspace.                                    |
-| `pnpm build`                            | Build every workspace package.                               |
-| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.            |
-| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).    |
-| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).            |
-| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.         |
-| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.        |
-| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools. |
-| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).    |
-| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).             |
-| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                           |
-| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).       |
+| Command                                 | What it does                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm install`                          | Install the TS workspace.                                              |
+| `pnpm build`                            | Build every workspace package.                                         |
+| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.                      |
+| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).              |
+| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).                      |
+| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.                   |
+| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                  |
+| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.           |
+| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
+| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
+| `pnpm contract:diff`                    | Run oasdiff → write the breaking-change results `contract-gate` reads. |
+| `pnpm contract:accept`                  | Accept an intentional contract change (advance the baseline).          |
+| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                     |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                 |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -50,6 +52,11 @@ whose effective window covers the referencing row's (bitemporal, ADR-0025 / doc 
 hand-authored reference on Apache KIE / Drools (pinned 10.2.0), asserting identical results across
 every input vector — the Phase 2.0 proof that the hard boxed-expression kinds (BKM FEEL functions,
 boxed contexts, invocations) project and execute correctly; run `pnpm decision:jvm` first.
+`contract-gate` fails on any **breaking** change to the emitted OpenAPI vs the released baseline
+(`schemas/contract/openapi.baseline.yaml`): run `pnpm contract:diff` first (it runs oasdiff and
+writes the git-ignored `.ichiflow/contract-diff.json` the scope reads). When a breaking change is
+**intentional and reviewed**, run `pnpm contract:accept` to advance the baseline over the emitted
+OpenAPI, then commit the updated baseline — that commit is the record of the accepted contract change.
 
 ## Layout
 

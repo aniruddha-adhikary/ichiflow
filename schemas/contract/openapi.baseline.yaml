@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: ichiflow verify API
+  version: 0.0.0
+  description: |-
+    The verify status API (build plan chunk 1.1, ADR-0006). A minimal but real HTTP surface whose sole
+    purpose in Phase 1 is to exercise the TypeSpec→OpenAPI 3.1 emit + regenerate-and-diff drift path
+    on the same authoring source that feeds JSON Schema. It reuses the canonical `VerdictEnvelope`, so
+    the OpenAPI document and the JSON Schema stay derived from one model — the whole point of ADR-0006.
+tags: []
+paths:
+  /verify/{scope}:
+    get:
+      operationId: Verify_status
+      description: Latest verdict for a scope, or 404 if the scope has never run.
+      parameters:
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ichiflow.Verify.VerdictEnvelope'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFound'
+components:
+  schemas:
+    Ichiflow.Verify.CheckResult:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Stable check id, e.g. `self-check.envelope-schema`.
+        status:
+          $ref: '#/components/schemas/Ichiflow.Verify.CheckStatus'
+        artifact:
+          type: string
+          description: The artifact this check is about, if any (e.g. `decision:loan-eligibility@3.2.0`).
+        expected:
+          description: Expected value for a failed check (structured, not prose).
+        actual:
+          description: Actual value for a failed check (structured, not prose).
+        diff:
+          type: string
+          description: A short structured diff string; supplements expected/actual.
+        metric:
+          type: string
+          description: Named metric for coverage-style checks (e.g. `rule-coverage`).
+        value:
+          type: number
+          format: double
+          description: Metric value for a coverage-style check.
+        threshold:
+          type: number
+          format: double
+          description: Metric threshold for a coverage-style check.
+      description: |-
+        One check result. Failures carry a structured diff (expected/actual/artifact), never a
+        sentence. `id` is stable across runs so a dashboard and an agent track the same check.
+    Ichiflow.Verify.CheckStatus:
+      type: string
+      enum:
+        - pass
+        - fail
+        - skip
+      description: Outcome of a single enumerated check.
+    Ichiflow.Verify.ConformanceProgress:
+      type: object
+      required:
+        - green
+        - total
+      properties:
+        green:
+          type: integer
+          format: int32
+          minimum: 0
+        total:
+          type: integer
+          format: int32
+          minimum: 0
+      description: 'Enumerable "how much is done": green vs total over the conformance suite.'
+    Ichiflow.Verify.CoverageProgress:
+      type: object
+      required:
+        - value
+        - threshold
+        - met
+      properties:
+        value:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        threshold:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        met:
+          type: boolean
+      description: Coverage ratio against a declared threshold.
+    Ichiflow.Verify.Progress:
+      type: object
+      properties:
+        conformance:
+          $ref: '#/components/schemas/Ichiflow.Verify.ConformanceProgress'
+        coverage:
+          $ref: '#/components/schemas/Ichiflow.Verify.CoverageProgress'
+      description: The progress metric block — a count/ratio, never a narrative estimate.
+    Ichiflow.Verify.Verdict:
+      type: string
+      enum:
+        - pass
+        - fail
+      description: pass | fail — the only two verdicts a scope may emit.
+    Ichiflow.Verify.VerdictEnvelope:
+      type: object
+      required:
+        - verifyVersion
+        - scope
+        - ranAt
+        - seed
+        - verdict
+        - summary
+        - progress
+        - checks
+        - flaky
+      properties:
+        verifyVersion:
+          type: string
+          description: Envelope schema version.
+        scope:
+          type: string
+          description: The scope that produced this verdict (e.g. `self-check`, `schema-pipeline`).
+        ranAt:
+          type: string
+          format: date-time
+          description: ISO-8601 UTC timestamp of the run.
+        seed:
+          type: string
+          description: Seed for deterministic time/data (§3.6); recorded so a run is reproducible.
+        verdict:
+          $ref: '#/components/schemas/Ichiflow.Verify.Verdict'
+        summary:
+          $ref: '#/components/schemas/Ichiflow.Verify.VerdictSummary'
+        progress:
+          $ref: '#/components/schemas/Ichiflow.Verify.Progress'
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ichiflow.Verify.CheckResult'
+        flaky:
+          type: boolean
+          description: Must always be false — a flaky check is a harness defect, not a retry (§3.6).
+      description: The verdict envelope emitted by every verify scope.
+    Ichiflow.Verify.VerdictSummary:
+      type: object
+      required:
+        - checks
+        - passed
+        - failed
+        - skipped
+      properties:
+        checks:
+          type: integer
+          format: int32
+          minimum: 0
+        passed:
+          type: integer
+          format: int32
+          minimum: 0
+        failed:
+          type: integer
+          format: int32
+          minimum: 0
+        skipped:
+          type: integer
+          format: int32
+          minimum: 0
+      description: Count summary across the scope's checks.
+    NotFound:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - scope-not-found
+        message:
+          type: string

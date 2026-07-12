@@ -30,6 +30,9 @@ pins:
   - id: kie-dmn
     version: "10.2.0"
     note: Apache KIE / Drools DMN — v1 reference decision engine (ADR-0002). Pinned; a bump reruns the decision-projection-spike. DMN 1.6 (spec 20240513).
+  - id: oasdiff
+    version: "1.21.0"
+    note: OpenAPI breaking-change detector for the contract-gate scope (chunk 1.4a). Go release binary; installed in CI and run via `pnpm contract:diff`.
 
 resources:
   - id: run-verify
@@ -104,3 +107,11 @@ resources:
     kind: generated
     path: core/generated/src/main/kotlin
     description: Generated Kotlin contract models (Fabrikt). Regenerate with ./gradlew generateModels; never hand-edit.
+  - id: contract-gate
+    kind: harness
+    path: packages/cli/src/verify/scopes/contract-gate.ts
+    description: OpenAPI breaking-change gate (oasdiff) — zero unaccepted breaking changes vs the baseline.
+  - id: contract-baseline
+    kind: schema
+    path: schemas/contract/openapi.baseline.yaml
+    description: Released OpenAPI contract baseline; oasdiff compares the emitted contract against it. Advance via `pnpm contract:accept`.
