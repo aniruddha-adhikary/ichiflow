@@ -116,6 +116,7 @@ fork to the raw Temporal SDK.
 | **sub-flow** | Invoke another Flow definition as a child | Temporal child workflow (its own interpreter instance) |
 | **signal / event-wait** | Block until an external signal or a canonical event arrives (with optional timeout) | Temporal signal / inbound canonical event correlated by `case_id` |
 | **condition-gate** | Block a downstream Flow segment until a named **blocking Condition** reaches `fulfilled` (or is waived) — analogous to `signal/event-wait` but keyed to a Condition (§5.5) | Temporal await on the Condition's fulfilment signal / canonical event; the transition is recorded |
+| **external-task** | **Delegate** a unit of work to an **external system**: submit a schema'd request through an outbound Adapter, durably **await a correlated response** through an inbound Adapter, validate it, and resume (or take timeout/escalation/compensation paths) — the machine analog of `human-task` (§2.8, §5.8) | Outbound **adapter-call** to submit + **await-signal** on the correlated inbound response, raced by a pausable **SLA timer** with an escalation chain, keyed by a declared correlation contract ([05-adapters.md](./05-adapters.md) §11) |
 
 FEEL expressions (the DMN expression language) are the DSL's expression sublanguage for guards,
 routing predicates, and data mapping, so business users use one expression syntax across Decisions
@@ -263,6 +264,123 @@ renderer registry (BRIEF §21; [00-vision-and-principles.md](./00-vision-and-pri
 declared extension points") applied to the Flow step vocabulary. The CNCF-SWF conformance question — how
 these `x-` extensions degrade on export to other SWF runtimes — is the same extension-namespace concern
 tracked in the open questions.
+
+### 2.8 The `external-task` (delegation) step — offload work to an external system
+
+A Flow can **delegate** a unit of work to a system ichiflow does not run: submit a schema'd request, then
+durably **await a correlated response** that arrives later — on the external system's own schedule,
+possibly seconds or weeks after submission — validate it against a response schema, and resume. This is
+the **machine analog of `human-task`** (§5.2): where a human Task creates a work item and blocks on an
+await-signal raced by an SLA timer, an `external-task` submits a request and blocks on a **correlated
+inbound response** raced by the *same* pausable-clock SLA + escalation machinery. The symmetry is
+deliberate and is made explicit in §5.8. The round-trip is the **Request-Reply** Enterprise Integration
+Pattern; the Adapter layer supplies the correlation contract and transport profiles under it
+([05-adapters.md](./05-adapters.md) §11).
+
+**Why `external-task` is a *canonical* step type, not an *extension* step type (§2.7).** A step is
+canonical when the **interpreter itself must understand its control-flow semantics to replay them
+deterministically**; an extension step type (§2.7) is admissible only when the new kind reduces to a
+**compute-variant** dispatched through the generic code-activity path. `external-task` fails that
+reduction and meets the canonical bar on every count:
+
+- **It is durable-await machinery, not a computation.** Its semantics are *submit → suspend for a
+  correlated signal that arrives through a **different** adapter later → race a pausable clock → escalate
+  / compensate* — exactly the interpreter-level operations `human-task` (§5.2) and `signal/event-wait`
+  (§2.3) already are. A compute-variant runs one activity to completion; it cannot express a durable
+  cross-adapter await under a clock. So `external-task` is *not* reducible to §2.7.
+- **It is core semantics, not org-specific.** "Submit to an external system and await its correlated
+  reply" is a universal shape — the request-reply EIP ([05-adapters.md](./05-adapters.md) §11) — like
+  human review, not an `x-<org>` primitive.
+- **Transport is what's pluggable, and its seam already exists underneath.** The five transport profiles
+  (HTTP sync / callback / polling, message-queue request-reply, SFTP file round-trip —
+  [05-adapters.md](./05-adapters.md) §11) are **Adapter bindings** under the existing **Adapter-binding
+  SPI** ([05-adapters.md](./05-adapters.md) §2), *not* new step kinds. One canonical step, transport-
+  pluggable beneath it through a seam that already exists — the same shape as `adapter-call` being one
+  canonical step over many bindings. Forking a step kind per transport would fragment exactly the
+  correlation/timeout/audit semantics this step exists to unify (ADR-0028).
+
+So `external-task` joins `human-task` as a canonical await-with-SLA step whose *variability* lives in a
+declared SPI beneath it, never in the step vocabulary.
+
+```yaml
+# an external-task step — the machine analog of human-task (§5.2); transport-pluggable underneath (§05 §11)
+- id: verify-applicant-credentials
+  type: external-task
+  request:
+    schema: schema://vetting/CredentialCheckRequest/1      # canonical request schema ($ref'd)
+    adapter: adapter://vetting/credential-check-submit      # OUTBOUND adapter (submit)
+  response:
+    schema: schema://vetting/CredentialCheckResult/1        # canonical response schema ($ref'd)
+    inbound: adapter://vetting/credential-check-reply        # INBOUND adapter (await the correlated reply)
+  correlation:                                              # declarative per-transport (§05 §11.1)
+    inject:  { as: header, name: x-correlation-id, from: "case_id & '/' & step.id" }
+    extract: "response.correlationId"                        # JSONata over the inbound response
+  mode: single                                              # single | streamed | batch (see "Response modes")
+  reliability:
+    delivery: at-least-once                                 # idempotent receiver; dedup on the response
+    idempotencyKey: "case_id & '/' & step.id"
+    dedupOnResponse: "response.correlationId & '/' & response.messageId"
+  sla:                                                      # reuses the pausable-clock machinery (§5.7)
+    budget: P5D
+    onTimeout: chain/vetting-esc-1                           # escalation path — ordinary authored steps
+  onNegativeAck: compensate                                 # negative-ack → declared compensation (§10 saga)
+  onMalformed: dlq                                          # schema-invalid response → DLQ + Case surfacing
+```
+
+**Step declaration.** An `external-task` declares, all as schema-validated data:
+
+- **request** — the canonical **request schema** (`$ref`'d, doc 02 §5) and the **outbound Adapter** the
+  request is submitted through.
+- **response** — the canonical **response schema** (`$ref`'d) and the **inbound Adapter** the correlated
+  reply arrives on. The reply is validated against this schema before the flow resumes; a schema-invalid
+  reply is a `malformed` failure (below), never silent state.
+- **correlation** — the **correlation contract**: how the correlation id is *injected* onto the outbound
+  request and *extracted* from the inbound reply, **per transport**, as a **declarative rule** (a JSONata/
+  FEEL expression over the response, e.g. `response.correlationId`), never code. The extracted id is
+  matched to the waiting `external-task` instance (keyed to `case_id` + step). Injection/extraction rules
+  per transport profile live in [05-adapters.md](./05-adapters.md) §11.1.
+- **reliability** — **at-least-once submission + idempotent receiver** ([05-adapters.md](./05-adapters.md)
+  §5): the external system is expected to be an idempotent receiver keyed on `idempotencyKey`, and
+  inbound responses are **deduped** on `(correlation-id, response messageId)`, so a re-submitted request
+  or a duplicated reply applies once (mirrors §10's idempotency stance).
+- **sla / escalation** — a **timeout/SLA** that **reuses the pausable-clock machinery** (§5.7); on expiry
+  the flow follows an **escalation chain** (retry-submit, reroute to an alternate provider, an auto-decide
+  fallback Decision, or compensate), each an ordinary authored DSL step exactly as for `human-task` (§5.2).
+
+**Response modes.** A delegation is not always a single reply:
+
+- **`single`** — one correlated response completes the step (the common case).
+- **`streamed`** — a sequence of correlated chunks/partial responses arrives; the step accumulates them
+  (accumulation in a `compute` step, §2.6, never inline) until a declared completion marker, then resumes.
+- **`batch`** — the request submits a set of records and the reply is a **batch of per-record results**;
+  **record-level correlation** ([05-adapters.md](./05-adapters.md) §11.1) matches each result to its
+  request record, and partial batches are surfaced per record rather than all-or-nothing.
+
+**Failure taxonomy.** Four distinct, first-class outcomes — a delegation never simply "hangs":
+
+| Failure | Trigger | Handling |
+|---|---|---|
+| **no-response timeout** | SLA expires with no correlated reply | escalation chain (`sla.onTimeout`) — reuses §5.7 pausable clock |
+| **negative-ack** | the external system replies with a typed *reject/error* outcome | `onNegativeAck` — a branch or **declared compensation** (§10 saga); it is an *outcome*, not a retryable error |
+| **malformed response** | a reply fails response-schema validation | `onMalformed: dlq` — lands in the Adapter **DLQ** with triage/replay ([05-adapters.md](./05-adapters.md) §5) **and surfaces on the Case** (a diagnostic Task/flag), never a stuck flow |
+| **transport/transient** | submission or delivery I/O failure | the Adapter's at-least-once retry/backoff (§10, [05-adapters.md](./05-adapters.md) §5); exhausted → DLQ |
+
+**Routing — *which* external system is itself a Decision.** Just as assignment routing for a human Task
+is a `decision-eval` (§5.3), *which* external system (or which of several accredited providers) a
+delegation targets is a **Decision** over a classification/routing DecisionModel, whose output selects the
+outbound Adapter/endpoint. Provider selection is therefore governed, simulated, and explained like any
+other Decision, and lands in the DecisionRecord (§5.8).
+
+**Audit.** Every delegation emits trace events into the DecisionRecord (§7): **submitted / ack'd /
+responded / timed-out**, each with the request/response payloads **snapshotted per audit policy**, the
+outbound and inbound Adapter I/O snapshots ([08-audit-and-observability.md](./08-audit-and-observability.md)
+§1.1), the resolved correlation id, and the provider-selection Decision — so "we delegated X to system Y,
+correlated by Z, and it replied W at time T" is answerable through the *why* API.
+
+**Zones.** Delegation to a system in another zone rides the **one-way relay** patterns
+([05-adapters.md](./05-adapters.md) §8): the request egresses through a controlled outbound Adapter and
+the reply re-enters through an inbound DMZ Adapter that relays one-way to the core, correlated to the
+waiting `external-task` — no synchronous callback from intranet into DMZ.
 
 ---
 
@@ -517,6 +635,30 @@ Task:
   clock: { pausedAt: 2026-07-10T09:00:00Z, reason: request-for-information }
 ```
 
+### 5.8 `external-task` — the machine analog of the human Task
+
+`human-task` (§5.2) and `external-task` (§2.8) are the two **await-with-SLA** steps — one for a human
+work item, one for an external system — and the Case module treats them **symmetrically**. Both create a
+work item, block on an idempotent correlated resolution, race a **pausable SLA timer** (§5.7), and follow
+an authored **escalation chain** on expiry; both record their resolution into the DecisionRecord (§7).
+
+| Aspect | `human-task` (§5.2) | `external-task` (§2.8) |
+|---|---|---|
+| Work item | a **Task** in the task store | a **request submitted** through an outbound Adapter |
+| Blocks on | resolve **signal** (idempotent) | **correlated inbound response** (idempotent; dedup on response) |
+| Raced by | SLA timer (pausable, §5.7) | the **same** pausable SLA timer + escalation |
+| On expiry | escalation: reassign → supervisor → auto-decide fallback | escalation: retry-submit → reroute provider → fallback Decision → compensate |
+| Routing = a Decision | *who* the assignee/queue is (§5.3) | *which* external system/provider is (§2.8) |
+| Recorded | reviewer identity, outcome, timing | submitted/ack'd/responded/timed-out + payload snapshots (§2.8 audit) |
+
+The **routing symmetry** is exact: §5.3's "assignment routing is itself a Decision" for humans is
+"provider selection is itself a Decision" for external systems. The **clock-stop nuance**: an
+`external-task`'s SLA by default measures the *external system's own turnaround* — which is precisely what
+you want to escalate on — so it does not pause while awaiting that system; §5.7's pause/resume is reused
+only where a delegation must additionally exclude a *further* downstream wait (e.g. the delegation is
+itself blocked pending applicant input), recorded distinctly like any clock-stop
+([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6).
+
 ---
 
 ## 6. Manual-review Flow example (diagram)
@@ -566,6 +708,9 @@ actions into one causal chain. The Flow layer is its primary feeder:
 - **human-task** resolutions attach reviewer identity, outcome, and timing (delegation vs
   auto-decide on SLA expiry recorded distinctly).
 - **adapter-call** steps attach the correlated message id / DLQ outcome ([05-adapters.md](./05-adapters.md)).
+- **external-task** delegations (§2.8) attach a **submitted / ack'd / responded / timed-out** trace with
+  request/response payloads snapshotted per audit policy, the resolved correlation id, both Adapter I/O
+  snapshots, and the provider-selection Decision — the delegation's full round-trip on the causal chain.
 
 The DecisionRecord is a **projection** of this history (event-source the decision/flow core;
 [BRIEF.md](./BRIEF.md) §9), so the *why* API can re-derive "this case took path X because Decision D
@@ -634,9 +779,14 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
   portability; extensions maximize expressiveness. The shape is now decided — a conformant core + a
   clearly-marked ichiflow extension namespace, which is also the seam for **user-declared extension
   step types** (§2.7, `x-<org>/<stepType>`, decided per BRIEF §21). The residual open detail is the
-  **export-degradation contract**: exactly how ichiflow-native and `x-`-extension step kinds degrade
-  (documented-but-non-portable vs. lowered to a portable approximation) when a Flow is exported to
-  another SWF runtime.
+  **export-degradation contract**: exactly how ichiflow-native step kinds (`human-task`, `decision-eval`,
+  `external-task`, §2.8) and `x-`-extension step kinds degrade (documented-but-non-portable vs. lowered to
+  a portable approximation) when a Flow is exported to another SWF runtime.
+- **external-task multi-response completion.** For `streamed` and `batch` delegations (§2.8), the
+  **completion predicate** — when a stream of correlated chunks or a batch of per-record replies counts a
+  delegation as "done" — needs a declared, replay-safe shape (a declared completion marker vs. a per-record
+  quorum), and how a partially-completed batch surfaces on the Case (some records resolved, some timed out)
+  interacts with the failure taxonomy (§2.8) and the composite-clock model (§5.7).
 - **Case aggregate vs Flow instance cardinality.** §5.6 establishes that post-decision operations
   (appeal / correct / withdraw) spawn **correlated child Cases**, so a Case is *not* strictly 1:1 with a
   root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows
