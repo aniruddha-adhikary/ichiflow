@@ -29,6 +29,7 @@ union ResourceKind {
   pattern: "pattern",
   harness: "harness",
   schema: "schema",
+  generated: "generated",
 }
 
 /** A named, discoverable resource in the Workspace. */

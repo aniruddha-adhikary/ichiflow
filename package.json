@@ -19,6 +19,8 @@
     "schema:build": "pnpm --filter @ichiflow/schemas build",
     "schema:drift": "pnpm --filter @ichiflow/schemas drift",
     "license:check": "node tools/license-check/index.mjs",
+    "codegen:ts": "pnpm --filter @ichiflow/contracts-ts generate",
+    "codegen:drift": "pnpm --filter @ichiflow/contracts-ts drift",
     "spike:jvm": "cd core && ./gradlew -q runSpike",
     "verify": "node packages/cli/dist/cli.js verify"
   },

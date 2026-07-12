@@ -27,20 +27,25 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses). |
 | `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).         |
 | `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.      |
+| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api). |
+| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).          |
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
-| `(cd core && ./gradlew build)`          | Build + test the Kotlin core.                             |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).    |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
-JSON Schema 2020-12) authored once in TypeSpec.
+JSON Schema 2020-12) authored once in TypeSpec. `codegen` asserts the generated edges — TypeScript
+types (hey-api) and Kotlin models (Fabrikt) — cover every OpenAPI component schema; byte-level
+reproducibility is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModelsUpToDate` (Kotlin).
 
 ## Layout
 
 - `schemas/` — TypeSpec authoring; emitted JSON Schema + OpenAPI 3.1 in `schemas/generated/` are the contract of record.
 - `packages/cli/` — the `ichiflow` CLI and the verify harness engine.
-- `core/` — the Kotlin core (Gradle).
+- `packages/contracts-ts/` — generated TypeScript contract types (hey-api) in `src/gen/`; regenerate, never hand-edit.
+- `core/` — the Kotlin core (Gradle); generated contract models (Fabrikt) in `core/generated/`.
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
 - `.ichiflow/resources.manifest.yaml` — version pins + named resources (doc 10 §2.5).
 
