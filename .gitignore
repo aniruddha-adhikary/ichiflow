@@ -145,6 +145,8 @@ vite.config.ts.timestamp-*
 # ichiflow
 # Progress ledger is derived state (doc 13 §3.3), not committed.
 .ichiflow/ledger/
+# oasdiff breaking-change results — derived state produced by `pnpm contract:diff` (chunk 1.4a).
+.ichiflow/contract-diff.json
 
 # Gradle / Kotlin core
 core/.gradle/

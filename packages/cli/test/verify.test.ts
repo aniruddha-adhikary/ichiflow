@@ -19,6 +19,7 @@ import {
   windowCovers,
   type CodeSetDoc,
 } from "../src/verify/reference-data.js";
+import { contractGateScope } from "../src/verify/scopes/contract-gate.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -86,6 +87,65 @@ describe("schema-pipeline", () => {
     const failures = checks.filter((c) => c.status !== "pass");
     expect(failures).toEqual([]);
     expect(checks.some((c) => c.id === "schema-pipeline.openapi.version-3.1")).toBe(true);
+  });
+});
+
+describe("contract-gate", () => {
+  const seed = deriveSeed("contract-gate");
+
+  function withResults(results: unknown, fn: (root: string) => void): void {
+    const root = mkdtempSync(join(tmpdir(), "ichiflow-contract-"));
+    try {
+      mkdirSync(join(root, ".ichiflow"), { recursive: true });
+      writeFileSync(join(root, ".ichiflow", "contract-diff.json"), JSON.stringify(results));
+      fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it("passes when the results file has no breaking changes", () => {
+    withResults({ tool: "oasdiff", breakingChanges: [] }, (root) => {
+      const checks = contractGateScope.run({ repoRoot: root, seed });
+      expect(checks).toEqual([{ id: "contract-gate.no-breaking-changes", status: "pass" }]);
+    });
+  });
+
+  it("fails when the results file lists breaking changes", () => {
+    withResults(
+      {
+        tool: "oasdiff",
+        breakingChanges: [
+          {
+            id: "api-path-removed-without-deprecation",
+            text: "api path removed",
+            operation: "GET",
+            path: "/verify/{scope}",
+            level: 3,
+          },
+        ],
+      },
+      (root) => {
+        const checks = contractGateScope.run({ repoRoot: root, seed });
+        const gate = checks.find((c) => c.id === "contract-gate.no-breaking-changes");
+        expect(gate?.status).toBe("fail");
+        expect(gate?.actual).toBe("1 breaking change(s)");
+        expect(String(gate?.diff)).toContain("api-path-removed-without-deprecation");
+      },
+    );
+  });
+
+  it("fails with an actionable diff when the results file is missing", () => {
+    const root = mkdtempSync(join(tmpdir(), "ichiflow-contract-missing-"));
+    try {
+      const checks = contractGateScope.run({ repoRoot: root, seed });
+      expect(checks).toHaveLength(1);
+      expect(checks[0].id).toBe("contract-gate.results-present");
+      expect(checks[0].status).toBe("fail");
+      expect(String(checks[0].diff)).toContain("pnpm contract:diff");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
