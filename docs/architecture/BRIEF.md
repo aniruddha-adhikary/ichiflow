@@ -93,19 +93,30 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   SOAP, webhook, CDC. Inbound → canonical command/event; outbound from canonical.
 - **Portal** — an audience-scoped UI + BFF (back-office, customer, partner) with its own IdP
   config and entitlements.
+- **Design Kit** — the first-party UX-designer toolchain (parallel to the AI-native agent kit):
+  a DTCG design-token pipeline, a component workbench, a live playground (real screens over
+  schema-driven mocks), and a designer-facing safety contract (see doc 07). uischema/viewschema
+  are the canonical artifacts; the playground is the authoring surface.
+- **pageschema / copyset** — *proposed* designer artifacts (ADR pending, see doc 07 §13):
+  `pageschema` composes multiple uischema/viewschema regions into a screen; `copyset` is a
+  translator-friendly, i18n-keyed microcopy catalog referenced by key (sharing the CodeSet
+  `plainLanguage` i18n substrate). Named here as vocabulary; committing them as governed artifact
+  classes is a founder decision.
 - **Workspace** — the design-time project (schemas, decisions, flows, uischemas, adapters,
   policies) — a git repo an AI agent can operate on.
 - **DecisionRecord / why API** — the audit/explainability object and its query surface.
 - **Copilots** — Domain Modeling Copilot (greenfield), Migration Copilot (brownfield), Rule
   Authoring assistance for business users; all follow "AI proposes, deterministic tools +
-  humans dispose," with provenance.
+  humans dispose," with provenance. (A design-facing UI/Design Copilot on the same contract is
+  documented in docs 07/10.)
 - **Tiers** — Dev (single binary, SQLite/embedded), Team (docker compose/small K8s, Postgres),
   Enterprise (HA, zones, SSO, compliance packs). Same app code across tiers; config only.
 
 ## Personas
 
 Business domain user (maps their domain, authors/tests rules with AI assistance) · UX designer
-(overrides generated UI safely) · Application developer · Platform/ops engineer · Auditor /
+(overrides generated UI safely via the first-party **Design Kit** — token pipeline, component
+workbench, live playground) · Application developer · Platform/ops engineer · Auditor /
 compliance officer · AI coding agent (build + runtime) · End customer.
 
 ## Doc conventions

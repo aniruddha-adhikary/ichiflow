@@ -70,6 +70,38 @@ catch up) · JSON Schema 2020-12 · AsyncAPI 3.1.0 · Fabrikt 27.4.x (Kotlin) ·
 deprecated — use Zod v4's native `z.toJSONSchema()`. hey-api is still 0.x — **pin exactly**;
 orval 8 is the validated drop-in.
 
+### 1.1 Which types are canonical — the boundary-crossing test
+
+"Author in TypeSpec" scopes the **contracts**, not *every struct in the system*. The brief locks
+"TypeSpec → JSON Schema canonical" for contracts but never says which types are contracts — so a
+naive reader (or agent) could TypeSpec every internal struct, which is exactly the over-ceremony to
+avoid. Forcing a canonical schema on a shape with one consumer in one language adds a codegen
+indirection, a checked-in artifact, and a diff-gate that buy nothing. The rule:
+
+**A type MUST be lifted into the canonical schema (TypeSpec → JSON Schema) if, and only if, it
+crosses a governed boundary** — i.e. a second, independently-deployed or independently-versioned
+consumer reads it. Concretely: adapter wire contracts, portal/BFF APIs, Flow step payloads,
+Decision input/output, canonical commands/events, persisted Case data, and MCP tool I/O. At those
+boundaries the one schema pays for itself — cross-language Kotlin+TS parity, runtime validation,
+versioning/compat gates, UI generation, and an LLM tool schema, all from one source.
+
+**A module-internal shape stays native.** A helper struct between two Kotlin functions in one
+module, a small config read at startup by one component, an internal DTO that never serializes
+across a boundary — a plain Kotlin `data class` / TS `interface` is enough, and is *more* readable
+and auditable than a TypeSpec round-trip.
+
+**The litmus:** *does this shape cross a boundary where a second, independently-deployed or
+independently-versioned consumer — the other language, an external system, an auditor, or an agent
+— reads it?* Yes → canonical schema. No (one module, one language, one lifetime) → native type.
+
+**Tie-breaker on cost asymmetry.** Getting it wrong toward "lift to schema" costs ceremony now;
+getting it wrong toward "keep native" costs future drift *only if* it later crosses a boundary —
+and lifting a stable data class into TypeSpec is mechanical, made safe by the expand/contract
+discipline (§6.3). So lift when a shape is on a boundary or clearly heading for one; otherwise keep
+it native and lift later. Small config shapes follow the same test: one module's internal config
+(timeouts, pool sizes) is a native type; operator-facing config that ships in Helm values / the
+deployment contract crosses the ops boundary and *is* schema'd.
+
 ---
 
 ## 2. The artifact pipeline
@@ -144,6 +176,11 @@ so async contracts are first-class, not an afterthought.
   Modelina's Kotlin output falls short, the payload JSON Schema is fed to **Fabrikt** directly
   (it accepts component schemas), so event types and API types descend from the same artifact.
 
+Say it plainly: hand-authored AsyncAPI is a **second hand-maintained surface** — a bounded, named
+dent in "one schema, no drift." Only the *channel/operation* wrapper is hand-authored; the payload
+shape stays single-sourced by `$ref`, so the drift risk is scoped to the wrapper, not the data. It
+is a real v1 maintenance cost, tracked in open-q2, not a silent one.
+
 This is what lets a single `LoanApplication` schema back both a `POST /loan-applications` REST
 endpoint and a `loan.application.submitted.v1` event with no divergence.
 
@@ -209,6 +246,15 @@ The no-drift ranking (from [research 03 §6.1](../research/03-schema-and-types.m
 A **shared cross-language conformance suite** runs the same fixtures against Ajv and against
 OptimumCode/networknt in CI, so the two validator families are proven to agree on the canonical
 schemas.
+
+**v1 phasing.** Running *multiple* validators per language (and the cross-validator conformance
+suite that proves them equivalent) is a standing tax. For **v1, standardize on one runtime validator
+per language** — generated **Zod v4** on TS, **OptimumCode/json-schema-validator** on Kotlin — and
+treat the cross-validator conformance suite (Ajv ↔ OptimumCode/networknt) as **v1-optional /
+later**, adopted when a deployment actually runs a second validator family (Ajv for
+registry-fetched/dynamic schemas, or networknt on a JVM-only path). This keeps the no-drift
+guarantee — one canonical schema, one validator per side — without the standing dual-validator
+burden.
 
 ---
 
@@ -488,8 +534,10 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
    limits blast radius; openapi-generator is the emergency fallback. Upstream sponsorship is an
    open option.
 4. **Kotlin validator hardening.** OptimumCode (KMP) and networknt (JVM) are less battle-tested
-   than Ajv. The cross-language conformance suite (§5) mitigates, but the choice between running
-   both vs. standardizing on one per deployment tier is unsettled.
+   than Ajv. **v1 standardizes on one validator per language** (Zod v4 on TS, OptimumCode on Kotlin)
+   and defers the cross-validator conformance suite to v1-optional (§5); the residual question is
+   which second-family validators a given deployment tier enables (Ajv for dynamic/registry-fetched
+   schemas, networknt on JVM-only paths) and when the equivalence suite becomes mandatory.
 5. **uischema scope auto-migration fidelity.** `@renamedFrom` can drive automatic uischema-scope
    migration on field renames (§6.3), but how much can be automated vs. flagged for the designer
    is still to be validated — see [07-ui-and-portals.md](07-ui-and-portals.md).

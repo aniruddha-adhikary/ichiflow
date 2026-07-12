@@ -89,7 +89,7 @@ AI-native and enterprise-grade point the same direction.
 | Persona | What they do in ichiflow | What ichiflow gives them |
 |---|---|---|
 | **Business domain user** | Maps their domain; authors and tests Decisions with AI assistance | DMN decision tables + FEEL and a governance/simulation layer (versioning, approval, what-if) that Drools alone lacks (see [`../research/01-rule-engines.md`](../research/01-rule-engines.md) §6) |
-| **UX designer** | Refines the auto-generated UI | JSON Forms uischema + design tokens as versioned artifacts; the scaffold never overwrites their work (see [`../research/03-schema-and-types.md`](../research/03-schema-and-types.md)) |
+| **UX designer** | Refines the auto-generated UI with a first-party toolchain | The **Design Kit**: a schema-driven design-token pipeline, a component workbench (every renderer state, including PDP hidden/read-only states), a live playground that renders real screens against mocked schema data, and a preview-and-safety report per change — on top of the JSON Forms model where uischema + design tokens are versioned artifacts the scaffold never overwrites (see [`07-ui-and-portals.md`](07-ui-and-portals.md), [`../research/03-schema-and-types.md`](../research/03-schema-and-types.md)) |
 | **Application developer** | Assembles Schemas, Decisions, Flows, Adapters into an application | One schema source generating Kotlin + TypeScript types and runtime validators; a modular monolith that runs on a laptop |
 | **Platform / ops engineer** | Deploys, scales, and separates zones | Helm/operator, air-gap bundle, DMZ/intranet split, per-module scaling, OpenTelemetry across both runtimes |
 | **Auditor / compliance officer** | Answers "why was this decided this way, as of when?" | The DecisionRecord and the "why" API — one causal chain, bitemporally queryable (see [`../research/05-audit-observability-deployment.md`](../research/05-audit-observability-deployment.md) §1) |
@@ -102,18 +102,46 @@ Each principle is a decision filter. When a design choice is unclear, the choice
 more of these wins. They restate the [BRIEF](BRIEF.md)'s locked decisions as values.
 
 ### "Declare, don't code."
-Every port, decision, flow, form, and policy is a **typed, versioned, schema'd artifact** a
-runtime interprets — not hand-written code. Code is reserved for genuine exceptions (custom
-transforms, custom credential flows). Declarative artifacts are diffable, validatable, and
-AI-authorable; code is none of those by default. (Adapters/auth:
+Control-flow graphs (Flows), rule matrices (Decisions), structural field-mappings (Adapters),
+closed governed vocabularies, and boundary-crossing type contracts are **typed, versioned,
+schema'd artifacts** a runtime interprets — because for these shapes the declarative artifact *is*
+the shared analyst/auditor artifact and its diff shows the change directly. But "declare, don't
+code" is a rule about **which shapes go declarative — not a claim that code is always the lesser
+choice.** Computation — data reshaping between Flow steps, feature-prep before a rule evaluates,
+enrichment in an adapter — is *more* legible as idiomatic typed Kotlin/TS with a unit test than as
+sprawling YAML/FEEL, so it belongs in code. What keeps that code safe is not the authoring format
+but the **audit spine**: every code extension is schema'd at its boundary and trace-emitting, so it
+lands in the DecisionRecord like any declarative step (see the diff-test principle below, and
+[`03-decision-layer.md`](03-decision-layer.md) §2.4,
+[`04-flow-and-case-layer.md`](04-flow-and-case-layer.md) §2.3,
+[`05-adapters.md`](05-adapters.md) §1). Declarative artifacts are diffable, validatable, and
+AI-authorable; code earns its place where the work is genuinely computation. (Adapters/auth:
 [`../research/04-adapters-and-auth.md`](../research/04-adapters-and-auth.md).)
+
+### "The diff test — and the audit spine is not the authoring format."
+The litmus for any change, declarative or code: *can a reviewer — human OR agent — reading only the
+PR diff answer (a) WHAT the system will now do differently, and (b) WHY (against which rule /
+contract / policy), without running the code or loading extra context?* Two properties satisfy it:
+**WHAT-legibility** (the behavioral effect is visible in the diff) and **WHY-traceability** (the
+change references a governed artifact — a CodeSet `@version`, a DecisionModel, a schema version — so
+the reviewer can locate the authority). Crucially, **auditability lives in the trace / DecisionRecord
+spine and the schema'd boundary, not in whether the artifact is YAML or Kotlin.** A declarative
+artifact passes the diff test while it stays declarative (a graph of named steps, a table of rules)
+and *fails* it once it encodes computation; typed code passes it when the code is schema'd at its
+boundary and emits a trace. This is why moving computation to code costs legibility-for-analysts but
+**not** auditability.
 
 ### "One schema, many types — no drift."
 There is a single canonical model (authored in TypeSpec; emitted OpenAPI 3.1 / JSON Schema
 2020-12 / AsyncAPI 3.1 as the checked-in contract of record). Kotlin types, TypeScript types,
 runtime validators on both sides of every boundary, generated forms, and docs all derive from
 it. CI fails on divergence. Nothing downstream depends on the authoring tool, so any tool can
-be swapped. (Schema: [`../research/03-schema-and-types.md`](../research/03-schema-and-types.md).)
+be swapped. The canonical schema is required for types that **cross a governed boundary** — where a
+second, independently-deployed or independently-versioned consumer reads them; a module-internal
+shape with a single language and a single consumer stays a native Kotlin `data class` / TS
+`interface` (the boundary-crossing test, [`02-schema-foundation.md`](02-schema-foundation.md) §1.1),
+so schema is not forced where it only adds ceremony. (Schema:
+[`../research/03-schema-and-types.md`](../research/03-schema-and-types.md).)
 
 ### "API-first; UI auto-generated but never clobbered."
 The contract is complete and useful with zero UI. The UI is derived from the same schemas via
@@ -257,7 +285,9 @@ window onto.
 
 - **How close to Decision Center must v1 get?** The governance/simulation layer is the hardest
   and most differentiating build. What is the minimum viable governance surface for v1 vs later?
-  (See [`03-decision-layer.md`](03-decision-layer.md).)
+  The **governance-level dial** (off/light/full) in [`03-decision-layer.md`](03-decision-layer.md)
+  §5.6 is the first answer — governance ceremony scales with tier rather than being a fixed
+  constant; the residual question is the *default* level per tier.
 - **Second rule engine timing.** DMN is canonical and Drools is the reference engine; when does
   the GoRules ZEN (TS/edge) engine become a supported tier rather than a planned one?
 - **Managed offering.** Non-goal for now — but the boundary between "self-hosted framework" and
