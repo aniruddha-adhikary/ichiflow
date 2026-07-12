@@ -5,6 +5,7 @@ import { schemaFidelitySpikeScope } from "./scopes/schema-fidelity-spike.js";
 import { schemaPipelineScope } from "./scopes/schema-pipeline.js";
 import { codegenScope } from "./scopes/codegen.js";
 import { contractVectorsScope } from "./scopes/contract-vectors.js";
+import { referenceDataScope } from "./scopes/reference-data.js";
 
 /**
  * The scope registry — the harness catalog (doc 13 §2) as it comes online phase by phase.
@@ -17,6 +18,7 @@ const SCOPES: Scope[] = [
   schemaPipelineScope,
   codegenScope,
   contractVectorsScope,
+  referenceDataScope,
 ];
 
 export function allScopes(): Scope[] {

@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeSetOwner.json",
+    "type": "object",
+    "properties": {
+        "team": {
+            "type": "string",
+            "description": "Owning Team id, e.g. `trade-policy-team`."
+        },
+        "stewards": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Named steward principal ids accountable for the rows."
+        }
+    },
+    "required": [
+        "team",
+        "stewards"
+    ],
+    "description": "Owning Team + named stewards — metadata mirror of the authz ownership relation (§9.1, doc 06)."
+}

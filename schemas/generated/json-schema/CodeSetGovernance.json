@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeSetGovernance.json",
+    "type": "object",
+    "properties": {
+        "level": {
+            "type": "string",
+            "description": "Governance level for this artifact, e.g. `full` | `light`."
+        },
+        "routeApprovalBy": {
+            "type": "string",
+            "description": "How approval is routed, e.g. `owning-team-role`."
+        }
+    },
+    "required": [
+        "level"
+    ],
+    "description": "Per-artifact governance override of the Workspace/tier dial (§9.1, doc 03 §5.6/§5.8)."
+}

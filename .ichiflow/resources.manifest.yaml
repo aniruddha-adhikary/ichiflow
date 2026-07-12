@@ -69,6 +69,18 @@ resources:
     kind: pattern
     path: schemas/vectors/contract-corpus.json
     description: Labelled validation vectors for the real emitted contract (build plan 1.3).
+  - id: reference-data
+    kind: harness
+    path: packages/cli/src/verify/scopes/reference-data.ts
+    description: CodeSet fixtures conform to the contract and every cross-CodeSet codeRef resolves to a live, in-window row (ADR-0025).
+  - id: codeset-schema
+    kind: schema
+    path: schemas/reference-data.tsp
+    description: The CodeSet reference-data artifact class (TypeSpec → JSON Schema); rows carry codeRef foreign keys.
+  - id: codeset-fixtures
+    kind: pattern
+    path: schemas/reference-data/fixtures
+    description: Interdependent CodeSet fixtures exercising cross-version, effective-dated codeRef integrity.
   - id: contracts-ts
     kind: generated
     path: packages/contracts-ts/src/gen
