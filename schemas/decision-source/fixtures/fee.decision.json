@@ -1,0 +1,31 @@
+{
+  "namespace": "https://ichiflow.ai/dmn/fee",
+  "name": "fee",
+  "inputs": [
+    { "name": "Income", "type": "number" },
+    { "name": "Region", "type": "string" }
+  ],
+  "bkms": [
+    {
+      "name": "Base Fee",
+      "type": "number",
+      "parameters": [{ "name": "region", "type": "string" }],
+      "body": "if region = \"A\" then 100 else 200"
+    }
+  ],
+  "decision": {
+    "name": "Fee",
+    "type": "number",
+    "requires": ["Income", "Region"],
+    "knowledge": ["Base Fee"],
+    "context": [
+      {
+        "name": "base",
+        "type": "number",
+        "invoke": { "bkm": "Base Fee", "bindings": { "region": "Region" } }
+      },
+      { "name": "adjusted", "type": "number", "expr": "base * (Income / 1000)" },
+      { "result": true, "expr": "adjusted" }
+    ]
+  }
+}

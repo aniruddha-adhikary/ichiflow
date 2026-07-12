@@ -19,21 +19,22 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 
 ## Commands
 
-| Command                                 | What it does                                              |
-| --------------------------------------- | --------------------------------------------------------- |
-| `pnpm install`                          | Install the TS workspace.                                 |
-| `pnpm build`                            | Build every workspace package.                            |
-| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.         |
-| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses). |
-| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).         |
-| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.      |
-| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.     |
-| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api). |
-| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).          |
-| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
-| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).    |
+| Command                                 | What it does                                                 |
+| --------------------------------------- | ------------------------------------------------------------ |
+| `pnpm install`                          | Install the TS workspace.                                    |
+| `pnpm build`                            | Build every workspace package.                               |
+| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.            |
+| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).    |
+| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).            |
+| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.         |
+| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.        |
+| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools. |
+| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).    |
+| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).             |
+| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                           |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).       |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -45,6 +46,10 @@ networknt) and requires agreement; run `pnpm vectors:jvm` first to produce the J
 `reference-data` validates the committed CodeSet fixtures against the emitted `CodeSet` contract and
 enforces cross-CodeSet `codeRef` referential integrity — every reference must resolve to a live row
 whose effective window covers the referencing row's (bitemporal, ADR-0025 / doc 02 §9.4).
+`decision-projection-spike` compiles the `decision-source` fixture to DMN 1.6 and executes it and a
+hand-authored reference on Apache KIE / Drools (pinned 10.2.0), asserting identical results across
+every input vector — the Phase 2.0 proof that the hard boxed-expression kinds (BKM FEEL functions,
+boxed contexts, invocations) project and execute correctly; run `pnpm decision:jvm` first.
 
 ## Layout
 
