@@ -32,11 +32,14 @@ data center. The design stance that makes this possible:
 Everything in this document follows from that stance plus one hard requirement (§4):
 **time-to-first-success < 10 minutes**.
 
-The tiers — **Dev**, **Team**, **Enterprise** — are the *same binary and the same app code*
-selected by **configuration/profile only** (locked decision §3; research 06 §B.2). What changes
-across tiers is the substrate (embedded store → Postgres → SPIs), the deployment topology
-(single process → compose/small K8s → HA/zoned K8s), and which enterprise layers (SSO, audit
-retention, zones, compliance packs) are switched on. None of it changes the programming model.
+The tiers — **Dev**, **Team**, **Enterprise** — are **technical capability profiles
+(deployment-complexity ladders), not commercial editions**: the *same binary and the same app code*
+selected by **configuration/profile only** (locked decision §3; research 06 §B.2), and **every tier
+is the one fully-open-source build** (locked decision §15; ADR-0022). What changes across tiers is the
+substrate (embedded store → Postgres → SPIs), the deployment topology (single process → compose/small
+K8s → HA/zoned K8s), and which layers (SSO, audit retention, zones, the compliance profile) are
+switched on. None of it changes the programming model, and none of it is a paid gate — the
+**compliance profile is an open-source, optional install**, not a purchased pack.
 
 ---
 
@@ -154,7 +157,7 @@ flowchart TB
     direction TB
     e1["HA K8s: Helm chart (stateless) + Operator (stateful)"]
     e2["Postgres HA + storage SPIs (audit/search/analytics)"]
-    e3["DMZ/intranet zones · SSO · Vault/ESO · compliance packs"]
+    e3["DMZ/intranet zones · SSO · Vault/ESO · compliance profile (OSS, optional)"]
     e4["air-gap bundle (Zarf-style tarball, mirrored registry)"]
     e1 --- e2 --- e3 --- e4
   end
@@ -192,6 +195,7 @@ bundled, and which are deferred to Team+:
 | **Camel-on-Quarkus (heavy adapters)** | **deferred to Team+**; dev uses **native REST/webhook** paths |
 | **Debezium (CDC)** | **deferred to Team+** |
 | **immudb (ledger)** | **deferred to Team+** (optional even there) |
+| **Observability backend** | **none bundled as a commitment** — Dev ships a **minimal local OTel viewer**; Team/Enterprise export via **OTLP to a BYO backend** (CloudWatch/X-Ray, Google Cloud Operations, Grafana, Datadog, …). ichiflow builds no proprietary store and ships no Grafana-class stack (doc 08 §4.1; ADR-0011 amendment note) |
 
 Two honest admissions follow. (1) The core is genuinely **two runtimes** — a JVM (Kotlin activities,
 Drools, domain services) and Node (the TS interpreter workflow + BFFs) — so "single binary" means
@@ -247,8 +251,12 @@ The anti-pattern is Backstage (6–18 months to usable, ~10% adoption). What the
 2. **Convention over configuration** — one obvious way, opinionated defaults; the newcomer writes
    only domain logic.
 3. **Scaffolding generates a *runnable* app, not an empty project** — `create-ichiflow` +
-   domain templates (`loan-origination`, `insurance-claims`, `kyc-review`), each a runnable bundle
-   of canonical Schema + DMN DecisionModel + Flow + human-task queues + audit config.
+   domain templates that **lead with public-sector casework** (`event-permit`, `business-license`,
+   `benefit-application`, `inspection-case` — the design-target-first set, locked decision §16) with
+   the regulated-finance templates (`loan-origination`, `insurance-claims`, `kyc-review`) as the
+   adjacent second set, each a runnable bundle of canonical Schema + DMN DecisionModel + Flow +
+   human-task queues + audit config. The `event-permit` template is the **canonical reference
+   product** ([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md)).
 4. **Instant feedback** — the local UI shows the Decision/Flow execute immediately.
 5. **Explicit dev-vs-prod modes** so dev defaults are convenient without being production-unsafe.
 
@@ -382,6 +390,36 @@ teams from the backend. Each zone gets its own Vault namespace/policy; DMZ workl
 the scoped, short-lived credentials they need (never core-DB creds). **AI agents are non-human
 identities** under this same regime — scoped, short-lived, auditable, never a static shared key
 (research 05 §5.3; cross-ref `06-identity-and-access.md` and `10-ai-native-experience.md` §3).
+
+### 6.3 Production-access posture — a configurable dial, not a forced default
+
+*Who and what may touch production, and by which path,* is a **posture each org configures**, not a
+single stance ichiflow hard-codes (locked decision §18; ADR-0020). ichiflow **ships the mediation
+layers** and lets a deployment dial how strictly they are enforced:
+
+- **the *why* API** ([`08-audit-and-observability.md`](08-audit-and-observability.md)) as the
+  read path — inspect production by querying structured lineage, not by shelling into it;
+- the **human support/ops console** ([`07-ui-and-portals.md`](07-ui-and-portals.md) §7.2) as the
+  mediated human write path (the human PEP over the same Tier-2 actuators an agent uses);
+- **`ichiflow-mcp` guardrail tiers** ([`10-ai-native-experience.md`](10-ai-native-experience.md) §3.3)
+  as the mediated agent path (read-only / sandbox / prod-with-JIT+approval);
+- **environment promotion as the artifact write path** — a change reaches prod by promoting a
+  reviewed, versioned artifact through environments, not by editing prod in place;
+- **break-glass that is loud and logged** — a direct-access escape hatch always exists for
+  emergencies, but every use is conspicuous, time-boxed, and written to the audit ledger.
+
+The **dial levels** an org selects among:
+
+| Posture level | Meaning |
+|---|---|
+| **`zero-direct-access`** | No human or agent holds standing prod credentials; *all* change flows through env promotion + the mediated consoles/tools; break-glass is the only direct path and is loud/logged. The strictest posture for the most regulated adopters. |
+| **`agents-mediated-humans-conventional`** | Agents are confined to the mediated guardrail tiers and NHI/JIT rails, while humans retain conventional (audited) operational access. A pragmatic middle. |
+| **`custom`** | The org composes its own matrix of who (human / NHI) may use which path (why API / console / MCP tier / promotion / break-glass) per environment. |
+
+ichiflow's job is to make the **mediated path the easy, well-lit default** and direct access the
+deliberate exception — but the *strictness* is the operator's dial, so the framework fits both a
+zero-trust ministry and a team that wants conventional ops. The layers are always present; the posture
+selects how much is mandatory.
 
 ---
 
