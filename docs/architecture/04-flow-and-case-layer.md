@@ -105,10 +105,11 @@ deterministic interpreter operation and/or an activity invocation.
 | **adapter-call** | Send/request through a declared **Adapter** (outbound port) | Activity on the TS integration queue → canonical bus ([05-adapters.md](./05-adapters.md)) |
 | **human-task** | Raise a **Task**, block until resolved | `createTask` activity + **await-signal** with an **SLA timer** (§5) |
 | **timer / SLA** | Durable wait (wall-clock or business-calendar) | Temporal timer; deterministic in the interpreter |
-| **parallel / branch** | Fan-out concurrent branches; join on all/any/quorum | Interpreter child scopes over multiple activities |
+| **parallel / branch** | Fan-out concurrent branches; join on all/any/quorum. When branches are per-authority Decisions, the join emits a **`CompositeOutcome`** under a declared composition policy (§5.7), not an ad-hoc FEEL merge | Interpreter child scopes over multiple activities |
 | **loop** | Iterate over a collection or until a condition | Bounded interpreter loop (guardrailed iteration cap) |
 | **sub-flow** | Invoke another Flow definition as a child | Temporal child workflow (its own interpreter instance) |
 | **signal / event-wait** | Block until an external signal or a canonical event arrives (with optional timeout) | Temporal signal / inbound canonical event correlated by `case_id` |
+| **condition-gate** | Block a downstream Flow segment until a named **blocking Condition** reaches `fulfilled` (or is waived) — analogous to `signal/event-wait` but keyed to a Condition (§5.5) | Temporal await on the Condition's fulfilment signal / canonical event; the transition is recorded |
 
 FEEL expressions (the DMN expression language) are the DSL's expression sublanguage for guards,
 routing predicates, and data mapping, so business users use one expression syntax across Decisions
@@ -189,9 +190,20 @@ would require. The Case & Task module is a first-party ichiflow module layered o
 
 A **Case** is the unit of business work. It is created when a Flow starts (typically from an inbound
 canonical command), carries the global `case_id`, and aggregates the flow instance(s), the Tasks,
-the fired-Decision traces, and the DecisionRecord. Its lifecycle — `Open → InProgress →
-(Suspended) → Resolved → Closed` — is driven by the Flow, not hand-managed; the Case row is a
-projection of flow state plus case-level metadata (owner, tenant, priority, SLA envelope).
+the fired-Decision traces, its Outcome and its Conditions (§5.5), and the DecisionRecord. Its lifecycle —
+`Open → InProgress → (Suspended) → Resolved → (ObligationsOpen) → Closed` — is driven by the Flow, not
+hand-managed; the Case row is a projection of flow state plus case-level metadata (owner, tenant,
+priority, SLA envelope).
+
+- **`ObligationsOpen`** is the lightweight state a Case sits in when it has **resolved** but still
+  carries live **post-approval obligations** (§5.5) — deadline-bearing conditions and retention windows
+  that must be tracked *after* the substantive work is done. A Case reaches `Closed` only when its
+  obligations are all fulfilled/waived/expired. (Equivalently, an obligation may spawn a durable child
+  timer/Task that outlives the parent Case; §5.5.)
+- **Case ↔ artifact versioning.** The governed output artifact a Case produces (its "permit/decision"
+  record) is **versioned**. Amendment and correction (§5.6) produce a **new version** of that artifact,
+  version-linked to its predecessors, with the **DecisionRecord spanning all versions** — so the audit
+  chain survives amendments ([08-audit-and-observability.md](./08-audit-and-observability.md) §1).
 
 ### 5.2 Manual review = await-signal + SLA timer + escalation
 
@@ -206,6 +218,12 @@ A **human-task** step implements the documented, battle-tested Temporal human-in
    its **escalation chain** — reassign, notify, escalate to a supervisor queue, or auto-decide via a
    fallback Decision — each step itself an ordinary DSL step, so escalation is authored, not
    hard-coded.
+
+The SLA timer is **pausable** (clock-stop): when a Task enters an `awaiting-external` /
+`awaiting-applicant` sub-state — because the ball has moved to the applicant or another party for
+more information — the SLA clock pauses and the paused interval is excluded from SLA accounting.
+This is a common, legally-material pattern (SLA is measured excluding the party's own wait); the
+mechanics are in §5.7.
 
 Because this is all durable Temporal state, a Task can wait days or months across worker crashes and
 restarts without losing position.
@@ -235,10 +253,113 @@ Task:
   type: loan.manual_review.v1
   queue: underwriting-tier2
   assignee: null                 # set by the assignment Decision
-  sla: { due: 2026-07-15T09:00:00Z, escalation: chain/underwriting-esc-1 }
-  state: open                    # open | claimed | resolved | escalated | expired
+  sla:                           # pausable clock-stop SLA (§5.7)
+    budget: P3D
+    elapsed: P1D4H
+    clock: running               # running | paused
+    escalation: chain/underwriting-esc-1
+  state: open                    # open | claimed | awaiting-external | resolved | escalated | expired
   payload_ref: schema://loan/ManualReviewContext/1
   correlation: { signal: resolve, idempotency_key: t-9f2a }
+```
+
+### 5.5 Conditions: typed, stateful outcome obligations
+
+A Case's Outcome (doc 02 §9.3) can carry **Conditions** — a first-class entity the Case module tracks as
+part of its projected state. Each Condition is individually typed and individually stateful:
+
+- **`kind`** — `blocking` (gates a downstream event/step) or `post-approval-obligation` (an obligation
+  tracked after the substantive decision).
+- **`state`** — `pending → fulfilled | waived | breached`.
+
+The two kinds behave differently in the Flow:
+
+- **Blocking conditions gate later steps.** A blocking Condition (e.g. "present the item for
+  inspection," "prior approval obtained," "duty paid") holds a downstream Flow segment via a
+  **`condition-gate`** step (§2.3) until it reaches `fulfilled` or is `waived`. Fulfilment arrives as a
+  signal or canonical event (correlated by `case_id`) and the transition is recorded to the
+  DecisionRecord.
+- **Post-approval obligations can outlive Case closure.** Obligations carry **deadlines** and
+  **retention windows** ("return supporting documents within 48 hours," "retain records five years,"
+  "re-export within the window"). They must be trackable *after* the Case reaches `Resolved`: the Case
+  either sits in the lightweight `ObligationsOpen` state (§5.1) or the obligation spawns a **durable
+  child timer/Task**. A **missed deadline** flips the Condition to `breached`, raises a canonical
+  `condition.breached` event, and may open a **remediation Case** — the breach is a distinct,
+  audit-first-class event ([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6).
+
+```yaml
+# Conditions on a Case Outcome (canonical shapes from doc 02 §9.3)
+conditions:
+  - code: PRESENT_FOR_INSPECTION
+    codeSet: obligations@4.3.0
+    kind: blocking
+    gates: [cargo-release]          # a condition-gate step keyed here holds the release segment
+    state: pending
+  - code: RETURN_SUPPORTING_DOCS
+    codeSet: obligations@4.3.0
+    kind: post-approval-obligation
+    deadline: { fromResolution: P0D, dueIn: PT48H }   # tracked after the Case resolves
+    state: pending
+```
+
+### 5.6 Post-submission Case operations
+
+A submitted Case is not frozen at "decided." ichiflow models **amend, cancel, withdraw, appeal, and
+correct** as first-class Case operations. Each operation is:
+
+1. **State-gated** by the Case lifecycle — e.g. *amend* only while the artifact is not yet consumed or
+   expired; *cancel* only within a validity window and not while under compliance hold.
+2. **Reason-coded** from a governed CodeSet where applicable — cancellation captures a reason code
+   (a `cancellation-reasons` CodeSet, doc 02 §9.1).
+3. **Field-scoped for amendment** via a governed **field-amendability CodeSet**: some fields are
+   amendable in place, others are **non-amendable** — attempting to change a non-amendable field forces
+   a **cancel-and-resubmit** path rather than a mutation.
+4. **Artifact-versioning** (§5.1): the operation produces a **new version** of the governed output
+   artifact while preserving DecisionRecord continuity across versions.
+5. **Alternative-remediation aware**: when a hard state gate blocks the operation (e.g. the artifact is
+   already consumed, or the case is expired past a threshold, or under audit), the operation branches to
+   an **alternative-remediation Flow** (e.g. voluntary disclosure / manual redress) rather than failing
+   silently.
+
+**Correlated child Cases.** *Correction*, *appeal*, and *withdraw* open **correlated child Cases** that
+reference the parent's DecisionRecord — a correction re-enters as a *new* correlated submission (the
+original Case closed as rejected/superseded), an appeal spawns a review sub-case, a withdrawal records a
+terminal disposition. This formalises the Case↔Flow cardinality question (Open questions): a Case is not
+strictly 1:1 with a root Flow — post-decision operations spawn sibling/child flows under one correlation
+lineage.
+
+| Operation | Typical state gate | Reason-coded | Produces |
+|---|---|---|---|
+| **amend** | not consumed / not expired; field is amendable | (field-amendability CodeSet) | new artifact version |
+| **cancel** | within validity; not under hold | cancellation-reason CodeSet | terminal cancel + version |
+| **withdraw** | pre-resolution | optional | terminal disposition |
+| **appeal** | post-decision, within appeal window | appeal-reason CodeSet | correlated child review Case |
+| **correct** | on non-amendable field / post-rejection | correction-reason CodeSet | new correlated child Case |
+
+### 5.7 Clock-stop (pausable) SLA timers and composite per-authority clocks
+
+SLA timers support **pause/resume** so that time spent waiting on an external party does not count
+against the processing budget:
+
+- Entering an `awaiting-external` / `awaiting-applicant` Task sub-state (§5.2, §5.4) **pauses** the SLA
+  clock; resuming (the party responds) **resumes** it. The paused interval is **excluded** from SLA
+  accounting and **recorded distinctly** as a clock-stop event
+  ([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6), because it carries SLA-reporting
+  weight.
+- A **composite Case** (§2.3 in [03-decision-layer.md](./03-decision-layer.md)) runs **independent
+  per-authority clocks**: each authority's Decision has its own SLA budget and its own pause/resume
+  state, so one authority's request-for-information does not pause another's clock, and the Case-level
+  view aggregates the per-authority clocks.
+- The **composite fan-out/join** is a `parallel/branch` step (§2.3) whose join applies the declared
+  **composition policy** and emits a `CompositeOutcome`; authority-selection is a `decision-eval` routing
+  step over a classification CodeSet (§5.3, "routing is a Decision").
+
+```yaml
+# Pausable SLA on a Task (clock-stop), with an awaiting-applicant sub-state
+Task:
+  sla: { budget: P3D, elapsed: P1D4H, clock: paused }   # paused excludes applicant wait
+  subState: awaiting-applicant                           # open | claimed | awaiting-applicant | resolved | ...
+  clock: { pausedAt: 2026-07-10T09:00:00Z, reason: request-for-information }
 ```
 
 ---
@@ -357,9 +478,11 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
   1.0 vs. adding ichiflow-specific step types (human-task, decision-eval)? Strict fidelity maximizes
   portability; extensions maximize expressiveness. Likely: a conformant core + a clearly-marked
   ichiflow extension namespace, with the extensions degrading gracefully on export.
-- **Case aggregate vs Flow instance cardinality.** Is a Case always 1:1 with a root Flow instance,
-  or can one Case span multiple sibling flows (e.g. a claim with parallel sub-cases)? Affects the
-  DecisionRecord stitching model and the task inbox grouping.
+- **Case aggregate vs Flow instance cardinality.** §5.6 establishes that post-decision operations
+  (appeal / correct / withdraw) spawn **correlated child Cases**, so a Case is *not* strictly 1:1 with a
+  root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows
+  *concurrently* (e.g. a submission with parallel per-authority sub-cases under §2.3 composition) — how
+  the DecisionRecord and task-inbox grouping present one logical Case over N flows.
 - **Interpreter granularity.** One universal interpreter workflow vs. a small family (e.g. a
   separate interpreter for high-fan-out vs. long-human-wait shapes) to tune Temporal history size
   and sticky-cache behavior. Undecided pending load testing.

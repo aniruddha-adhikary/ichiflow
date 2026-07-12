@@ -82,6 +82,29 @@ runtime sprawl for the ability to terminate any protocol an enterprise throws at
 ([../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md) §A.4 risk:
 "polyglot runtime sprawl" — mitigated by making the bus + contract the invariant).
 
+### 2.1 Legacy structured-message profile (segment / positional EDI-family)
+
+The catalogue is not only REST / MQ / Kafka / SOAP / file. Some inbound channels are **fixed-field or
+segment-based message formats** — the EDI-family lineage (segment-and-element messages, positional /
+fixed-width records) still load-bearing in trade, finance, insurance, and health. ichiflow enumerates a
+first-class **legacy structured-message adapter profile**:
+
+- **Contract** — the message grammar (segment/element dictionary or positional field map) declared as a
+  schema'd artifact, versioned in the registry like any other contract.
+- **Mapping** — inbound segment/positional message → canonical command, and canonical → outbound message,
+  as a declared, versioned Message Translator (§4). The heavy/legacy Camel-on-Quarkus binding hosts the
+  transport and codec.
+- **Boundary validation** — the decoded structure is schema-validated at the boundary exactly like every
+  other adapter, so a malformed segment never reaches the core.
+
+**Immutable-submission pattern.** In many regulated domains a submission is a legal artifact that is
+**not mutated** on rejection. The profile makes this explicit: a rejected inbound message is **not
+edited** — the correction is a **new correlated inbound message assigned a new correlation id**, and the
+original Case is closed as **rejected/superseded** (the correction opens a correlated child Case,
+[04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.6). The adapter therefore treats each inbound
+message as immutable and relies on the Correlation Identifier (§4) to link a correction to its
+predecessor, rather than attempting an in-place amend at the wire edge.
+
 ---
 
 ## 3. Ports-and-adapters topology (diagram)
@@ -158,6 +181,22 @@ the EIP vocabulary verbatim so architects and AI agents share one language:
 Canonical types are **bounded-context-scoped and strictly versioned** to prevent the CDM becoming a
 bloated "god schema" ([../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md) §A.4
 risk: "canonical model rot").
+
+### 4.1 Outbound composite-outcome publication
+
+A resolved **`Outcome` / `CompositeOutcome`** (the typed decision result, with all its reason codes and
+conditions intact — [02-schema-foundation.md](./02-schema-foundation.md) §9.3,
+[03-decision-layer.md](./03-decision-layer.md) §2.3) is published as a **canonical outbound event** and
+consumed by **multiple** downstream adapters, partners, and portals — the "one structured outcome,
+many consumers" pattern. Two requirements make this safe:
+
+- **The outcome is part of the canonical event schema**, so it fans out through ordinary outbound
+  adapters (§4, §3 diagram) with no special path.
+- **Codes survive serialization unaltered.** Every code is a `CodeRef` (`code` + `codeSet@version`, doc
+  02 §9.3) pinned to its governed CodeSet, so a downstream consumer reads the exact same code, from the
+  exact same table version, that the Decision emitted — and per-authority attribution on a
+  `CompositeOutcome` is preserved through the wire. A breaking change to the outcome/code shape bumps the
+  canonical type version (§9) like any other contract.
 
 ---
 

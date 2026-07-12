@@ -139,6 +139,31 @@ flowchart TD
   DR -.->|as-of replay| REPLAY["Deterministic replay\n= forensic tool (§6)"]
 ```
 
+### 1.5 Code, condition, authority, and reference-data attribution
+
+Regulated outcomes are legally load-bearing at the granularity of a **single code**: penalties, appeals,
+and remediation turn on *which* code fired, from *which* authority, under *which* rule and reference-data
+version. The DecisionRecord and "why" API therefore answer, for any Case:
+
+- **Which codes were emitted** — every reason and condition code on the Case's `Outcome` /
+  `CompositeOutcome` (canonical typed shapes, [02-schema-foundation.md](./02-schema-foundation.md) §9.3).
+- **By which authority / Decision** — for a composite decision
+  ([03-decision-layer.md](./03-decision-layer.md) §2.3), each member Outcome and its codes stay attributed
+  to their originating **authority / rule-owner**.
+- **Under which versions** — the **DecisionModel version** that emitted the code *and* the
+  **CodeSet / rate-table version** it read (the `codeSet@version` pin carried in the typed trace,
+  [03-decision-layer.md](./03-decision-layer.md) §7). A computed fee records the **rate-table version**
+  used alongside the amount.
+- **The lifecycle history of each condition** — every transition (`raised → fulfilled | waived |
+  breached`) with its **timestamp and actor** ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md)
+  §5.5).
+
+Post-submission operations — **amendment, cancellation, appeal, withdrawal, correction**
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.6) — appear as **attributed events spanning
+the artifact's versions** (§1.1, the versioned governed output artifact), so the causal chain survives
+amendments and every version is **bitemporally as-of reconstructable** (§3). A correction's child Case
+references the parent DecisionRecord, keeping the lineage queryable end to end.
+
 ---
 
 ## Part 2 — Storage strategy
@@ -267,6 +292,24 @@ For **BCBS 239 end-to-end data lineage** at the dataset/pipeline layer, ichiflow
 §2.3, §6). This complements the per-Case causal chain: OpenLineage covers *data/pipeline* lineage (how a
 dataset was produced), the DecisionRecord covers *decision* lineage (why a Case resolved as it did).
 Together they satisfy the lineage principle regulators find hardest.
+
+### 4.6 Obligation-breach and SLA-pause events are audit-first-class
+
+Two Case-lifecycle transitions carry legal / penalty and SLA-reporting weight and are therefore recorded
+as **distinct, queryable audit events**, not merely inferred from state:
+
+- **Obligation breach.** When a post-approval obligation misses its deadline
+  ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.5), a `condition.breached` event is
+  written — attributed to its condition code, CodeSet version, deadline, and the Case artifact version —
+  because a breach may trigger a penalty or open a remediation Case, and an auditor must be able to query
+  "every Case that breached obligation X."
+- **SLA clock-stop (pause/resume).** Each pause and resume of a pausable SLA timer
+  ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.7) is recorded distinctly, with the
+  reason (e.g. request-for-information) and the paused interval, so SLA reporting can prove *net*
+  processing time excluded the party's own wait — and, on a composite Case, per authority clock.
+
+Both event kinds land in the same append-only stream as the rest of the DecisionRecord (§1, §2.2) and are
+`case_id`-correlated, so they surface through the "why" API alongside decisions and human actions.
 
 ---
 
