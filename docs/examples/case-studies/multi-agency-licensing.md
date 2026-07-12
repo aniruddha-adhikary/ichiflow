@@ -706,5 +706,3 @@ needs. Keep `CaseType` **additive**, per the closed-core/declared-extension doct
 [^download]: GoBusiness — approved licences **downloadable from *My Licences* within one business day** of
     approval; login via **Singpass** (Corppass-assigned for UEN entities since 11 Apr 2021).
     https://licensing.gobusiness.gov.sg/faq/manage-licences/download-licence
-</content>
-</invoke>
