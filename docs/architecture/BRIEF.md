@@ -51,18 +51,27 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 8. **Authorization**: central PDP driving the SAME entitlements across generated API and generated
    UI (field/row-level); authz decisions produce decision logs (explainable). **v1 = OpenFGA only**
    (ReBAC backbone + list-filtering + simple attribute conditions). **Cedar/OPA ABAC** for richer
-   attribute/feature/field-level policy is an **Enterprise-tier / post-v1 add-on behind the same PDP
-   interface** — the PDP contract is unchanged whether one engine or two sit behind it; the hybrid
+   attribute/feature/field-level policy is a **post-v1 capability-profile add-on (open source,
+   optional install) behind the same PDP interface** — the PDP contract is unchanged whether one
+   engine or two sit behind it; the hybrid
    OpenFGA + Cedar/OPA model remains the target end-state.
 9. **Audit/explainability**: per-case DecisionRecord is a first-class typed domain object
    stitching workflow event history + fired-rule traces + DMN results + human review + AI-agent
    actions into one causal chain, queryable via a "why" API. Event-source the decision/flow
    core only; audit tables + transactional outbox elsewhere; bitemporal as-of support.
+   Observability is **OTel-native, BYO backend**: all signals (traces/metrics/logs/decision events)
+   export via standard OTLP and work with AWS CloudWatch/X-Ray, Google Cloud Operations, Grafana,
+   Datadog, etc.; ichiflow builds **no proprietary observability store** and ships **no bundled
+   Grafana-class stack as a commitment** (integration guidance only) — the Dev tier bundles a minimal
+   local viewer.
 10. **Persistence**: PostgreSQL-first with storage SPIs (audit/search/analytics swappable);
     correlation via global case_id; CDC via Debezium where needed.
 11. **Topology**: modular monolith by default, async-first module boundaries, split-later into
     independently scalable services; explicit DMZ/intranet zone support (portal in DMZ, core in
-    intranet, one-way async relay between zones).
+    intranet, one-way async relay between zones). **v1 is single-org per deployment**, with
+    multi-tenant seams designed in now (tenant_id discipline in schemas/persistence, per-Portal IdP
+    isolation already present, entitlement scoping) so hosted multi-tenant can follow later without
+    rework.
 12. **AI-native surfaces**: in-repo agent kit (AGENTS.md, .claude/ skills, hooks, subagents,
     plugin) + first-party `ichiflow-mcp` runtime MCP server exposing the why/case/flow query
     APIs with three server-enforced guardrail tiers (read-only / sandbox-mutating /
@@ -76,6 +85,35 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     exportable (DMN, flow DSL, schemas, data) — migration OUT is as supported as migration IN.
 14. **Licensing hygiene**: avoid Camunda 8 (paid license), Liquibase 5 (FSL), KurrentDB (KLv1
     needs legal review), openapi-fetch (maintenance mode). Prefer Apache-2.0/MIT substrates.
+    ichiflow itself is **fully open source** (Apache-2.0/MIT) end to end — see decision 15.
+15. **Fully open source**: ichiflow ships **entirely under Apache-2.0/MIT — all of it**, including
+    every capability the docs call "enterprise"/"compliance". There is **no gated feature, no
+    open-core, no source-available tier**. Monetization, if ever, is **support / hosting / services**,
+    never gated features. The Dev/Team/Enterprise **tiers are technical capability profiles**
+    (deployment-complexity ladders), **not commercial editions**; a "compliance profile/add-on" is an
+    open-source, optional install (ADR-0022, consistent with the licensing-hygiene ADR-0016).
+16. **Design target — public sector first**: the primary first-adopter design target is
+    **government / public-sector-style casework** (permitting, licensing, registrations, benefits,
+    inspections), with **regulated financial services** the adjacent second target (loan/claims/KYC
+    examples stay valid). Onboarding/domain templates prioritize permit/licensing/benefits-style
+    templates; procurement realities (self-host, air-gap, data residency) already fit. The permit
+    walkthrough ([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md))
+    is the **canonical reference product**. **HARD RULE: no real government systems are named.**
+    **v1 acceptance = one real app end-to-end**: the reference product running on the kernel
+    (schemas→decisions→flows→portal→audit→ichiflow-mcp debug, all real) is the v1 milestone
+    (ADR-0023, ADR-0017 amendment).
+17. **Prefer proven open source**: when a mature OSS component exists for a **non-differentiating**
+    concern, **integrate it rather than build** (BI, IdP, observability backends are the exemplars);
+    the **differentiators — decision governance, DecisionRecord, Flow DSL, Copilots — are built**.
+    Reporting therefore **embeds proven OSS BI** (Metabase/Superset-class) over ichiflow's
+    schema-derived, **governed read-model projections** (cases, outcomes, conditions/obligations,
+    SLAs, decision stats) with first-class integration (embedding, SSO via the broker, row/field-level
+    security driven by the same PDP); there is **no custom report engine** (ADR-0021).
+18. **Production-access posture is a configurable dial**: ichiflow ships the mediation layers (the
+    *why* API, the support/ops console, ichiflow-mcp guardrail tiers, env promotion as the artifact
+    write path, break-glass that is loud and logged), and each org **configures its posture** —
+    e.g. `zero-direct-access` / `agents-mediated-humans-conventional` / `custom` — rather than
+    inheriting one forced default (ADR-0020).
 
 ## Core vocabulary (use these names consistently)
 
@@ -117,7 +155,11 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   a DTCG design-token pipeline, a component workbench, a live playground (real screens over
   schema-driven mocks), and a designer-facing safety contract (see doc 07). uischema/viewschema
   are the canonical artifacts; **AI chat authors them and the live playground is the read-only
-  judgment surface** (no visual-builder canvas — Authoring doctrine; ADR-0019).
+  judgment surface** (no visual-builder canvas — Authoring doctrine; ADR-0019). The **chat +
+  live-preview playground is THE designer surface** (prompt-first, rapid low-fi exploration against
+  real schemas/mock data). **Figma is optional**: it imports brand tokens/variables *in* (the DTCG
+  pipeline stays) and exports rendered screens/specs *out* for stakeholder review — there is **no
+  two-way hi-fi round-trip / Code-Connect-class bridge** (ADR-0019 amendment).
 - **pageschema / copyset** — first-class **governed designer artifact classes** (see doc 07 §13):
   `pageschema` composes multiple uischema/viewschema regions into a screen; `copyset` is a
   translator-friendly, i18n-keyed microcopy catalog referenced by key (sharing the CodeSet
@@ -138,8 +180,11 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   artifacts, never a second editable representation. The approval surface is the **diff (AI-explained
   in plain language) + preview / simulation** pair. Direct artifact editing remains available to
   developers. (See doc 00 "Chat to author, preview to judge"; ADR-0019.)
-- **Tiers** — Dev (single binary, SQLite/embedded), Team (docker compose/small K8s, Postgres),
-  Enterprise (HA, zones, SSO, compliance packs). Same app code across tiers; config only.
+- **Tiers** — **technical capability profiles (deployment-complexity ladders), not commercial
+  editions**: Dev (single binary, SQLite/embedded), Team (docker compose/small K8s, Postgres),
+  Enterprise (HA, zones, SSO, compliance profile). Same app code across tiers; config only; **all
+  tiers are the one open-source build** (decision 15). A **compliance profile/add-on** is an
+  open-source, optional install, not a paid pack.
 
 ## Personas
 

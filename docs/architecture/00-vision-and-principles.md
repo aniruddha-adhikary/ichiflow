@@ -38,6 +38,19 @@ benefits adjudicator, a trade-exception desk — strip the domain nouns and they
 skeleton. ichiflow **modularizes that skeleton** so a team declares the parts specific to
 their domain and inherits the rest, correct and audited, from the framework.
 
+**Primary design target — public-sector casework.** ichiflow's first-adopter design target is
+**government / public-sector-style casework**: permitting, licensing, registrations, benefits, and
+inspections — regulated, human-in-the-loop processes with codified eligibility, obligations, appeals,
+and a hard audit mandate. **Regulated financial services** (loan origination, claims, KYC) is the
+**adjacent second target**, and every finance example in these docs stays valid. The two share the
+skeleton above; choosing public sector first orients the onboarding templates
+(permit/licensing/benefits-style first) and confirms that ichiflow's procurement-hard properties —
+self-host, air-gap, data residency, full exportability — are load-bearing, not optional. The
+**canonical reference product** is the outdoor-event-permit walkthrough in
+[`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md). **No real
+government system is ever named** in these docs; illustrations are generic by rule. (Product strategy:
+ADR-0023.)
+
 The framework is:
 
 - **Schema-centric** — one canonical typed model is the source of truth; every type,
@@ -194,8 +207,26 @@ Enterprise add-on behind the same PDP interface — ADR-0010, ADR-0017.)
 
 ### "Same code from laptop to zoned HA."
 There is one application codebase. The Dev tier (single binary, embedded store), Team tier
-(compose/small K8s, Postgres), and Enterprise tier (HA, DMZ/intranet zones, SSO, compliance
-packs) differ by **configuration only**. What you debug on a laptop is what runs in production.
+(compose/small K8s, Postgres), and Enterprise tier (HA, DMZ/intranet zones, SSO, the compliance
+profile) differ by **configuration only**. Tiers are **technical capability profiles, not commercial
+editions** — every tier is the one open-source build. What you debug on a laptop is what runs in
+production.
+
+### "Fully open source; no gated features."
+ichiflow ships **entirely under Apache-2.0/MIT — all of it**, including everything the docs call
+"enterprise" or "compliance." There is **no open-core split, no source-available tier, no paywalled
+capability**: the compliance profile is an open-source optional install, not a paid pack. Any future
+monetization is **support / hosting / services**, never gated features. This is the natural extension
+of the licensing-hygiene stance (ADR-0016) from "don't embed lock-in" to "don't *be* lock-in"
+(ADR-0022).
+
+### "Prefer proven open source."
+When a **mature open-source component exists for a non-differentiating concern, integrate it rather
+than build it.** Business intelligence, the identity provider, and observability backends are the
+exemplars — ichiflow embeds proven OSS (Metabase/Superset-class BI, Keycloak, any OTLP backend)
+rather than reinventing them. What ichiflow *does* build is the **differentiators**: decision
+governance, the DecisionRecord, the Flow DSL, and the Copilots. The test for "build vs. integrate" is
+whether the concern is where ichiflow's value actually lives (ADR-0021).
 
 ### "Async-first boundaries; split later."
 The default topology is a modular monolith, but module boundaries are async-first from day one,
@@ -237,12 +268,21 @@ phasing table aligned to this overview.
   Cedar/OPA ABAC layer, Camel-on-Quarkus heavy adapters, Debezium CDC, immudb ledger.
 - **post-v1** — GoRules ZEN second engine, Zitadel, self-service SSO/SCIM, Atlas/pgroll Ring-2, all
   **Copilots** (Domain Modeling, Migration, Rule Authoring, UI/Design — Ring-0 mapping ships as
-  declarative data without the Copilot), MCP Tier-2 prod-mutating, and the **Enterprise compliance
-  pack** (OpenLineage/BCBS-239 lineage, wide-event store, trigger-based bitemporal history).
+  declarative data without the Copilot), MCP Tier-2 prod-mutating, and the **compliance profile**
+  (an open-source, optional install — OpenLineage/BCBS-239 lineage, wide-event store, trigger-based
+  bitemporal history), plus **BI reporting via embedded OSS BI over governed read models**
+  ([`08-audit-and-observability.md`](08-audit-and-observability.md) §8; ADR-0021).
 
 **Governance scales with tier, not by fiat:** the governance-level dial defaults to **off** (Dev),
 **light** (Team), **full** (Enterprise) — ADR-0017, [`03-decision-layer.md`](03-decision-layer.md)
 §5.6.
+
+**v1 acceptance test — one real app, end-to-end.** The v1 milestone is not a feature checklist; it is
+**the canonical reference product made real**: the outdoor-event-permit product
+([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md)) running on
+the kernel with **every layer real** — schemas → decisions → flows → portal → audit → `ichiflow-mcp`
+debug — not mocked or stubbed. v1 is "done" when a permit application flows arrival-to-resolution on
+the actual kernel and an agent can debug a stuck case through the *why* API. (ADR-0017 amendment.)
 
 ## 6. Non-goals (explicit)
 
@@ -329,7 +369,10 @@ window onto.
   residual question is only *how close the `full` surface gets to Decision Center*, not the dial.
 - **Second rule engine timing.** DMN is canonical and Drools is the reference engine; when does
   the GoRules ZEN (TS/edge) engine become a supported tier rather than a planned one?
-- **Managed offering.** Non-goal for now — but the boundary between "self-hosted framework" and
-  any future managed control plane needs an explicit line before it blurs.
+- **Managed offering.** Non-goal for now — and constrained by the fully-open-source stance
+  (ADR-0022): any future revenue is **support / hosting / services over the same open build**, never
+  gated features, so a managed control plane could only ever be a convenience, not a feature paywall.
+  The boundary between "self-hosted framework" and any such hosted convenience still needs an explicit
+  line before it blurs.
 - **BAL-like authoring.** Whether ichiflow ships a controlled-natural-language authoring surface
   that compiles to DMN, or standardizes on DMN decision tables + FEEL only, is undecided.

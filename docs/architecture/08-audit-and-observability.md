@@ -260,6 +260,17 @@ across JVM/Kotlin and Node/TS — `../research/05` §2.1, §6). ichiflow emits a
 The framework-specific work is *not* "adopt OTel" (settled) — it is **correlating business decision
 traces with technical traces** and exposing a queryable "why" surface both humans and agents use.
 
+**OTel-native, BYO backend (locked decision §9; ADR-0011 amendment note).** *Every* signal —
+traces, metrics, logs, **and the decision events** (§4.3) — exports via **standard OTLP**, so a
+deployment points ichiflow at **whatever backend it already runs**: AWS CloudWatch / X-Ray, Google
+Cloud Operations, Grafana (Tempo/Loki/Mimir), Datadog, and any other OTLP-compatible stack. ichiflow
+**builds no proprietary observability store** and **does not ship or bundle a Grafana-class stack as a
+commitment** — what it provides for backends is **integration guidance**, not a shipped/owned monitoring
+product. The **Dev tier bundles only a minimal local OTel viewer** so a laptop shows spans without
+standing up a backend ([`09-deployment-and-topology.md`](09-deployment-and-topology.md) §3.1). The
+differentiator ichiflow *does* own is the business↔technical correlation and the *why* API over it
+(§1, §4.2) — not the telemetry store underneath.
+
 ### 4.2 `trace_id ↔ case_id` correlation
 
 - Set the business correlation ID (`case_id`) at the entry point, propagate it via **OTel baggage**, and
