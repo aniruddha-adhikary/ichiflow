@@ -217,7 +217,11 @@ selects how strictly the mediated paths are mandatory versus how much convention
 tiers themselves are always enforced server-side. See
 [`09-deployment-and-topology.md`](09-deployment-and-topology.md) §6.3 and ADR-0020 for the dial, its
 levels, and the sibling mediation layers (why API, human ops console, env promotion, loud/logged
-break-glass).
+break-glass). **v1 phasing (ADR-0024):** the sibling **human ops console is not built as a UI in v1** —
+in v1 the human operator's path *is* these `ichiflow-mcp` Tier-2 actuators in Claude Code (the console
+is the same human PEP over the same actuators, a post-v1 builder surface; see
+[`07-ui-and-portals.md`](07-ui-and-portals.md) §7.2 and doc 12 class D3). The env-promotion,
+break-glass, and why-API mediation layers are all v1.
 
 ### 3.4 Agents as non-human identities
 

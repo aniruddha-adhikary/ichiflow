@@ -277,6 +277,18 @@ phasing table aligned to this overview.
 **light** (Team), **full** (Enterprise) — ADR-0017, [`03-decision-layer.md`](03-decision-layer.md)
 §5.6.
 
+**Human-surface phasing — LLM-only internal surfaces in v1 (ADR-0024).** v1 keeps its human-built UI
+to the **generated end-user Portals only** — the customer/partner forms + status and the back-office
+**manual-review** inbox/case view, because generating those Portals *is* the product. **Every internal
+/ operator / builder / admin surface** (support/ops console, Decision governance/approval, the Design
+Kit playground + component workbench, admin/config, the standalone auditor query surface, the packaged
+Copilots) is **LLM-only in v1** — Claude Code + `ichiflow-mcp` + the `ichiflow` CLI + chat, with live
+previews as **read-only rendered artifacts** (an `ichiflow preview` URL, not an interactive app). The
+underlying typed APIs / MCP tools **are** the seam, so those internal surfaces can be "wed in" as real
+apps **post-v1** without a rewrite — only the v1 phasing of *surfaces* is affected, never a seam or
+contract. Full inventory, per-surface LLM paths, and the accepted UX tradeoffs with their revisit
+triggers are in [`12-system-map-and-v1-surfaces.md`](12-system-map-and-v1-surfaces.md).
+
 **v1 acceptance test — two real exercises, both required.** The v1 milestone is not a feature
 checklist; **v1 is accepted only when *both* of these pass on the actual kernel** (ADR-0017 amendment):
 

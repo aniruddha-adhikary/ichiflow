@@ -376,6 +376,15 @@ required approvals, SLA timers, and escalation. Approvals, reviewers, diffs, and
 are recorded to the append-only DecisionRecord so "who approved this rule change, when, on what
 evidence" is answerable via the why API.
 
+**Approval-as-a-Flow is not DecisionModel-only.** The same pattern governs a change to **any** governed
+Workspace artifact — **CodeSets** especially, but uniformly Schemas, Flows, uischemas, and policies. A
+change opens a review Case whose **routing is itself a Decision**: it routes to approvers **by role within
+the artifact's owning Team** (the `owner` relation, [02-schema-foundation.md](./02-schema-foundation.md)
+§9.1, [06-identity-and-access.md](./06-identity-and-access.md) Part 4) — an `approver`/`steward` of the
+owning team, or a designated approver team — exactly the "routing is a Decision" stance as Task assignment
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.3). Reference-data change governance (the
+deprecation/impact-review flow for referenced codes) is detailed in §5.8.
+
 ### 5.3 Business-user authoring UX — AI-chat-first, judged by live simulation (v1)
 
 Per the authoring doctrine (ADR-0019; doc 00 "Chat to author, preview to judge"), a business user
@@ -449,6 +458,13 @@ Approval-as-a-Flow (§5.2), released baselines, and coverage gating are the **`f
 (Enterprise default); the lighter levels are the tier-defaulted posture for teams that do not need
 that ceremony, and any Workspace may set its level explicitly.
 
+**The dial is also overridable per artifact.** The Workspace/tier level is the default, but an individual
+governed artifact may carry its own `governance.level` (and approval-routing rule), overriding it either
+way — so a high-stakes **CodeSet** (a legally-precise rate or eligibility table) can run `full` governance
+inside an otherwise `light` Workspace, and a throwaway internal lookup can opt down. The override lives in
+the artifact's envelope/metadata (e.g. a CodeSet's `governance` block,
+[02-schema-foundation.md](./02-schema-foundation.md) §9.1) and is itself version-controlled.
+
 ### 5.7 Shadow / canary promotion for any rule change
 
 The shadow → canary → authoritative promotion ladder is **not migration-only**. Migration defines it
@@ -468,6 +484,35 @@ golden-dataset diff — and this subsection assembles them into one promotion st
 every released rule, not only migrated ones. (How released artifacts are *deployed/promoted across
 environments* — a runtime rule registry, dev→staging→prod promotion, hot-deploy independent of code
 — is a separate, larger question not settled here.)
+
+### 5.8 Reference-data (CodeSet) change governance and the deprecation/impact-review flow
+
+**CodeSets are governed exactly like DecisionModels**, inheriting the governance dial (§5.6) with a
+per-artifact override (a CodeSet's `governance` block, [02-schema-foundation.md](./02-schema-foundation.md)
+§9.1). A change to a `full`-governed CodeSet opens a review Case via the same approval-as-a-Flow machinery
+(§5.2), **routed by role within the CodeSet's owning Team** — an `approver`/`steward` of the owning team,
+or a designated approver team ([06-identity-and-access.md](./06-identity-and-access.md) Part 4). The
+routing rule is a **Decision** (like assignment routing, §5.2), so *which* approver a reference-data change
+lands on is governed, simulated, and explained, not hard-wired.
+
+Because CodeSets are **interdependent** ([02-schema-foundation.md](./02-schema-foundation.md) §9.4), a
+change that **deprecates or removes a referenced row** carries extra ceremony beyond a normal edit:
+
+- **Publish-time impact analysis.** The publish gate walks the CodeSet dependency graph (doc 02 §9.4) to
+  enumerate every dependent — other CodeSets' `codeRef` columns, and the DecisionModels/Flows/UI that pin
+  the affected `codeSet@version`. Cross-version, effective-dated referential integrity is checked, so a
+  deprecation cannot silently orphan a live dependent.
+- **Blocked publish or forced dependent review.** If dependents exist, the change is either **blocked** or
+  **routed into a review Flow that fans out to each dependent's owning-team approvers** — a per-authority
+  fan-out/join (§2.3, [04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.7) over the impacted
+  owning teams — so a shared code is retired only on an explicit, audited, multi-owner decision.
+- **On the audit spine.** The impact set, the approvals, and the referential-integrity result are recorded
+  to the DecisionRecord, so "why was this code deprecated, who signed off, and what did it break" is
+  answerable via the why API (§7).
+
+Effective-dating (§2.2) makes the transition safe: a deprecating change can be released with a future
+`effective.from` while dependents migrate their pins, and in-flight Cases stay pinned to the
+`codeSet@version` they started on (§5.7).
 
 ---
 

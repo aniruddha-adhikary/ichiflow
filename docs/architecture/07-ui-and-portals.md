@@ -166,6 +166,11 @@ audience-appropriate layer selected from the Portal's audience config (§8). Bec
 lives in the governed CodeSet, a code's meaning is authored once and stays consistent across every
 Portal, the why API, and printed correspondence.
 
+Where a value is a **`codeRef` into another CodeSet** (interdependent reference data, doc 02 §9.4),
+resolution follows the **CodeSet dependency graph** to fetch the referenced CodeSet's display metadata —
+so a code that points at, say, a `countries` CodeSet renders that country's audience-appropriate label
+without the referencing screen duplicating it.
+
 ### 4.2 App-level internationalization (i18n / l10n)
 
 CodeSet display metadata carries per-locale `plainLanguage` for coded values (§4.1, doc 02 §9.2) —
@@ -305,6 +310,15 @@ Two error-UX gaps for a *stuck* Case (adapter down, engine error) close onto exi
   back-office surface over the Case-status + Tier-2 primitives, not a bespoke tool — otherwise the
   agent out-tools the human.
 
+  **v1 phasing (ADR-0024).** In v1 this human ops console is **not built as a UI**; the operator's v1
+  surface is **Claude Code + `ichiflow-mcp`** — the *same* Tier-2 actuators (signal / retry / cancel /
+  re-drive / reassign / patch, [10-ai-native-experience.md](10-ai-native-experience.md) §3.2) with the
+  why API as the read path, gated by JIT NHI + approval + audit. The console is a **post-v1 builder
+  surface** (doc 12 class D3), and the seam that keeps it a later, additive build is precisely that it
+  is the *human PEP over the same Tier-2 API* — a UI is just another client of the actuators the agent
+  already uses. The honest v1 cost (a non-agent operator works through chat) and its revisit trigger
+  are recorded in [12-system-map-and-v1-surfaces.md](12-system-map-and-v1-surfaces.md) §3.
+
 ---
 
 ## 8. Portals — audience-scoped deployables
@@ -403,6 +417,18 @@ first-party surface a designer actually operates, so the persona is defined by t
 only by the override mechanism. It is the design-side parallel to the AI-native agent kit (doc 10),
 and its core properties ride rails that already exist — one schema source, deterministic generation,
 the regenerate-and-diff CI gate, a reason-returning PDP.
+
+> **v1 phasing (ADR-0024) — the Design Kit is *artifacts + previews* in v1, not built apps.** The
+> Design Kit's **contracts and pipelines are all v1**: the DTCG token pipeline (§11.1), the
+> uischema/viewschema/pageschema/copyset artifact classes (§13), the drift/a11y/contrast CI checks
+> (§12), and the schema-driven mock substrate (§14). What v1 does **not** build as an interactive app
+> is the **component workbench** (§11.2) and the **live playground** (§11.3): the designer's v1 surface
+> is **chat + a read-only `ichiflow preview` URL** that *renders* the real stories and screens from the
+> canonical artifacts. The interactive workbench/playground apps are a **post-v1 builder surface**
+> (doc 12 class D1); the seam that keeps them additive is that they are just another renderer of the
+> `contracts/ui`/`tokens` artifacts + the mock/preview build. Read §11.2–§11.3 below as describing the
+> *rendered-preview* content in v1 and the *interactive app* post-v1. See
+> [12-system-map-and-v1-surfaces.md](12-system-map-and-v1-surfaces.md) §2.B (B5–B7) and §3.
 
 ### 11.1 Design-token pipeline (DTCG → theme)
 
