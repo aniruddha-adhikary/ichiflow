@@ -1,0 +1,86 @@
+{
+  "suite": "ichiflow-dmn-tck-subset",
+  "note": "Curated DMN-TCK-style conformance subset (build plan 2.1). Each case runs a bundled DMN 1.6 model through the Decision Engine SPI and asserts the named decision's result. Covers decision tables (UNIQUE hit policy), FEEL built-in functions, and BKM/invocation/boxed-context.",
+  "cases": [
+    {
+      "id": "grade/unique-A-boundary",
+      "model": "/dmn/tck/0001-grade-decision-table.dmn",
+      "decision": "Grade",
+      "inputs": { "Score": 90 },
+      "expect": "A",
+      "kind": "string"
+    },
+    {
+      "id": "grade/unique-A",
+      "model": "/dmn/tck/0001-grade-decision-table.dmn",
+      "decision": "Grade",
+      "inputs": { "Score": 95 },
+      "expect": "A",
+      "kind": "string"
+    },
+    {
+      "id": "grade/unique-B",
+      "model": "/dmn/tck/0001-grade-decision-table.dmn",
+      "decision": "Grade",
+      "inputs": { "Score": 85 },
+      "expect": "B",
+      "kind": "string"
+    },
+    {
+      "id": "grade/unique-C",
+      "model": "/dmn/tck/0001-grade-decision-table.dmn",
+      "decision": "Grade",
+      "inputs": { "Score": 60 },
+      "expect": "C",
+      "kind": "string"
+    },
+    {
+      "id": "grade/unique-F",
+      "model": "/dmn/tck/0001-grade-decision-table.dmn",
+      "decision": "Grade",
+      "inputs": { "Score": 40 },
+      "expect": "F",
+      "kind": "string"
+    },
+    {
+      "id": "strings/feel-builtins-alice",
+      "model": "/dmn/tck/0002-feel-string-functions.dmn",
+      "decision": "Code",
+      "inputs": { "Name": "alice" },
+      "expect": "ALI5",
+      "kind": "string"
+    },
+    {
+      "id": "strings/feel-builtins-bob",
+      "model": "/dmn/tck/0002-feel-string-functions.dmn",
+      "decision": "Code",
+      "inputs": { "Name": "Bob" },
+      "expect": "BOB3",
+      "kind": "string"
+    },
+    {
+      "id": "discount/gold",
+      "model": "/dmn/tck/0003-discount-context-bkm.dmn",
+      "decision": "Net Price",
+      "inputs": { "Tier": "GOLD", "Price": 100 },
+      "expect": "80",
+      "kind": "number"
+    },
+    {
+      "id": "discount/silver",
+      "model": "/dmn/tck/0003-discount-context-bkm.dmn",
+      "decision": "Net Price",
+      "inputs": { "Tier": "SILVER", "Price": 200 },
+      "expect": "180",
+      "kind": "number"
+    },
+    {
+      "id": "discount/none",
+      "model": "/dmn/tck/0003-discount-context-bkm.dmn",
+      "decision": "Net Price",
+      "inputs": { "Tier": "BRONZE", "Price": 50 },
+      "expect": "50",
+      "kind": "number"
+    }
+  ]
+}

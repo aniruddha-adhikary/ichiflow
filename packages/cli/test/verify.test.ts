@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildEnvelope, validateEnvelope } from "../src/verify/envelope.js";
 import { deriveSeed, pass } from "../src/verify/check.js";
@@ -12,6 +12,8 @@ import { schemaPipelineScope } from "../src/verify/scopes/schema-pipeline.js";
 import { codegenScope } from "../src/verify/scopes/codegen.js";
 import { contractVectorsScope } from "../src/verify/scopes/contract-vectors.js";
 import { referenceDataScope } from "../src/verify/scopes/reference-data.js";
+import { decisionLayerScope } from "../src/verify/scopes/decision-layer.js";
+import { codeQualityScope } from "../src/verify/scopes/code-quality.js";
 import {
   checkReferentialIntegrity,
   windowCovers,
@@ -185,6 +187,189 @@ describe("codegen", () => {
     expect(checks.some((c) => c.id === "codegen.ts.covers-contract")).toBe(true);
     expect(checks.some((c) => c.id === "codegen.kotlin.covers-contract")).toBe(true);
     expect(checks.some((c) => c.id === "codegen.canonical-model-parity")).toBe(true);
+  });
+});
+
+describe("decision-layer scope (DMN-TCK subset conformance)", () => {
+  const goodCaps = {
+    engineId: "drools",
+    engineVersion: "10.2.0",
+    dmnSpecVersions: ["20240513"],
+    feel: true,
+    decisionTable: true,
+    businessKnowledgeModel: true,
+    context: true,
+    invocation: true,
+  };
+  const writeResults = (root: string, body: unknown) => {
+    const p = join(root, "core/build/decision-tck-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
+
+  it("passes when every TCK case matches and capabilities conform", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      writeResults(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        suite: "s",
+        capabilities: goodCaps,
+        cases: [
+          {
+            id: "a",
+            model: "m",
+            decision: "D",
+            kind: "string",
+            expect: "A",
+            actual: "A",
+            errors: false,
+          },
+          {
+            id: "b",
+            model: "m",
+            decision: "D",
+            kind: "number",
+            expect: "80",
+            actual: "80.0",
+            errors: false,
+          },
+        ],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "decision-layer.tck-cases-green")!;
+      expect(green.value).toBe(2);
+      expect(green.threshold).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a case whose result mismatches or errors, and a missing capability", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      writeResults(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        suite: "s",
+        capabilities: { ...goodCaps, invocation: false },
+        cases: [
+          {
+            id: "wrong",
+            model: "m",
+            decision: "D",
+            kind: "string",
+            expect: "A",
+            actual: "B",
+            errors: false,
+          },
+          {
+            id: "errored",
+            model: "m",
+            decision: "D",
+            kind: "string",
+            expect: "A",
+            actual: null,
+            errors: true,
+          },
+        ],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decision-layer.capability.invocation");
+      expect(failed).toContain("decision-layer.tck.wrong");
+      expect(failed).toContain("decision-layer.tck.errored");
+      expect(failed).toContain("decision-layer.tck-cases-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly with an actionable message when the artifact is missing", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      expect(checks).toHaveLength(1);
+      expect(checks[0].id).toBe("decision-layer.results-present");
+      expect(String(checks[0].diff)).toContain("runDecisionTck");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("code-quality scope (detekt + ArchUnit gate)", () => {
+  const seedRepo = (
+    root: string,
+    opts: { detektFindings?: number; archViolation?: boolean; wired?: boolean },
+  ) => {
+    const gradle =
+      opts.wired === false
+        ? 'plugins { kotlin("jvm") }'
+        : 'plugins { id("io.gitlab.arturbosch.detekt") }\ndependencies { testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0") }';
+    const gradlePath = join(root, "core/build.gradle.kts");
+    mkdirSync(dirname(gradlePath), { recursive: true });
+    writeFileSync(gradlePath, gradle);
+
+    const sarifPath = join(root, "core/build/reports/detekt/detekt.sarif");
+    mkdirSync(dirname(sarifPath), { recursive: true });
+    const results = Array.from({ length: opts.detektFindings ?? 0 }, (_, i) => ({
+      ruleId: `Rule${i}`,
+      message: { text: "finding" },
+      locations: [
+        { physicalLocation: { artifactLocation: { uri: "X.kt" }, region: { startLine: i } } },
+      ],
+    }));
+    writeFileSync(sarifPath, JSON.stringify({ runs: [{ results }] }));
+
+    const archPath = join(root, "core/build/arch-rules-results.json");
+    writeFileSync(
+      archPath,
+      JSON.stringify({
+        suite: "archunit",
+        rules: 1,
+        results: [
+          {
+            id: "spi.boundary.kie-confined-to-spi",
+            passed: !opts.archViolation,
+            violations: opts.archViolation ? ["v"] : [],
+          },
+        ],
+      }),
+    );
+  };
+
+  it("passes with zero detekt findings and all ArchUnit rules green", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-cq-"));
+    try {
+      seedRepo(tmp, {});
+      const checks = await codeQualityScope.run({ repoRoot: tmp, seed: deriveSeed("cq") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      expect(checks.some((c) => c.id === "code-quality.detekt.zero-findings")).toBe(true);
+      expect(
+        checks.some((c) => c.id === "code-quality.archunit.spi.boundary.kie-confined-to-spi"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails on detekt findings, an ArchUnit violation, or unwired gates", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-cq-"));
+    try {
+      seedRepo(tmp, { detektFindings: 2, archViolation: true, wired: false });
+      const checks = await codeQualityScope.run({ repoRoot: tmp, seed: deriveSeed("cq") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("code-quality.detekt.zero-findings");
+      expect(failed).toContain("code-quality.archunit.spi.boundary.kie-confined-to-spi");
+      expect(failed).toContain("code-quality.wiring.detekt-plugin");
+      expect(failed).toContain("code-quality.wiring.archunit-dep");
+      const detekt = checks.find((c) => c.id === "code-quality.detekt.zero-findings")!;
+      expect(detekt.value).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 

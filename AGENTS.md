@@ -29,12 +29,14 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.         |
 | `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.        |
 | `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools. |
+| `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).  |
+| `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.     |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).    |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).             |
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                           |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).       |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `decision-layer`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -50,6 +52,14 @@ whose effective window covers the referencing row's (bitemporal, ADR-0025 / doc 
 hand-authored reference on Apache KIE / Drools (pinned 10.2.0), asserting identical results across
 every input vector — the Phase 2.0 proof that the hard boxed-expression kinds (BKM FEEL functions,
 boxed contexts, invocations) project and execute correctly; run `pnpm decision:jvm` first.
+`decision-layer` runs a curated **DMN-TCK subset** (decision tables with UNIQUE hit policy, FEEL
+built-in functions, BKM + invocation + boxed context) through the **Decision Engine SPI** reference
+engine (Drools) and asserts `tck_cases_green == total` plus the engine's **capability descriptor** —
+the Phase 2.1 proof that a capability-declared, engine-neutral SPI executes canonical DMN 1.6; run
+`pnpm decision-tck:jvm` first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
+**detekt** (zero findings, from SARIF) and **ArchUnit** rule results (notably the SPI boundary — only
+`…decision.spi` may depend on `org.kie..`), both of which also fail `./gradlew check`/`test`; run
+`pnpm quality:jvm` first.
 
 ## Layout
 
@@ -65,3 +75,6 @@ boxed contexts, invocations) project and execute correctly; run `pnpm decision:j
 - Never edit files under any `generated/` directory by hand — regenerate and commit (drift check gates this).
 - Add a new verify scope by registering it in `packages/cli/src/verify/registry.ts` with its checks.
 - Keep every dependency on the license allowlist (`tools/license-check/allowlist.json`).
+- Kotlin quality is non-negotiable: **detekt** (config `core/config/detekt/detekt.yml`) and **ArchUnit**
+  (`core/src/test/kotlin/ai/ichiflow/core/architecture/`) fail `./gradlew build`. Fix findings —
+  don't relax rules to pass. Only the `…decision.spi` package may depend on `org.kie..`/`org.drools..`.

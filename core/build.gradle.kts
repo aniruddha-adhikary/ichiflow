@@ -5,6 +5,9 @@
 plugins {
     kotlin("jvm") version "2.0.21"
     application
+    // Kotlin static analysis (non-negotiable quality gate, ADR-0016 / build doctrine). detekt runs as
+    // part of `check`, so `./gradlew build` fails on any finding. Pinned; Apache-2.0.
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "ai.ichiflow"
@@ -32,12 +35,35 @@ dependencies {
     // Apache-2.0 — clean under ADR-0016.
     implementation("org.kie:kie-dmn-core:10.2.0")
     testImplementation(kotlin("test"))
+    // ArchUnit enforces architecture invariants as ordinary tests (build plan 2.1): the Decision
+    // Engine SPI boundary — only `…decision.spi` may touch `org.kie..` — is a compile-checked rule,
+    // not a convention. Apache-2.0 — clean under ADR-0016.
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 
     fabrikt("com.cjbooms:fabrikt:26.1.0")
 }
 
 kotlin {
     jvmToolchain(17)
+}
+
+// detekt scans only hand-authored sources — generated Fabrikt models (contract of record, drift-gated)
+// are never linted. SARIF is emitted for the `code-quality` verify scope to consume machine-readably.
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("config/detekt/detekt.yml"))
+    source.setFrom(files("src/main/kotlin", "src/test/kotlin"))
+    parallel = true
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        sarif.required.set(true)
+        html.required.set(false)
+        xml.required.set(false)
+        txt.required.set(false)
+        md.required.set(false)
+    }
 }
 
 // Generated Kotlin contract models are committed (contract of record) and compiled into main.
@@ -78,6 +104,16 @@ tasks.register<JavaExec>("runDecisionSpike") {
     description = "Compile decision-source → DMN 1.6, execute vs the reference DMN on KIE, and write core/build/decision-projection-results.json."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("ai.ichiflow.core.decision.DecisionProjectionSpike")
+}
+
+// Run the curated DMN-TCK conformance subset through the Decision Engine SPI reference engine
+// (build plan 2.1). Writes core/build/decision-tck-results.json, consumed by the TS
+// `decision-layer` scope for the tck_cases_green/total + capability-descriptor assertions.
+tasks.register<JavaExec>("runDecisionTck") {
+    group = "verification"
+    description = "Execute the DMN-TCK subset on the SPI reference engine and write core/build/decision-tck-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.tck.DecisionTckRunner")
 }
 
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")

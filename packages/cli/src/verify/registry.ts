@@ -7,6 +7,8 @@ import { codegenScope } from "./scopes/codegen.js";
 import { contractVectorsScope } from "./scopes/contract-vectors.js";
 import { referenceDataScope } from "./scopes/reference-data.js";
 import { decisionProjectionSpikeScope } from "./scopes/decision-projection-spike.js";
+import { decisionLayerScope } from "./scopes/decision-layer.js";
+import { codeQualityScope } from "./scopes/code-quality.js";
 
 /**
  * The scope registry — the harness catalog (doc 13 §2) as it comes online phase by phase.
@@ -21,6 +23,8 @@ const SCOPES: Scope[] = [
   contractVectorsScope,
   referenceDataScope,
   decisionProjectionSpikeScope,
+  decisionLayerScope,
+  codeQualityScope,
 ];
 
 export function allScopes(): Scope[] {

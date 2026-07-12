@@ -1,15 +1,11 @@
 package ai.ichiflow.core.decision
 
+import ai.ichiflow.core.decision.spi.DecisionEngine
+import ai.ichiflow.core.decision.spi.DroolsDecisionEngine
+import ai.ichiflow.core.decision.spi.LoadedModel
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.io.File
-import java.io.StringReader
-import java.math.BigDecimal
-import org.kie.api.io.ResourceType
-import org.kie.dmn.api.core.DMNMessage
-import org.kie.dmn.api.core.DMNRuntime
-import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder
-import org.kie.internal.io.ResourceFactory
 
 /**
  * Phase 2.0 decision-projection spike (build plan 2.0, ADR-0001/0002/0027). Compiles the
@@ -18,37 +14,16 @@ import org.kie.internal.io.ResourceFactory
  * retires "riskiest bet #2": the hard boxed-expression kinds (BKM FEEL functions, boxed contexts,
  * invocations) both compile to valid DMN *and* execute identically to a reference. Results are
  * written machine-readably for the `decision-projection-spike` verify scope.
+ *
+ * As of Phase 2.1 the KIE coupling lives behind the [DecisionEngine] SPI; this spike drives that
+ * engine rather than talking to `org.kie.*` directly.
  */
 object DecisionProjectionSpike {
 
-    private fun buildRuntime(xml: String, sourcePath: String): DMNRuntime {
-        val res = ResourceFactory.newReaderResource(StringReader(xml))
-            .apply { sourcePath.let { setSourcePath(it) } }
-        res.resourceType = ResourceType.DMN
-        return DMNRuntimeBuilder.fromDefaults()
-            .buildConfiguration()
-            .fromResources(listOf(res))
-            .getOrElseThrow { e -> RuntimeException("DMN runtime build failed for $sourcePath", e) }
-    }
-
-    private fun coerce(v: Any?): Any? =
-        when (v) {
-            is Int -> BigDecimal(v)
-            is Long -> BigDecimal(v)
-            is Double -> BigDecimal(v.toString())
-            is Float -> BigDecimal(v.toString())
-            else -> v
-        }
-
     /** Evaluate one decision over one input row; returns the stringified result + whether it errored. */
-    fun evaluate(runtime: DMNRuntime, inputs: Map<String, Any?>, decisionName: String): Pair<String?, Boolean> {
-        val model = runtime.models.first()
-        val ctx = runtime.newContext()
-        for ((k, v) in inputs) ctx.set(k, coerce(v))
-        val result = runtime.evaluateAll(model, ctx)
-        val hasError = result.messages.any { it.severity == DMNMessage.Severity.ERROR }
-        val value = result.getDecisionResultByName(decisionName)?.result
-        return value?.toString() to hasError
+    fun evaluate(engine: DecisionEngine, model: LoadedModel, inputs: Map<String, Any?>, decisionName: String): Pair<String?, Boolean> {
+        val evaluation = engine.evaluate(model, inputs)
+        return evaluation.resultOf(decisionName)?.toString() to evaluation.hasErrors
     }
 
     @JvmStatic
@@ -68,11 +43,12 @@ object DecisionProjectionSpike {
             .bufferedReader().use { it.readText() }
         val compiledXml = DecisionSourceCompiler.compile(source)
 
-        val referenceRuntime = buildRuntime(referenceXml, "reference.dmn")
-        val compiledRuntime = buildRuntime(compiledXml, "compiled.dmn")
+        val engine = DroolsDecisionEngine()
+        val referenceModel = engine.load(referenceXml, "reference.dmn")
+        val compiledModel = engine.load(compiledXml, "compiled.dmn")
 
         val root = mapper.createObjectNode()
-        root.put("engine", "kie-dmn:10.2.0")
+        root.put("engine", "kie-dmn:${engine.capabilities.engineVersion}")
         root.put("specVersion", "DMN 1.6")
         root.put("decision", decisionName)
         val arr = root.putArray("vectors")
@@ -83,8 +59,8 @@ object DecisionProjectionSpike {
             vector["inputs"].fields().forEach { (k, node) ->
                 inputs[k] = if (node.isNumber) node.numberValue() else node.asText()
             }
-            val (refValue, refError) = evaluate(referenceRuntime, inputs, decisionName)
-            val (compValue, compError) = evaluate(compiledRuntime, inputs, decisionName)
+            val (refValue, refError) = evaluate(engine, referenceModel, inputs, decisionName)
+            val (compValue, compError) = evaluate(engine, compiledModel, inputs, decisionName)
 
             val node = arr.addObject()
             node.put("id", id)

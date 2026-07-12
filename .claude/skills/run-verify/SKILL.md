@@ -26,7 +26,8 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 ## Registered scopes
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
-`contract-vectors`, `reference-data`, `decision-projection-spike`. More come online phase by phase (doc 14).
+`contract-vectors`, `reference-data`, `decision-projection-spike`, `decision-layer`, `code-quality`.
+More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -48,3 +49,11 @@ each reference must resolve to a live row whose effective window covers the refe
 `decision-projection-spike` compiles the `decision-source` fixture to DMN 1.6 and executes it and a
 hand-authored reference DMN on Apache KIE / Drools, asserting identical results per input vector; run
 `pnpm decision:jvm` before `pnpm verify` to produce `core/build/decision-projection-results.json`.
+
+`decision-layer` runs the curated DMN-TCK subset through the Decision Engine SPI reference engine
+(Drools) and asserts `tck_cases_green == total` plus the capability descriptor; run
+`pnpm decision-tck:jvm` before `pnpm verify` to produce `core/build/decision-tck-results.json`.
+
+`code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
+both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce
+`core/build/reports/detekt/detekt.sarif` and `core/build/arch-rules-results.json`.

@@ -66,6 +66,12 @@ jobs:
       - name: Decision projection spike — DMN 1.6 on KIE/Drools
         run: pnpm decision:jvm
 
+      - name: Decision layer — DMN-TCK subset on the SPI reference engine
+        run: pnpm decision-tck:jvm
+
+      - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
+        run: pnpm quality:jvm
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

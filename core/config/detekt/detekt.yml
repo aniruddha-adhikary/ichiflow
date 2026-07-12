@@ -1,0 +1,37 @@
+# detekt configuration for the ichiflow Kotlin core (build doctrine: non-negotiable quality gate).
+# Layered on top of detekt's default rules (buildUponDefaultConfig = true); this file only records
+# deliberate deviations. Any finding fails `./gradlew build` and the `code-quality` verify scope.
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+complexity:
+  LongParameterList:
+    active: true
+    functionThreshold: 8
+    constructorThreshold: 9
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    thresholdInObjects: 20
+
+style:
+  # Domain code is dense with FEEL/DMN/currency literals; a blanket magic-number ban is pure noise
+  # and would push toward meaningless named constants. Naming/complexity rules carry the weight.
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  ReturnCount:
+    active: true
+    max: 5
+
+exceptions:
+  TooGenericExceptionThrown:
+    active: true

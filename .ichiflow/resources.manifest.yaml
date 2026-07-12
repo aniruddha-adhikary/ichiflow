@@ -29,7 +29,13 @@ pins:
     note: Kotlin contract-model generator from OpenAPI (build plan 1.2). Bump reruns ./gradlew checkModelsUpToDate.
   - id: kie-dmn
     version: "10.2.0"
-    note: Apache KIE / Drools DMN — v1 reference decision engine (ADR-0002). Pinned; a bump reruns the decision-projection-spike. DMN 1.6 (spec 20240513).
+    note: Apache KIE / Drools DMN — v1 reference decision engine (ADR-0002). Pinned; a bump reruns the decision-projection-spike + decision-layer. DMN 1.6 (spec 20240513).
+  - id: detekt
+    version: "1.23.7"
+    note: Kotlin static-analysis gate (non-negotiable). Fails ./gradlew check and the code-quality scope on any finding; config in core/config/detekt/detekt.yml.
+  - id: archunit
+    version: "1.3.0"
+    note: Architecture-rule tests (archunit-junit5) enforcing the Decision Engine SPI boundary. Fails ./gradlew test and the code-quality scope on violation.
 
 resources:
   - id: run-verify
@@ -96,6 +102,30 @@ resources:
     kind: pattern
     path: core/src/main/resources/dmn/reference/fee.dmn
     description: Hand-authored DMN 1.6 reference the projection spike executes against for behavioural equivalence.
+  - id: decision-layer
+    kind: harness
+    path: packages/cli/src/verify/scopes/decision-layer.ts
+    description: DMN-TCK subset conformance on the Decision Engine SPI reference engine (Drools) + capability-descriptor conformance (build plan 2.1).
+  - id: decision-engine-spi
+    kind: pattern
+    path: core/src/main/kotlin/ai/ichiflow/core/decision/spi
+    description: The engine-neutral Decision Engine SPI (ADR-0002) + its Drools reference impl; only this package may depend on org.kie.
+  - id: dmn-tck-subset
+    kind: pattern
+    path: core/src/main/resources/dmn/tck
+    description: Curated DMN-TCK subset models (decision tables, FEEL built-ins, BKM/invocation/context) for SPI conformance.
+  - id: decision-tck-cases
+    kind: pattern
+    path: schemas/decision-tck/cases.json
+    description: Expected-outcome vectors for the DMN-TCK subset consumed by the decision-layer scope.
+  - id: code-quality
+    kind: harness
+    path: packages/cli/src/verify/scopes/code-quality.ts
+    description: Kotlin quality gate — detekt (zero findings) + ArchUnit rules (SPI boundary), both build-failing.
+  - id: detekt-config
+    kind: pattern
+    path: core/config/detekt/detekt.yml
+    description: detekt ruleset for the Kotlin core; deviations from defaults are recorded here.
   - id: contracts-ts
     kind: generated
     path: packages/contracts-ts/src/gen

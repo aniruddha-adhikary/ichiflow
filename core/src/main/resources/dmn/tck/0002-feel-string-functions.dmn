@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-TCK subset (build plan 2.1). Compliance-level-3 construct: a literal-expression decision that
+  composes FEEL built-in string functions (upper case, substring, string length) over a string input.
+  Exercises the FEEL library rather than decision-table matching.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/"
+             xmlns:feel="https://www.omg.org/spec/DMN/20240513/FEEL/"
+             namespace="https://ichiflow.ai/dmn/tck/strings"
+             id="strings"
+             name="strings">
+
+  <inputData id="idName" name="Name">
+    <variable name="Name" typeRef="string"/>
+  </inputData>
+
+  <decision id="decCode" name="Code">
+    <variable name="Code" typeRef="string"/>
+    <informationRequirement>
+      <requiredInput href="#idName"/>
+    </informationRequirement>
+    <literalExpression>
+      <text>upper case(substring(Name, 1, 3)) + string(string length(Name))</text>
+    </literalExpression>
+  </decision>
+
+</definitions>
