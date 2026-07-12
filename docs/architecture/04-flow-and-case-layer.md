@@ -816,6 +816,291 @@ only where a delegation must additionally exclude a *further* downstream wait (e
 itself blocked pending applicant input), recorded distinctly like any clock-stop
 ([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6).
 
+### 5.9 The `QuotaLedger` — cross-Case shared resource state
+
+Some Cases consume a resource **another Case needs**. The permit reference product's fee pool is a
+scalar counter, but two harder shapes break that: a **public-housing ballot** consumes
+`(project, block, ethnicGroup)` × `(project, block, SPR)` × `(project, scheme)` headroom under a hard
+fairness invariant — *no dimension may go below zero, ever, under concurrent selection appointments* —
+with **TTL'd reservations** (a selection appointment holds a block for 120 minutes); and a
+**competitive grant round** consumes a **monetary** budget pool drawn down by a ranked funding line.
+Both are **cross-Case shared mutable state** the per-`case_id` model does not carry, and modelling either
+as an ad-hoc `compute` over a Postgres table puts the fairness invariant in **hand-written SQL the *why*
+API and the harness cannot see**. ichiflow makes it first-class: the **`QuotaLedger`** (ADR-0030) — a
+governed, **Team-owned**, effective-dated resource ledger, a **`CodeSet` sibling**
+([02-schema-foundation.md](./02-schema-foundation.md) §9) — consumed atomically from Flows through a
+canonical **`quota-op`** step. *(Target design; v1.)*
+
+**The artifact.** A `QuotaLedger` declares, all as governed data:
+
+- **Dimensions** — composite keys (e.g. `[project, block, ethnicGroup]`) naming the resource axes a
+  movement is keyed on. A dimension carries a **`kind`**: a plain **count** dimension reserves one unit at
+  a time; a **`monetary`** dimension reserves a **variable-size amount** (below).
+- **Capacity rows** — per-dimension capacity that is **CodeSet-like**: effective-dated, Team-owned with
+  named stewards, semver-versioned and governed, so a scheduled capacity change (a block's quota, a
+  round's budget ceiling) is an **effective-dated row change, not a redeploy**. The **capacity version is
+  pinned into the DecisionRecord** at every commit.
+- **Invariants** — per-dimension declared invariants (`headroom >= 0`, `committed <= capacity`,
+  `consumed <= reserved`) enforced **at the ledger, atomically on every movement**. This is the
+  load-bearing change: the fairness invariant moves out of application SQL into the **audited artifact
+  layer**, becoming the governed contract the *why* API and the concurrency harness
+  ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.l) understand.
+
+**Operations — atomic `reserve` / `commit` / `release`.** The three movements are invoked from a Flow
+through the canonical **`quota-op`** step (`op: reserve | commit | release`), never hand-written:
+
+- **`reserve`** — atomically claims headroom (or a monetary amount) under the invariant and holds it with
+  a **TTL** (a held reservation that auto-expires — the ballot's 120-minute selection appointment, the
+  grant's provisional-award hold).
+- **`commit`** — converts a live reservation to consumption (the ballot's Option-to-Purchase issuance,
+  the grant's Letter-of-Offer acceptance), pinning the capacity/rate version.
+- **`release`** — returns a reservation to the pool on expiry, decline, or clawback.
+
+**Why `quota-op` is a *canonical* step type, not a `compute`-variant (§2.6/§2.7).** The canonical bar
+(§2.8, §2.9) is that the **interpreter must own the step's durable semantics to replay them
+deterministically**; an extension type (§2.7) is admissible only when the kind reduces to a pure
+**compute-variant** on the generic code-activity path. `quota-op` fails that reduction for exactly the
+reason `issue-document` number allocation does:
+
+- **A reservation is a memoized side effect, not a computation.** Claiming headroom **mutates shared
+  state under an invariant** — it is not pure (`compute` steps are pure and re-runnable, §2.6). On replay
+  or continue-as-new the interpreter must **not** reserve or commit a *second* time; it **memoizes the
+  mutation keyed by `(case_id, step.id)`**, exactly-once under at-least-once execution — the **same
+  discipline as §2.9.1 issue-document number allocation** (a monotonic counter consumed once). A pure
+  activity cannot host a memoized shared-state mutation under an atomic invariant.
+- **The invariant is core semantics, not org-specific.** "Reserve/commit/release against a governed pool
+  without breaching an invariant" is a universal shape — like human review or issuance — not an
+  `x-<org>` primitive.
+
+So `quota-op` joins `issue-document` as a canonical **side-effecting, replay-memoized** step. It
+**replaces** the case studies' interim modeling — the `compute`-refs `kt://…/QuotaReserve@1.0.0` /
+`QuotaCommit@1.0.0` were a stopgap; the canonical surface is `quota-op`.
+
+```yaml
+# a QuotaLedger artifact — multi-dimensional, invariant-guarded, Team-owned, effective-dated
+kind: QuotaLedger
+metadata: { id: bto-2026-jun-quota, owner: { team: policy-allocation } }
+dimensions:
+  - key: [project, block, ethnicGroup]  kind: count     invariant: headroom >= 0           basis: ethnic-allocation@2026.1.0
+  - key: [project, block, SPR]          kind: count     invariant: headroom >= 0           basis: ethnic-allocation@2026.1.0
+  - key: [roundId]                       kind: monetary  invariant: committed <= capacity   basis: round-budget@2026.2.0
+reservations: { ttl: PT120M }             # a held reservation auto-expires (selection appointment)
+reflow: next-in-ranked-order              # release-back policy (vocabulary + cross-round governance = Open question)
+
+# a quota-op step — atomic reserve; exactly-once-memoized on replay by (case_id, step.id) like §2.9.1
+- id: reserve-unit
+  type: quota-op
+  op: reserve                             # reserve | commit | release
+  ledger: quota://policy-allocation/bto-2026-jun-quota
+  key:    { project: "${sel.project}", block: "${sel.block}", ethnicGroup: "${case.applicant.ethnicGroup}" }
+  amount: 1                               # a count dimension; a monetary dimension passes the money amount
+  ttl:    PT120M
+  onBreach: { emit: unit-unavailable, code: EIP_BLOCK_QUOTA_FULL }   # invariant would break → coded outcome, not an error
+
+- id: commit-on-option
+  type: quota-op
+  op: commit                              # convert the held reservation → consumption (pins capacity/rate version)
+  ledger: quota://policy-allocation/bto-2026-jun-quota
+  from: reserve-unit                      # the reservation this commit consumes
+```
+
+**Monetary amounts are a dimension kind.** A `monetary` dimension reserves a **variable-size amount**, so
+the fit test is **`capacity − committed − reserved ≥ amount`** rather than `headroom ≥ 1`. This is what
+makes a **grants budget pool the same primitive** as a count-based block quota; the ledger pins the
+**rate version per commit** (a grant amount is `requested × fundingRate@version`).
+
+**Ranked reserve-list draw + release-back reflow.** For an oversubscribed pool a **ranked draw** is a
+**set-level** operation: candidates are ranked and the pool is drawn down **in rank order** until
+exhausted; those below the line fall onto a **reserve list** — a first-class, coded end state
+(`BELOW_BUDGET_LINE`), distinct from a quality failure. The ranked draw is the set-level step of a
+**cohort gather-barrier (§5.10)** — the round ranking *is* the draw. Returned capacity (a clawback, an
+under-claim, a declined offer) reflows per a **declared release-back reflow policy**
+(`next-in-ranked-order` / `next-round` / `treasury`) so the reflow choice is *modeled*, not buried in
+code. The exact **reflow-policy vocabulary** and the governance of **cross-round** reflow — returning
+released money to a *closed* round — is flagged as an **Open question** (below; ADR-0030), not invented.
+
+**Audit.** Every movement — `reserve` / `commit` / `release` / `draw` / `void` — emits a DecisionRecord
+event (§7) with the ledger key, the delta, the resulting headroom, the **pinned capacity version**, and
+the acting principal, so "why couldn't I book / where did this money go" is answerable through the *why*
+API ([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6). A **concurrency harness**
+([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.l) red-teams the invariant under simulated
+parallel `reserve`/`commit`/`release`, plus the monetary, ranked-draw, and release-back reflow vectors.
+
+### 5.10 Set-level Cases — `cohort` and `bundle`
+
+The Case and DecisionRecord model is **per-`case_id`**: one unit of work, one causal chain. Two delivered
+shapes need work that is inherently **set-level**, in two *different* ways — a **ballot** that must see
+the whole roster at once and emit one global ordering, and a **multi-licence application** that spawns a
+computed set of independent sub-Cases joined only for the applicant's dashboard. ichiflow adds **two
+declared set-level Case shapes** (ADR-0031), both ordinary Flow shapes that inherit durability,
+replay-audit, and version pinning like any Flow. *(Target design; v1.)*
+
+**(a) `cohort` — a gather-barrier over a case selector.** A cohort Flow gathers all member Cases in a
+cohort *C* (a `find_cases`-style selector, e.g. `exercise:${exerciseId}`), runs **one set-level step** — a
+set-level `decision-eval` or `compute` over the whole set (the ballot ordering, the grant round ranking) —
+then **scatters** the result back to member Cases. Three properties:
+
+- **Fan-in to one set-level decision.** Unlike the **§2.4 batch trigger**, which fans a schedule out into
+  *independent* per-Case sub-flows, the cohort adds a **gather-barrier**: the set-level step sees *all*
+  members at once. It composes with the **QuotaLedger ranked draw (§5.9)** — the round ranking is the
+  set-level step that draws down the pool.
+- **A cohort-scoped DecisionRecord.** The set-level step emits **one** DecisionRecord keyed by the
+  **`cohortId`** (`exerciseId` / `roundId`) that member Cases **reference**
+  ([08-audit-and-observability.md](./08-audit-and-observability.md) §1.7). "Prove my queue number / my
+  rank" resolves to **one** cohort record every member points at — killing the "smear one shared fact
+  across 50,000 per-Case records" anti-pattern.
+- **A bounded fan-in guardrail.** The set-level step must not silently load tens of thousands of Cases; a
+  declared cap (and chunking) bounds the fan-in. The concrete cap + chunking policy is an **Open
+  question** (below).
+
+**(b) `bundle` — a computed heterogeneous sub-Case fan-out.** A bundle Flow is a long-lived **parent
+Case** whose children are a **computed, heterogeneous** set: a **`forEach` over a computed selection**
+spawns **one sub-Case per element, each of a different `caseType`**, resolved through the **CaseType
+catalog** ([02-schema-foundation.md](./02-schema-foundation.md) §10 — the governed manifest binding a case
+type's artifact bundle, which doc 02 owns). Each child is a **full independent Case** — its own agency
+Flow, its own SLA, its own lifecycle, renewing years apart. Two properties:
+
+- **Joined by a partial-tolerant status roll-up view — explicitly NOT a `CompositeOutcome`.** The children
+  are joined by a **status aggregation**, not an outcome composition. A `CompositeOutcome`
+  ([03-decision-layer.md](./03-decision-layer.md) §2.3) composes **N Outcomes into ONE gated decision on
+  ONE Case** (customs' `all-must-approve`); a bundle is **N independent Cases presented together**, where
+  **partial approval is a valid end state** (three licences approve, one is rejected, the applicant
+  proceeds with the three). A `partial` bundle is a first-class, non-gated status, not a blocked
+  composition.
+- **Parent record references, never merges, child records.** The parent **bundle-Case** DecisionRecord
+  **references** its child records ([08-audit-and-observability.md](./08-audit-and-observability.md) §1.7)
+  — one dashboard over N heterogeneous children without faking a composition.
+
+**Cohort vs bundle — the line.** They are adjacent but different families:
+
+| | `cohort` (§5.10a) | `bundle` (§5.10b) |
+|---|---|---|
+| Direction | **fan-in** to one set-level decision | **fan-out** to N independent decisions |
+| Shared computation | yes — one ordering/ranking over the set | none — each child decides on its own |
+| Set-level record | **cohort record** (one shared computation) | **bundle parent record** (references children) |
+| Join | gather-barrier + scatter | partial-tolerant status aggregation |
+| Not to be confused with | the §2.4 **batch trigger** (independent per-Case fan-out) | a **`CompositeOutcome`** (§2.3; N Outcomes → one gated decision) |
+
+```yaml
+# a cohort gather-barrier step — gather cohort C, run ONE set-level step, scatter (fan-in)
+- id: rank-round
+  type: cohort
+  select: "exercise:${exerciseId}"          # the case selector defining cohort C
+  barrier: { maxFanIn: 50000, chunk: 5000 } # bounded fan-in guardrail (cap + chunking — Open question)
+  setStep:                                    # ONE set-level step over the whole frozen set
+    compute: kt://frdg/RankAndFund@1.0.0      # or a set-level decision-eval; here rank + QuotaLedger ranked draw (§5.9)
+  record: { scope: cohort, key: "${exerciseId}" }   # cohort-scoped DecisionRecord members reference (08 §1.7)
+  scatter: "member.queuePosition"            # scatter the set-level result back to each member Case
+
+# a bundle forEach fan-out — one heterogeneous sub-Case per computed element (fan-out)
+- id: spawn-licences
+  type: bundle
+  forEach: "journey.licences"                # the set is COMPUTED (a guided-journey Decision), not statically listed
+  spawn:
+    type: sub-case
+    caseType: "${item.id}"                    # per-element caseType resolved through the CaseType catalog (doc 02 §10)
+    owner:    "${item.owningTeam}"            # each child owned by its agency Team, not the bundle
+  join: status-rollup                         # partial-tolerant aggregation — NOT a CompositeOutcome; partial approval valid
+  record: { scope: bundle-parent }           # parent record REFERENCES child records, never merges (08 §1.7)
+```
+
+### 5.11 Case associations — peer many-to-many links
+
+ichiflow already relates Cases as a **hierarchy** (parent → child correlation, §5.6) and as a **parent's
+owned children** (the §2.4 batch fan-out, the §5.10 bundle). Neither expresses a **peer, many-to-many**
+relationship among Cases that are **otherwise independent** — one **SIU investigation** spanning multiple
+independent claim Cases (a provider anomaly linking two claims from *different* policyholders), or one
+applicant org's **portfolio** carrying invariants ("no more than N active awards," "the same cost cannot
+be double-funded") **across** peer Cases. ichiflow makes this a first-class **`Case association`**
+(ADR-0032) — a governed, typed, many-to-many peer link. *(Target design; v1.)*
+
+- **Typed link kinds.** An association declares a **kind** from a governed vocabulary —
+  `investigation-group`, `portfolio-of-applicant`, `duplicate-suspect` — so *why* two Cases are linked is
+  itself typed and explainable, not an untyped edge.
+- **PDP-scoped visibility, its own boundary.** An association is a first-class relation with its **own
+  visibility scope** ([06-identity-and-access.md](./06-identity-and-access.md) Part 4): membership in an
+  `investigation-group` grants an investigator read **across** the linked Cases **without merging their
+  ownership** — each Case keeps its own owner/audit boundary, and a party on one Case gains no visibility
+  into the other. Reading across a link **must not collapse the linked Cases' separate ownership/audit
+  boundaries**.
+- **Audited link / unlink.** Creating or removing a link is an **audited event** (who linked what, when,
+  why-coded); the association carries **its own DecisionRecord**, distinct from the linked Cases' records
+  ([08-audit-and-observability.md](./08-audit-and-observability.md) §1.6).
+- **Cross-Case invariant checks.** "This org is over its active-award cap," "these two grants double-fund
+  the same cost," "these two claims share a provider anomaly" are **invariant checks expressible over the
+  association set + the entity store** ([02-schema-foundation.md](./02-schema-foundation.md) §11) — a
+  governed check over the linked set, not a query buried in code. Whether the check runs at **link time**,
+  as a **scheduled Flow** over the portfolio, or **both** is an **Open question** (below; ADR-0032).
+
+**Distinct from its neighbours** — the docs draw the lines explicitly:
+
+- **vs parent/child correlation (§5.6)** — an association is **peer**, not derived; neither linked Case is
+  the other's parent, and neither inherits the other's visibility.
+- **vs a `bundle` (§5.10)** — a bundle **owns** its computed children (one applicant's licence set); an
+  association links **otherwise-independent** peer Cases with no owning parent (two claims from different
+  policyholders that predate and outlive the link).
+
+```yaml
+# a Case association — a typed, many-to-many PEER link with its own visibility scope + audit
+kind: CaseAssociation
+metadata: { id: siu-2026-00471, owner: { team: siu } }
+linkKind: investigation-group               # investigation-group | portfolio-of-applicant | duplicate-suspect
+members: [ case://claims/c-2026-00218, case://claims/c-2026-00934 ]   # otherwise-independent peer Cases
+visibility:                                 # PDP scope — read ACROSS members without collapsing boundaries (06 Part 4)
+  grants: { relation: investigator-of, on: members }   # an investigator reads linked claims; parties on one see nothing of the other
+invariantChecks:                            # over the association set + the entity store (doc 02 §11)
+  - id: shared-provider-anomaly             # cadence (link-time | scheduled | both) is an Open question
+record: { scope: association }              # link/unlink carries its own DecisionRecord (08 §1.6), distinct from members'
+```
+
+### 5.12 Standing Flow patterns
+
+Beyond the command- and cohort-triggered Flows above, three recurring **standing** patterns are worth
+naming as blessed designs — they add no new machinery; they compose existing steps.
+
+**(1) Post-approval obligation-monitoring — a standing Flow, separate from issuance.** A permit or licence
+commonly prints **post-approval obligations** (§5.5) — "retain records five years," "present for
+inspection," "re-export within the window" — that must be **re-verified long after the issuing Case
+closes**. This is a **standing Flow pattern**: a **scheduled/timer Flow** (§2.4 scheduled triggers —
+timers running over *years*) that re-verifies each obligation against the **Condition state machine**
+(§5.5) and, on breach, flips the Condition to `breached`, raises a canonical **`condition.breached`**
+event ([08-audit-and-observability.md](./08-audit-and-observability.md) §4.6), and **opens a remediation
+Case**. **Issuance and obligation-monitoring are two Flows, not one**: the `issue-document` Flow (§2.9)
+ends when the instrument is issued and its obligations recorded; the monitoring Flow is a *separate*,
+long-horizon standing instance keyed to the obligation, so a five-year retention clock never holds an
+issuance Flow open for five years.
+
+```yaml
+# a STANDING obligation-monitoring Flow — separate from the issuance Flow (§2.9); timers run over years
+id: obligation-monitor
+trigger: { schedule: "daily", scope: "obligations:open" }        # scheduled sweep (§2.4)
+steps:
+  - id: due-obligations   type: loop                             # over each open post-approval obligation (§5.5)
+    over: "find_conditions(kind: post-approval-obligation, state: pending, due: <= now)"
+    body:
+      - id: re-verify     type: decision-eval                    # is the obligation still met?
+        model: obligation-check@1.0.0
+        onDeny:                                                  # breach path
+          - set:  { condition.state: breached }                 # Condition → breached (§5.5)
+          - emit: condition.breached                            # canonical breach event (08 §4.6)
+          - open: case://remediation/obligation-breach          # remediation Case
+```
+
+**(2) Reviewer- and workload-aware assignment (a note).** Assignment-routing Decisions (§5.3) may consume
+**load / capacity / expertise features** via **feature-functions** — capacity-constrained matching
+expressed as a `compute` over the cohort, whose typed features key an assignment DecisionModel. The
+**honesty boundary**: conflict-of-interest and fairness correctness is **bounded by graph data quality** —
+a resolver can only exclude the relationships it holds, so a missing recent co-authorship is a
+data-completeness boundary, not a rule bug. The **deep treatment lives in
+[03-decision-layer.md](./03-decision-layer.md) §2.4** (graph feature-prep + the assignment honesty note);
+this is only the Flow-side pointer.
+
+**(3) Auditable randomness — the `SeededAllocate` recipe.** A ballot / lottery / random-allocation Flow
+uses the blessed **`SeededAllocate`** pattern — a commit-reveal (or public-beacon) seed via `external-task`,
+a frozen-and-hashed roster, a **pure `allocate(roster, seed)` `compute` step**, and a published
+`(seed, roster-hash)` for auditor reproduction — a **named pattern, not a new step type**, specified with
+its harness in [13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.n.
+
 ---
 
 ## 6. Manual-review Flow example (diagram)
