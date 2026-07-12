@@ -406,9 +406,21 @@ layers** and lets a deployment dial how strictly they are enforced:
 - **`ichiflow-mcp` guardrail tiers** ([`10-ai-native-experience.md`](10-ai-native-experience.md) §3.3)
   as the mediated agent path (read-only / sandbox / prod-with-JIT+approval);
 - **environment promotion as the artifact write path** — a change reaches prod by promoting a
-  reviewed, versioned artifact through environments, not by editing prod in place;
+  reviewed, versioned artifact through environments, not by editing prod in place. Both the artifact
+  *content* **and the *activation*** are version-controlled: which released `id@version` is active in
+  which environment is a **checked-in env-pin file** in the Workspace (e.g.
+  `environments/prod.pins.yaml`), so **promotion = a commit that changes the pin + a deploy of the
+  artifact bundle** — dev→staging→prod is a sequence of reviewable pin commits, never a bare console
+  click. The **runtime rule/artifact registry is a downstream pin/gate — a cache of the pinned
+  artifacts an environment loads — never a write surface or an authority**: it holds no version that did
+  not arrive by git merge and no active-binding not set by a pin commit
+  ([02-schema-foundation.md](02-schema-foundation.md) §6.1,
+  [03-decision-layer.md](03-decision-layer.md) §5.7; BRIEF §21). Effective-dating decouples merge-time
+  from activation-time (a version can merge and pin now with a future `effective.from`);
 - **break-glass that is loud and logged** — a direct-access escape hatch always exists for
-  emergencies, but every use is conspicuous, time-boxed, and written to the audit ledger.
+  emergencies (an expedited PR, or a genuine break-glass), but every use is conspicuous, time-boxed,
+  written to the audit ledger, and **reconciled by a back-filled commit** to the env-pin — so even an
+  emergency terminates in version control, never in a standing registry write.
 
 The **dial levels** an org selects among:
 

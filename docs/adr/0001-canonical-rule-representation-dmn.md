@@ -83,3 +83,8 @@ Negative / costs:
 - Research 05 §1.3 (DMN as provenance substrate), §1.6 (regulatory drivers)
 - DMN TCK — https://dmn-tck.github.io/tck/
 - Related: [0002](0002-pluggable-decision-engine-spi-drools-default.md), [0011](0011-decisionrecord-and-selective-event-sourcing.md), [0014](0014-map-first-migrate-last.md)
+- **Amended by [0027](0027-dmn-authoring-projection.md)** on two points: (1) an LLM-friendly **decision
+  source** projection covering the full DMN 1.6 surface compiles one-way to the canonical DMN XML
+  (which stays the executed/exported artifact); (2) the engine-native escape hatches (DRL / rule units
+  / CEP) are first-class **AI-authorable + testable** governed paths — quarantine marks *portability*,
+  not authorability. The canonical-format-over-engine decision above is otherwise unchanged.
