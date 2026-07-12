@@ -1,0 +1,37 @@
+{
+  "name": "@ichiflow/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The ichiflow CLI — the single `ichiflow verify` entry point and its harness engine.",
+  "license": "Apache-2.0",
+  "bin": {
+    "ichiflow": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ichiflow/schemas": "workspace:*",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.6.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.15.0",
+    "@types/node": "20.17.6",
+    "eslint": "9.15.0",
+    "typescript-eslint": "8.18.0",
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
+  }
+}

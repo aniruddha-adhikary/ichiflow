@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ConformanceProgress.json",
+    "type": "object",
+    "properties": {
+        "green": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        }
+    },
+    "required": [
+        "green",
+        "total"
+    ],
+    "description": "Enumerable \"how much is done\": green vs total over the conformance suite."
+}

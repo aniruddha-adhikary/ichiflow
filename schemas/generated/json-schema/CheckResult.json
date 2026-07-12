@@ -1,0 +1,45 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CheckResult.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Stable check id, e.g. `self-check.envelope-schema`."
+        },
+        "status": {
+            "$ref": "CheckStatus.json"
+        },
+        "artifact": {
+            "type": "string",
+            "description": "The artifact this check is about, if any (e.g. `decision:loan-eligibility@3.2.0`)."
+        },
+        "expected": {
+            "description": "Expected value for a failed check (structured, not prose)."
+        },
+        "actual": {
+            "description": "Actual value for a failed check (structured, not prose)."
+        },
+        "diff": {
+            "type": "string",
+            "description": "A short structured diff string; supplements expected/actual."
+        },
+        "metric": {
+            "type": "string",
+            "description": "Named metric for coverage-style checks (e.g. `rule-coverage`)."
+        },
+        "value": {
+            "type": "number",
+            "description": "Metric value for a coverage-style check."
+        },
+        "threshold": {
+            "type": "number",
+            "description": "Metric threshold for a coverage-style check."
+        }
+    },
+    "required": [
+        "id",
+        "status"
+    ],
+    "description": "One check result. Failures carry a structured diff (expected/actual/artifact), never a\nsentence. `id` is stable across runs so a dashboard and an agent track the same check."
+}

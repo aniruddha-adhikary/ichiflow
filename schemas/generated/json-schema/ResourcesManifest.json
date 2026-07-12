@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ResourcesManifest.json",
+    "type": "object",
+    "properties": {
+        "version": {
+            "type": "string",
+            "description": "Manifest schema version."
+        },
+        "pins": {
+            "type": "array",
+            "items": {
+                "$ref": "VersionPin.json"
+            }
+        },
+        "resources": {
+            "type": "array",
+            "items": {
+                "$ref": "Resource.json"
+            }
+        }
+    },
+    "required": [
+        "version",
+        "pins",
+        "resources"
+    ],
+    "description": "The manifest root — a governed, schema-validated Workspace artifact."
+}

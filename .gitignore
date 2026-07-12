@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ichiflow
+# Progress ledger is derived state (doc 13 §3.3), not committed.
+.ichiflow/ledger/
+
+# Gradle / Kotlin core
+core/.gradle/
+core/build/
+.gradle/

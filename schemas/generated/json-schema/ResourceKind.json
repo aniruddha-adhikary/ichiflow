@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ResourceKind.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "skill"
+        },
+        {
+            "type": "string",
+            "const": "pattern"
+        },
+        {
+            "type": "string",
+            "const": "harness"
+        },
+        {
+            "type": "string",
+            "const": "schema"
+        }
+    ],
+    "description": "Kind of a named resource an agent can reach for."
+}

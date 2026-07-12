@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CheckStatus.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "pass"
+        },
+        {
+            "type": "string",
+            "const": "fail"
+        },
+        {
+            "type": "string",
+            "const": "skip"
+        }
+    ],
+    "description": "Outcome of a single enumerated check."
+}

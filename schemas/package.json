@@ -1,0 +1,26 @@
+{
+  "name": "@ichiflow/schemas",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeSpec authoring for ichiflow canonical schemas; emitted JSON Schema / OpenAPI are the contract of record.",
+  "license": "Apache-2.0",
+  "exports": {
+    "./verdict-envelope": "./generated/json-schema/VerdictEnvelope.json",
+    "./resources-manifest": "./generated/json-schema/ResourcesManifest.json"
+  },
+  "files": [
+    "generated"
+  ],
+  "scripts": {
+    "emit": "tsp compile .",
+    "build": "tsp compile .",
+    "drift": "node ./scripts/drift-check.mjs",
+    "typecheck": "tsp compile . --no-emit",
+    "lint": "tsp compile . --no-emit"
+  },
+  "dependencies": {
+    "@typespec/compiler": "0.62.0",
+    "@typespec/json-schema": "0.62.0"
+  }
+}

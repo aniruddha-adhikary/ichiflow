@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "VersionPin.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Pin id, e.g. `apache-kie`, `dmn-tck`, `fabrikt`."
+        },
+        "version": {
+            "type": "string",
+            "description": "Exact version or commit, e.g. `10.2.0` or a git sha."
+        },
+        "note": {
+            "type": "string",
+            "description": "Why this pin exists / what reruns on a bump."
+        }
+    },
+    "required": [
+        "id",
+        "version"
+    ],
+    "description": "A pinned external dependency: an exact version an agent and CI both read."
+}

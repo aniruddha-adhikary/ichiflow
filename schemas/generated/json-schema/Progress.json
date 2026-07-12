@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Progress.json",
+    "type": "object",
+    "properties": {
+        "conformance": {
+            "$ref": "ConformanceProgress.json"
+        },
+        "coverage": {
+            "$ref": "CoverageProgress.json"
+        }
+    },
+    "description": "The progress metric block — a count/ratio, never a narrative estimate."
+}
