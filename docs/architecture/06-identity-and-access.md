@@ -527,6 +527,42 @@ isolation rides the same graph: a partner Team's members reach only artifacts/ca
 assigned, and the ReBAC filter set (§2.3) is inherently Team- and tenant-scoped, so cross-team leakage is
 impossible by construction, not by convention.
 
+### 4.4 Case associations are a distinct relation kind (peer, PDP-scoped)
+
+Two Cases relate through `owner` (ownership, §4.1) and through **parent/child correlation** (a derived
+appeal/correct/withdraw Case, [04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5.6). A **`Case
+association`** ([04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5.11, ADR-0032) is a **third,
+distinct relation kind**: a first-class **typed, peer, many-to-many** link (`investigation-group`,
+`portfolio-of-applicant`, `duplicate-suspect`) that is **neither an ownership nor a hierarchy edge** and
+carries its **own visibility scope** in the OpenFGA graph. Its defining property is **cross-Case read
+without boundary collapse**: membership in an association grants read **across** the linked Cases while each
+linked Case **keeps its own `owner` → Team relation** and its own audit boundary. An investigator in an
+`investigation-group` reads the linked claims; a workshop or claimant on **one** linked Case gains **no**
+visibility into the other. The association is modelled as its own object type, so reading a peer never adds
+an `owner`/`can_modify` edge on it:
+
+```
+type case                      # (§4.3) — a Case now also carries the peer-association relation
+  relations
+    define owner:       [team]
+    define assignee:    [user]
+    define association: [association]              # the peer links this Case belongs to (ADR-0032)
+    define can_modify:  assignee or editor from owner
+    define can_view:    can_modify or viewer from owner or member from owner or reader from association
+
+type association               # a typed, PDP-scoped Case association (investigation-group, portfolio, …)
+  relations
+    define member: [case]                          # the linked peer Cases
+    define reader: [user, team#member]             # who may read ACROSS the linked set
+```
+
+`reader from association` grants read **only** through the association's own scope — it never confers
+ownership or modify on a linked Case, so the cross-Case read stays exactly what the link intends and never
+collapses the peers' separate isolation. This **cross-Case read-without-leak** shape is a new PDP surface
+the authz harness ([13-agent-harness-loops.md](13-agent-harness-loops.md) §2.f) must cover: assert an
+association `reader` sees the linked set and nothing more, and that a principal scoped to one linked Case
+gains no visibility into its peers.
+
 ---
 
 ## Part 5 — Non-human identities: AI agents as first-class principals

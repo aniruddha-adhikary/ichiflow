@@ -95,6 +95,19 @@ Positive:
 - Sub-org structure is honest: partner orgs and departments share one deployment with correct isolation,
   without abusing the tenant boundary, and the multi-tenant seams (ADR-0017) stay intact for later.
 
+**Amendment (2026-07-12) — per-Team env-pin activation.** Ownership is per-Team, but a released version's
+**activation** — the env-pin that promotes it — was a single deployment-wide checked-in file
+(`environments/prod.pins.yaml`, [09](../architecture/09-deployment-and-topology.md) §6.3, BRIEF §21a). On a
+multi-agency deployment (the multi-agency-licensing case study, its G3) N Teams promoting on independent
+schedules all commit to one pin file — a coordination bottleneck and a shared blast radius. The env-pin may
+therefore be **partitioned by owning Team** (`environments/prod/<team>.pins.yaml`), so a Team promotes its
+own bundle versions independently while the deployment **composes** the partitions into the effective pin
+set. This **preserves "version control is the write path"** (BRIEF §21a) — every pin is still a git commit —
+and scopes *activation* to the same ownership boundary that already governs *edit/approve*, without crossing
+the tenancy line (a Team is still not a tenant; it shares the deployment's tenancy root, PDP graph, and audit
+spine). See [03](../architecture/03-decision-layer.md) §5.7 and [09](../architecture/09-deployment-and-topology.md)
+§6.3.
+
 Negative / costs:
 - **Added publish-time complexity.** The CodeSet publish gate now walks the dependency graph and runs
   cross-version, effective-dated referential-integrity + impact analysis — more to build, and a slower,

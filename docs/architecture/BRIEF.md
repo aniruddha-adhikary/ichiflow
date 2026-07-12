@@ -57,7 +57,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    offer-acceptance await), while the pure render is a **pluggable rendering-engine SPI** beneath it — an
    **optional component, not baked into core**, with a **designed external-delegation path** (an enterprise
    document platform can own rendering, or full issuance, while ichiflow keeps the Document registry +
-   lifecycle + verification the audit spine anchors to) (ADR-0029).
+   lifecycle + verification the audit spine anchors to) (ADR-0029). The closed step set further gains a
+   canonical **`quota-op`** step (atomic reserve/commit/release against a first-class **`QuotaLedger`**,
+   exactly-once-memoized on replay like `issue-document` allocation — ADR-0030); the Case module gains two
+   **set-level Case** shapes (a **cohort** gather-barrier and a **bundle** heterogeneous fan-out, ADR-0031)
+   and first-class **Case associations** (peer many-to-many links, ADR-0032); and the `issue-document`
+   acceptance facet covers **multi-party countersignature** (co-applicants acceding, ADR-0029).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
 4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
@@ -151,7 +156,13 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     Reporting therefore **embeds proven OSS BI** (Metabase/Superset-class) over ichiflow's
     schema-derived, **governed read-model projections** (cases, outcomes, conditions/obligations,
     SLAs, decision stats) with first-class integration (embedding, SSO via the broker, row/field-level
-    security driven by the same PDP); there is **no custom report engine** (ADR-0021).
+    security driven by the same PDP); there is **no custom report engine** (ADR-0021). The general
+    **placement doctrine** these instantiate — (i) audit-spine-dependent semantics → **core**;
+    (ii) ichiflow-differentiating → **first-party optional component**; (iii) commodity with mature OSS →
+    **SPI + thin default + integration guidance**; (iv) enterprise-already-owns-one → **designed
+    external-delegation path** — is recorded as ADR-0033 (generalizing ADR-0029's placement profiles), with
+    a per-capability classification table in doc 12 §6; it classifies **semantics, not product areas**
+    (most capabilities are hybrid across the tree).
 18. **Production-access posture is a configurable dial**: ichiflow ships the mediation layers (the
     *why* API, the support/ops console, ichiflow-mcp guardrail tiers, env promotion as the artifact
     write path, break-glass that is loud and logged), and each org **configures its posture** —
@@ -185,7 +196,10 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     path** (DecisionRecord / append-only ledger), never git. Effective-dating decouples merge-time
     from activation-time; the emergency-change path is an **expedited PR + loud/logged break-glass**,
     reconciled by a back-filled commit — never a bare registry write (doc 03 §5.7, doc 09 §6.3,
-    ADR-0020). **(b) Closed core, declared extension points.** Every closed vocabulary is either
+    ADR-0020). Env-pin **activation** may be **partitioned by owning Team**
+    (`environments/prod/<team>.pins.yaml`) so Teams/agencies release independently while the deployment
+    composes the partitions — still a git commit per pin, scoping activation to the same ownership boundary
+    that governs edit/approve, without crossing the tenancy line (ADR-0025 amended). **(b) Closed core, declared extension points.** Every closed vocabulary is either
     **argued closed** in its doc or carries a **declared, schema'd, discoverable extension point** (an
     `x-`/SPI seam with an extension schema and a discovery affordance) — the review rule behind the
     Decision-Engine SPI, storage SPIs, renderer registry, composition-policy-via-DMN, code-activity
@@ -198,10 +212,16 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 - **Decision** — a rule-evaluated determination; authored as DMN; evaluated by an Engine via the
   Decision Engine SPI. A **DecisionModel** is versioned + governed.
 - **Outcome** — the typed result of a Decision: `{ type (approve | deny | refer | conditional-approve
-  | partial | …), reasons[], conditions[], authority? }`. Replaces ad-hoc `{outcome, reasonCodes}`.
-  A **CompositeOutcome** aggregates N per-authority Outcomes under a declared composition policy
-  (all-must-approve / any-blocks / quorum(k) / weighted); each member's codes stay attributed to their
-  originating authority.
+  | partial | …), reasons[], conditions[], authority?, scoreBreakdown?, feeBreakdown? }`. Replaces
+  ad-hoc `{outcome, reasonCodes}`. The optional typed **`scoreBreakdown[]`** (`{ criterion, points, band,
+  whyRef }`) and **`feeBreakdown[]`** (`{ component, base, rateRef, amount }`) make a points tally or an
+  itemized fee a **first-class contract** (a statutory per-criterion breakdown, a permit's operative fee),
+  not an audit-time reconstruction from the trace; both **survive `CompositeOutcome` composition** with
+  per-member attribution intact. A **CompositeOutcome** aggregates N per-authority Outcomes under a declared
+  composition policy (all-must-approve / any-blocks / quorum(k) / weighted / custom); each member's codes
+  and breakdown stay attributed to their originating authority. **Composition modeling rule:** a single
+  authority scoring N criteria is a **DRD, not a CompositeOutcome**; N independent authorities compose as a
+  **CompositeOutcome**; a review panel is a **DRD-per-reviewer composed across reviewers** (doc 03 §2.3).
 - **Condition** — an individually typed, stateful obligation carried by an Outcome:
   `kind ∈ {blocking, post-approval-obligation}`, `state ∈ {pending, fulfilled, waived, breached}`.
   Blocking Conditions gate a later Flow step; post-approval obligations are deadline-bearing and
@@ -216,6 +236,35 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   this code?") by humans and `ichiflow-mcp`; deprecating a referenced row triggers publish-time
   impact analysis (blocked publish or forced dependent review). Every CodeSet has an **owning Team +
   named stewards** and may override the governance dial per artifact.
+- **QuotaLedger** — a first-class **multi-dimensional resource-ledger** artifact (governed, Team-owned,
+  effective-dated; a `CodeSet` sibling): declares **dimensions** (composite keys, e.g.
+  `[project, block, ethnicGroup]`) + CodeSet-like **capacity rows**, and **invariants**
+  (`headroom >= 0`, `committed <= capacity`) enforced **at the ledger, atomically** — never in hand-written
+  SQL. Atomic **`reserve` / `commit` / `release`** operations (TTL'd reservations) are invoked from Flows
+  via a canonical **`quota-op`** step, exactly-once-memoized on replay like `issue-document` allocation.
+  **Monetary** amounts are a dimension kind (variable-size reservation → grants budget pools); a **ranked
+  reserve-list draw** + a **declared release-back reflow policy** handle oversubscription and returned
+  capacity; every movement is an audited DecisionRecord event (doc 04 §5.9, ADR-0030).
+- **Set-level Case (cohort / bundle)** — two declared Flow shapes above the per-`case_id` model (doc 04
+  §5.10, ADR-0031). A **`cohort`** adds a **gather-barrier** over a case selector (gather cohort *C* → one
+  set-level Decision/compute → scatter), emitting a **cohort-scoped DecisionRecord** keyed by `cohortId`
+  that member Cases reference — **fan-in** to one set-level decision (the ballot ordering, the round
+  ranking). A **`bundle`** is a computed **heterogeneous** sub-Case **fan-out** (per-member `caseType` via
+  the CaseType catalog), joined by a **partial-tolerant status roll-up** (explicitly **not** a
+  `CompositeOutcome` — N independent Cases presented together, partial approval valid), whose parent record
+  **references** child records.
+- **Case association** — a first-class **many-to-many peer** link between otherwise-independent Cases
+  (doc 04 §5.11, ADR-0032): typed **link kinds** (`investigation-group`, `portfolio-of-applicant`,
+  `duplicate-suspect`), **PDP-scoped** visibility (read across linked Cases without collapsing their
+  ownership/audit boundaries), audited **link/unlink**, and **cross-Case invariant checks** (double-funding,
+  active-award caps) over the associations + the entity store. **Distinct** from parent/child correlation
+  (appeal) and from a **bundle** (a bundle owns its computed children; an association links peers).
+- **CaseType catalog** — an **additive, optional** governed **manifest** binding a case type's artifact
+  bundle (schema + applicability Decision + Flow + fee CodeSet + doctemplate + SLA + operation set +
+  issuance mode) + applicability metadata, owned by a Team, versioned as a unit, and **discoverable**
+  (enumerable + pinnable) via `ichiflow-mcp`. It adds **no new runtime mechanism** (it resolves to existing
+  refs) and enables guided-journey Decisions that **quantify over the catalog**; single-product Workspaces
+  need none (doc 02 §10, ADR-0031/0033).
 - **Flow** — declarative long-running process definition interpreted on Temporal.
 - **Compute step / code activity** — the unified typed-code extension primitive: a versioned,
   schema'd-at-the-boundary, trace-emitting Kotlin/TS unit (`ref: <lang>://<module>/<Name>@<version>`
