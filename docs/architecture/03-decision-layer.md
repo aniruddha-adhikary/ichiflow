@@ -62,8 +62,13 @@ input data, business knowledge models, and knowledge sources, with logic express
 - **executable on multiple independent conformant engines** (Drools, Camunda, Trisotech are all DMN
   TCK conformance level-3);
 - **text/XML-serializable**, diffable, and reviewable in git;
-- **reasonably LLM-authorable** via FEEL (functional, well-specified, far more constrained and
-  reliable to generate than DRL — research 01 §3.1, §6).
+- **executable/exportable as the interchange artifact** — DMN 1.6 XML runs on any TCK-L3 engine, the
+  anti-lock-in keystone. It is, however, **LLM-hostile to author *directly*** (verbose, positional,
+  deep boxed-expression nesting — the same trait that disqualified BPMN XML as a Flow surface), so
+  ichiflow puts an LLM-friendly **decision-table source** projection in front of it that compiles
+  one-way to DMN XML (§2.6). FEEL itself stays comparatively LLM-friendly (functional, well-specified,
+  far more constrained and reliable to generate than DRL — research 01 §3.1, §6); the projection is
+  what makes *whole-model* authoring legible, not just the cell expressions.
 
 We accept DMN's known interchange caveats (FEEL under-specification, "DMN-washing," weak diagram
 round-trip) and manage them by pinning to **TCK-L3 engines** and running a differential-test harness
@@ -86,8 +91,10 @@ metadata:
   version: 3.2.0                 # semver; governed release (see §5.1)
   governanceState: released     # draft | in-review | released | deprecated
   effective: { from: 2026-08-01, to: null }   # bitemporal effectivity
+  authoredIn: table-source      # dmn-xml | table-source | ai-chat  (§2.6; provenance only)
 model:
-  dmn: ./loan-eligibility.dmn    # DMN 1.6 XML — the source of truth (DRD + FEEL)
+  dmn: ./loan-eligibility.dmn    # DMN 1.6 XML — the executed/exported source of truth (DRD + FEEL)
+  source: ./loan-eligibility.decision-table.md   # decision-table source; compiles one-way → dmn (§2.6)
   entryPoint: LoanEligibility    # named decision to evaluate
 contracts:
   input:  { schema: schemas/LoanApplication.json }   # JSON Schema (BRIEF §5)
@@ -207,6 +214,39 @@ answerable via the why API. Effective-dating (§2.2) and CodeSet eligibility alr
 time/region gating; framing gating as a Decision unifies them under one governed, auditable surface
 rather than scattering boolean flags through code.
 
+### 2.6 The decision-table source — an LLM-friendly authoring projection over DMN XML
+
+DMN 1.6 XML is the **executed, exported, interchange** artifact (§2.1, ADR-0001) and stays so — but it
+is LLM-hostile to author directly. Every other core artifact class was given an LLM-legible **canonical
+authoring projection that compiles one-way** to its portable-but-hostile executed form — TypeSpec →
+OpenAPI/JSON Schema ([02-schema-foundation.md](./02-schema-foundation.md) §1), the typed flow builder /
+YAML → canonical Flow JSON ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.5). Decisions —
+ichiflow's heart — get the **same two-layer treatment** (ADR-0027):
+
+- **The decision-table source** is a crisp markdown/JSON **decision-table form** — FEEL cells, hit
+  policy, input/output columns, and DRD wiring expressed as data — that an agent or business user
+  authors, and that **compiles deterministically one-way to DMN 1.6 XML**. It is the Decision-layer
+  mirror of TypeSpec→OpenAPI and flow-builder→FlowJSON.
+- **DMN XML remains the sole executed/exported/audited artifact.** The compiled `.dmn` is checked in
+  beside the source and covered by the **regenerate-and-diff gate** ([02-schema-foundation.md](./02-schema-foundation.md)
+  §4.3) like any two-layer artifact, so a reviewer diffs the source *and* its emitted DMN together.
+  **No round-trip is promised** — the source is not regenerated from hand-edited DMN XML, and one model
+  is never a persistent mix of hand-DMN and source.
+- **`authored-in` provenance extends to DecisionModels**: `dmn-xml | table-source | ai-chat` (the
+  `metadata.authoredIn` field, §2.2), mirroring a Flow's `code | yaml | ai-chat`. AI chat authors the
+  decision-table source (or DMN) from conversation; the human judges via the read-only decision-table
+  view + simulation (§5.3). **Direct DMN XML authoring stays available** for developers and for
+  imported / engine-bound models (§4.3); the spreadsheet import/export path (§5.3) targets the source
+  or the DMN.
+- **Coverage is bounded and honest.** Constructs the table source cannot express — deep
+  forward-chaining inference, CEP windows — stay **direct-DMN / DRL engine-bound escape hatches**
+  (§4.3, §8); the source records what it does not cover, exactly as the ZEN projection records what it
+  drops (§4.2).
+
+This closes the Decision-layer authorability asymmetry the rest of the architecture had already
+resolved for Schemas and Flows, without touching portability: what executes and exports is still DMN
+1.6 XML.
+
 ---
 
 ## 3. The Decision Engine SPI
@@ -276,6 +316,19 @@ runtime: [ts, edge, jvm, wasm]
 A DecisionModel declares `engine.requires: [...]`. At deploy, ichiflow matches `requires` against
 each candidate engine's descriptor and **refuses to deploy** a model that requires `inference` to an
 engine that lacks it — surfacing the incompatibility to the author, not to production traffic.
+
+### 3.4 Writing a third-party Decision Engine SPI binding
+
+The SPI is a **declared, discoverable extension point** (BRIEF §21), not a two-engine private
+contract. A third party adds a new engine by implementing the four operations (§3.1) plus a
+`CapabilityDescriptor` (§3.3), and **admission is verifiable, not asserted**: a candidate engine is
+not admitted behind the SPI until it **passes the DMN-TCK conformance suite the SPI ships**
+([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.b), and its declared capabilities must
+actually hold (a descriptor claiming `supports.inference` must infer). ichiflow ships a **"writing a
+Decision Engine SPI binding" third-party guide** alongside the SPI — the four ops, the trace-shape
+mapping (§3.2), the capability descriptor, and the conformance harness a binding runs to prove itself
+— so "pluggable engine" is an open, self-serve seam and not merely documentation of ichiflow's own two
+engines.
 
 ---
 
@@ -392,9 +445,10 @@ authors rules by **describing intent in chat** and **judging the result against 
 **not** by manipulating a table-editor canvas. Because BAL-style controlled natural language is
 materially more approachable than DRL (research 01 §6.2) and FEEL's constrained surface makes LLM
 generation comparatively reliable (research 01 §3.1), the v1 loop is: *describe in chat ("decline if
-debt-to-income exceeds 43% unless the co-signer FICO is above 740") → the AI proposes a DMN decision
-table + FEEL → the user judges via a read-only decision-table view and what-if simulation → approve
-the diff.* ichiflow never exposes raw DRL to a business author.
+debt-to-income exceeds 43% unless the co-signer FICO is above 740") → the AI proposes a
+**decision-table source** (§2.6) that compiles one-way to DMN + FEEL → the user judges via a read-only
+decision-table view and what-if simulation → approve the diff.* ichiflow never exposes raw DRL to a
+business author.
 
 - **The decision-table view is a read-only projection.** Boxed DMN with hit-policy, completeness/
   overlap checking (via `validate`), and FEEL cells — rendered *from* the canonical DMN as the artifact
@@ -407,9 +461,11 @@ the diff.* ichiflow never exposes raw DRL to a business author.
   **spreadsheet (Excel/OpenRules-style) import/export** (research 01 §3.6, §8) remains an *interchange*
   path for analysts who maintain rate/eligibility tables in a sheet — an import into the canonical DMN,
   not an in-app canvas.
-- **Guided articulation, not a builder.** A structured "when/then" way to state intent that emits
-  DMN + FEEL remains available as chat-adjacent scaffolding, deterministically compiled to the
-  canonical format — it is not a drag-and-drop builder.
+- **The decision-table source is the named authoring projection** (§2.6, ADR-0027) — not a vague
+  "guided articulation." A structured decision-table markdown/JSON form (FEEL cells + hit-policy + DRD
+  wiring) is what chat proposes and what a developer may edit directly; it **compiles deterministically
+  one-way to DMN 1.6 XML**, which stays the executed/exported artifact. It is an authoring surface, not
+  a drag-and-drop builder, and no round-trip is promised.
 
 Every proposal follows the framework-wide contract **"AI proposes, deterministic tools + humans
 dispose"** (BRIEF vocab, research 06 §A.5): type-checked by `validate`, shown as a diff, human-approved,
@@ -481,9 +537,32 @@ not just a legacy import:
 
 The pieces already exist — effective-dating, immutable released baselines, version pinning, the
 golden-dataset diff — and this subsection assembles them into one promotion story that applies to
-every released rule, not only migrated ones. (How released artifacts are *deployed/promoted across
-environments* — a runtime rule registry, dev→staging→prod promotion, hot-deploy independent of code
-— is a separate, larger question not settled here.)
+every released rule, not only migrated ones.
+
+**Which released version is active in which environment is itself a version-controlled artifact.** A
+DecisionModel/CodeSet/Flow **version** is authored and released **only by git merge** (chat-edit →
+auto-branch + agent-authored PR → approval-Flow = PR approval mirrored → merge). *Activation* is the
+second, separately-governed step, and it is **also** a commit: each environment carries a
+**version-controlled env-pin file** in the Workspace (e.g. `environments/prod.pins.yaml`) that binds
+each artifact to the exact released `id@version` that environment runs. So **promotion =
+commit-the-pin + deploy of the artifact bundle** — dev→staging→prod is a sequence of pin commits, each
+reviewable and diffable, never a bare console click.
+
+- **The runtime rule registry is a downstream pin/gate, never a write surface.** It is a *cache of the
+  pinned artifacts* an environment loads for hot-evaluation; it holds no version that did not arrive by
+  git merge and no active-binding that was not set by a pin commit ([02-schema-foundation.md](./02-schema-foundation.md)
+  §6.1; BRIEF §21). Selecting an active version by editing the registry directly is **not** a supported
+  path.
+- **Effective-dating decouples merge-time from activation-time.** A version can merge and pin now with
+  a future `effective.from` (§2.2), so a business-cadence change lands in git well ahead of the date it
+  becomes authoritative; in-flight Cases stay pinned to the version + effective date they started on.
+- **The emergency-change path is an expedited PR + loud break-glass, not a registry write.** When a
+  change must reach prod faster than the normal approval-Flow, the path is an **expedited PR** (reduced
+  reviewers, still merged) or a **loud, logged break-glass** ([09-deployment-and-topology.md](./09-deployment-and-topology.md)
+  §6.3, ADR-0020) whose after-the-fact reconciliation is a **back-filled commit** to the env-pin — so
+  even an emergency terminates in version control. **Net: both content and activation trace to a
+  commit; the registry is a cache, never an authority.** (Cross-environment promotion mechanics and the
+  pin-file schema live in [09-deployment-and-topology.md](./09-deployment-and-topology.md) §6.3.)
 
 ### 5.8 Reference-data (CodeSet) change governance and the deprecation/impact-review flow
 
@@ -735,9 +814,13 @@ a genuinely clean exit — not "one-click import."**
 
 ## 12. Open questions
 
-1. **BAL-like guided-rule fidelity.** How close can guided rules + NL-assisted authoring get to the
-   approachability of ODM BAL without a proprietary language? Needs user testing with business
-   analysts (§5.3).
+1. **BAL-like guided-rule fidelity — the authoring format is now decided (ADR-0027); fidelity
+   remains to be user-tested.** The named canonical authoring projection is the **decision-table
+   source** (§2.6): a markdown/JSON decision-table form compiling one-way to DMN 1.6 XML, mirroring
+   TypeSpec→OpenAPI and flow-builder→FlowJSON — so there is no longer an undefined "guided
+   articulation" gap. The residual, genuinely-open question is *fidelity*: how close the
+   decision-table source + NL-assisted authoring gets to the approachability of ODM BAL without a
+   proprietary language, which needs user testing with business analysts (§5.3).
 2. **Portable temporal subset.** Can a useful subset of CEP/temporal patterns be lifted into the DMN
    envelope so common windows avoid the engine-bound escape hatch (§8)? Undecided.
 3. **ZEN projection boundary.** Exactly which DMN/FEEL constructs project cleanly to JDM, and how we

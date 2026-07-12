@@ -157,6 +157,20 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     any engine must pass; harness definitions are governed Workspace artifacts that also ship to
     app-builders. Building ichiflow itself runs harness-first (each phase's exit = its harness green in
     CI), and the two v1 acceptance exercises are the outermost harnesses (ADR-0026, doc 13).
+21. **Write paths and extension doctrine**: two invariants hold across the whole system. **(a) Version
+    control is the write path.** Every governed artifact change lands as a **git commit** — content
+    *and* the env pin that activates a released version (promotion = commit-the-pin + deploy of the
+    artifact bundle; the runtime registry is a downstream pin/gate, never a write surface). Runtime
+    business data (Cases/Tasks/entity rows, Tier-2 actuations) goes through the **audited runtime
+    path** (DecisionRecord / append-only ledger), never git. Effective-dating decouples merge-time
+    from activation-time; the emergency-change path is an **expedited PR + loud/logged break-glass**,
+    reconciled by a back-filled commit — never a bare registry write (doc 03 §5.7, doc 09 §6.3,
+    ADR-0020). **(b) Closed core, declared extension points.** Every closed vocabulary is either
+    **argued closed** in its doc or carries a **declared, schema'd, discoverable extension point** (an
+    `x-`/SPI seam with an extension schema and a discovery affordance) — the review rule behind the
+    Decision-Engine SPI, storage SPIs, renderer registry, composition-policy-via-DMN, code-activity
+    worker SPI, extension Flow step types, the Adapter-binding SPI, and the MCP tool-extension SPI
+    (doc 00 principles).
 
 ## Core vocabulary (use these names consistently)
 
@@ -188,10 +202,23 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   + input/output JSON Schema) used identically as a Flow `compute` step, a Decision feature-function,
   and an Adapter code-transform. Computation lives here; declarative artifacts stay for control-flow
   graphs, rule tables, and structural mappings. Because it is schema'd at its boundary and emits a
-  trace, code participates in the audit spine without the DSL becoming a programming language.
-- **authored-in** — provenance on a Flow (and any artifact with multiple authoring surfaces)
-  recording which surface produced the canonical artifact: `code` (typed builder), `yaml`, or
-  `ai-chat`. The canonical JSON/DMN remains the executed/audited/exported artifact regardless.
+  trace, code participates in the audit spine without the DSL becoming a programming language. The
+  worker behind it is a **declared SPI** (Kotlin/TS in v1, Python expected first post-v1 for ML
+  feature-prep), and it is the substrate for **extension Flow step types**.
+- **authored-in** — provenance on any artifact with multiple authoring surfaces, recording which
+  surface produced the canonical artifact. A **Flow**: `code` (typed builder) | `yaml` | `ai-chat`. A
+  **DecisionModel**: `dmn-xml` (direct DMN) | `table-source` (the decision-table source projection) |
+  `ai-chat`. The canonical JSON/DMN-XML remains the executed/audited/exported artifact regardless.
+- **decision-table source** — the LLM-friendly canonical **authoring projection** for a DecisionModel:
+  a markdown/JSON decision-table form (FEEL cells + hit-policy + DRD wiring as data) that **compiles
+  deterministically one-way to DMN 1.6 XML**, the executed/exported artifact. The Decision-layer mirror
+  of TypeSpec→OpenAPI and the flow builder→FlowJSON; no round-trip is promised, and direct DMN XML
+  authoring stays available (ADR-0027).
+- **Extension step type** — a **custom Flow step type** declared in the Workspace under an extension
+  namespace (`x-<org>/<stepType>`): a schema'd, interpreter-registered **compute-variant** backed by
+  the unified code-activity contract, validated + trace-emitting like `compute`. The canonical
+  step-type set stays closed; new step kinds are additive + discoverable at this declared seam rather
+  than a fork.
 - **Case** — a unit of business work flowing through Flows (incl. manual review); carries the
   global `case_id` and its DecisionRecord. Supports post-submission operations (amend, cancel,
   withdraw, appeal, correct).
