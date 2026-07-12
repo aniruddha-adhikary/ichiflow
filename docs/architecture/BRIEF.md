@@ -24,8 +24,11 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    (await-signal + SLA timers + escalation; assignment routing is itself a decision).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
-4. **Languages**: Kotlin core (rules eval, flow workers, core domain services), TypeScript edges
-   (portals/UI, BFFs, CLI/tooling). Types on both sides are generated from one schema source.
+4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
+   TypeScript edges (portals/UI, BFFs, CLI/tooling). The deterministic Temporal **flow-interpreter
+   workflow runs in TypeScript** — Temporal has no first-class Kotlin SDK, so workflow (orchestration)
+   code is TS and Kotlin is confined to activity workers (see ADRs 0003/0007). Types on both sides
+   are generated from one schema source.
 5. **Schema strategy**: author in TypeSpec; emitted OpenAPI 3.1+ / JSON Schema 2020-12 are the
    canonical checked-in contract artifacts; AsyncAPI 3.1 for message contracts ($ref shared
    schemas). Codegen: Fabrikt (Kotlin), hey-api or orval (TS, pinned). Runtime validation from
@@ -110,7 +113,7 @@ compliance officer · AI coding agent (build + runtime) · End customer.
 - Location: `docs/architecture/NN-name.md`; ADRs in `docs/adr/NNNN-title.md` (MADR-style:
   Context, Decision, Alternatives considered, Consequences; cite research docs).
 - Each doc: front summary ("What this covers / Position in the system"), then substance;
-  Mermaid diagrams welcome (```mermaid); cross-reference sibling docs and research by relative
+  Mermaid diagrams welcome (fenced `mermaid` blocks); cross-reference sibling docs and research by relative
   path; explicit "Open questions" section at the end where genuinely undecided.
 - Write for two readers at once: senior engineers and AI coding agents. Precise nouns from the
   vocabulary above; no marketing fluff. Declarative artifacts > code; when showing an artifact

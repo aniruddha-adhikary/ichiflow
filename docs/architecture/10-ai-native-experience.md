@@ -16,7 +16,7 @@
 > replay — the substrate this doc exposes), `06-identity-and-access.md` (non-human identity, JIT,
 > PDP), `03-decision-layer.md` (DMN authoring / business-user rule assistance),
 > `09-deployment-and-topology.md` (the stateless MCP server, tiers, zones this rides on),
-> `04-adapters.md` (declared ports as agent targets).
+> `05-adapters.md` (declared ports as agent targets).
 
 ---
 
@@ -220,7 +220,7 @@ is vibes (research 07 §6.2, the real differentiator). ichiflow provides, **by c
 
 The determinism discipline has a cost worth stating loudly (research 07 §8.8): replay only works if
 the decision core stays deterministic (scoped event sourcing, doc 08) and **non-deterministic
-activities are isolated behind the port/adapter model** (`04-adapters.md`). This constrains how Flows
+activities are isolated behind the port/adapter model** (`05-adapters.md`). This constrains how Flows
 and Adapters are written — deliberately.
 
 ---

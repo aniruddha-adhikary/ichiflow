@@ -62,7 +62,7 @@ migrations), so a module carries its schema when it later leaves.
 | **Portal + BFF** (per audience) | TS edge | Audience-scoped UI + backend-for-frontend; renders "display-suitable" data | session/view state |
 | **Adapter runtime** | Kotlin (JVM) + TS | Inbound/outbound declared ports (REST, MQ/JMS/Kafka/AMQP, file/SFTP, SOAP, webhook, CDC); canonicalization + boundary validation | adapter cursors, dedup keys |
 | **Decision core** | Kotlin | DMN evaluation via the Decision Engine SPI; DecisionModel governance/simulation | decision logs, DecisionModel versions |
-| **Flow core** | Kotlin | Declarative Flow interpretation on Temporal; Case lifecycle | Case state, `case_id` registry |
+| **Flow core** | TS (interpreter workflow) + Kotlin (Case services) | Declarative Flow interpretation on Temporal — the deterministic interpreter workflow runs in TypeScript (no first-class Temporal Kotlin SDK); Case-lifecycle domain services are Kotlin | Case state, `case_id` registry |
 | **Task/case-management** | Kotlin | Human tasks, SLA timers, escalation, assignment routing (itself a Decision) | Task queues, SLA state |
 | **Audit/why** | Kotlin | DecisionRecord assembly, "why" API, append-only ledger | DecisionRecord (append-only) |
 | **Identity/PDP** | Kotlin/TS | IdP brokering, token exchange, central PDP (see `06-identity-and-access.md`) | authz decision logs |
