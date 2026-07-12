@@ -26,7 +26,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 ## Registered scopes
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
-`contract-vectors`. More come online phase by phase (doc 14).
+`contract-vectors`, `reference-data`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -40,3 +40,7 @@ byte-level drift is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModel
 
 `contract-vectors` cross-checks Ajv (TS) against networknt (JVM) on a corpus of accept/reject vectors
 for the _real_ contract (VerdictEnvelope & members); run `pnpm vectors:jvm` before `pnpm verify`.
+
+`reference-data` validates the committed CodeSet fixtures (`schemas/reference-data/fixtures/*.codeset.json`)
+against the emitted `CodeSet` contract and enforces cross-CodeSet `codeRef` referential integrity —
+each reference must resolve to a live row whose effective window covers the referencing row's.

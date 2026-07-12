@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeSetMetadata.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "CodeSet id, e.g. `obligations`."
+        },
+        "version": {
+            "type": "string",
+            "description": "Semver; breaking row/schema changes are gated like any other contract."
+        },
+        "governanceState": {
+            "$ref": "GovernanceState.json"
+        },
+        "effective": {
+            "$ref": "EffectiveWindow.json",
+            "description": "The set-level effective window."
+        },
+        "owner": {
+            "$ref": "CodeSetOwner.json"
+        },
+        "governance": {
+            "$ref": "CodeSetGovernance.json"
+        }
+    },
+    "required": [
+        "id",
+        "version",
+        "governanceState",
+        "effective",
+        "owner"
+    ],
+    "description": "CodeSet identity + governance metadata."
+}
