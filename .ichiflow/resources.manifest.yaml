@@ -21,6 +21,15 @@ pins:
   - id: networknt-json-schema-validator
     version: "1.5.4"
     note: Independent JVM JSON Schema 2020-12 validator for the cross-language fidelity spike.
+  - id: hey-api-openapi-ts
+    version: "0.80.0"
+    note: TypeScript contract-type generator from OpenAPI (build plan 1.2). 0.80.x is the last line supporting Node 20; bump reruns codegen drift.
+  - id: fabrikt
+    version: "26.1.0"
+    note: Kotlin contract-model generator from OpenAPI (build plan 1.2). Bump reruns ./gradlew checkModelsUpToDate.
+  - id: kie-dmn
+    version: "10.2.0"
+    note: Apache KIE / Drools DMN — v1 reference decision engine (ADR-0002). Pinned; a bump reruns the decision-projection-spike. DMN 1.6 (spec 20240513).
   - id: oasdiff
     version: "1.21.0"
     note: OpenAPI breaking-change detector for the contract-gate scope (chunk 1.4a). Go release binary; installed in CI and run via `pnpm contract:diff`.
@@ -54,6 +63,50 @@ resources:
     kind: schema
     path: schemas/service.tsp
     description: The verify status API surface (TypeSpec → OpenAPI 3.1).
+  - id: codegen
+    kind: harness
+    path: packages/cli/src/verify/scopes/codegen.ts
+    description: Generated TS (hey-api) + Kotlin (Fabrikt) edges cover every OpenAPI component schema.
+  - id: contract-vectors
+    kind: harness
+    path: packages/cli/src/verify/scopes/contract-vectors.ts
+    description: Cross-language accept/reject vectors for the real contract — Ajv (TS) vs networknt (JVM) must agree.
+  - id: contract-corpus
+    kind: pattern
+    path: schemas/vectors/contract-corpus.json
+    description: Labelled validation vectors for the real emitted contract (build plan 1.3).
+  - id: reference-data
+    kind: harness
+    path: packages/cli/src/verify/scopes/reference-data.ts
+    description: CodeSet fixtures conform to the contract and every cross-CodeSet codeRef resolves to a live, in-window row (ADR-0025).
+  - id: codeset-schema
+    kind: schema
+    path: schemas/reference-data.tsp
+    description: The CodeSet reference-data artifact class (TypeSpec → JSON Schema); rows carry codeRef foreign keys.
+  - id: codeset-fixtures
+    kind: pattern
+    path: schemas/reference-data/fixtures
+    description: Interdependent CodeSet fixtures exercising cross-version, effective-dated codeRef integrity.
+  - id: decision-projection-spike
+    kind: harness
+    path: packages/cli/src/verify/scopes/decision-projection-spike.ts
+    description: Compiled decision-source → DMN 1.6 executes identically to the hand-authored reference on KIE/Drools (build plan 2.0).
+  - id: decision-source-fixture
+    kind: pattern
+    path: schemas/decision-source/fixtures/fee.decision.json
+    description: decision-source authoring fixture (hard boxed-expression kinds) projected one-way to DMN (ADR-0027).
+  - id: dmn-reference
+    kind: pattern
+    path: core/src/main/resources/dmn/reference/fee.dmn
+    description: Hand-authored DMN 1.6 reference the projection spike executes against for behavioural equivalence.
+  - id: contracts-ts
+    kind: generated
+    path: packages/contracts-ts/src/gen
+    description: Generated TypeScript contract types (hey-api). Regenerate with pnpm codegen:ts; never hand-edit.
+  - id: contracts-kotlin
+    kind: generated
+    path: core/generated/src/main/kotlin
+    description: Generated Kotlin contract models (Fabrikt). Regenerate with ./gradlew generateModels; never hand-edit.
   - id: contract-gate
     kind: harness
     path: packages/cli/src/verify/scopes/contract-gate.ts

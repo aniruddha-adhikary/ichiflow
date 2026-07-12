@@ -1,0 +1,175 @@
+{
+  "description": "Cross-language validation vectors for the real emitted contract (build plan 1.3). Unlike the fidelity spike (which probes synthetic worst-case constructs), these vectors pin the accept/reject behaviour of the actual VerdictEnvelope contract and its members. Both Ajv (TS) and networknt (JVM) must match `expect` AND agree with each other on every vector — a divergence here is a real contract-fidelity defect, not a lab curiosity.",
+  "vectors": [
+    {
+      "id": "envelope.valid-full",
+      "schema": "VerdictEnvelope.json",
+      "expect": "accept",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "2026-07-12T00:00:00Z",
+        "seed": "sha256:0000",
+        "verdict": "pass",
+        "summary": { "checks": 2, "passed": 2, "failed": 0, "skipped": 0 },
+        "progress": { "conformance": { "green": 2, "total": 2 } },
+        "checks": [
+          { "id": "self-check.a", "status": "pass" },
+          { "id": "self-check.b", "status": "pass" }
+        ],
+        "flaky": false
+      }
+    },
+    {
+      "id": "envelope.missing-flaky",
+      "schema": "VerdictEnvelope.json",
+      "expect": "reject",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "2026-07-12T00:00:00Z",
+        "seed": "sha256:0000",
+        "verdict": "pass",
+        "summary": { "checks": 0, "passed": 0, "failed": 0, "skipped": 0 },
+        "progress": {},
+        "checks": []
+      }
+    },
+    {
+      "id": "envelope.bad-ranAt-format",
+      "schema": "VerdictEnvelope.json",
+      "expect": "reject",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "not-a-timestamp",
+        "seed": "sha256:0000",
+        "verdict": "pass",
+        "summary": { "checks": 0, "passed": 0, "failed": 0, "skipped": 0 },
+        "progress": {},
+        "checks": [],
+        "flaky": false
+      }
+    },
+    {
+      "id": "envelope.bad-verdict-enum",
+      "schema": "VerdictEnvelope.json",
+      "expect": "reject",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "2026-07-12T00:00:00Z",
+        "seed": "sha256:0000",
+        "verdict": "error",
+        "summary": { "checks": 0, "passed": 0, "failed": 0, "skipped": 0 },
+        "progress": {},
+        "checks": [],
+        "flaky": false
+      }
+    },
+    {
+      "id": "envelope.summary-wrong-type",
+      "schema": "VerdictEnvelope.json",
+      "expect": "reject",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "2026-07-12T00:00:00Z",
+        "seed": "sha256:0000",
+        "verdict": "pass",
+        "summary": { "checks": "2", "passed": 2, "failed": 0, "skipped": 0 },
+        "progress": {},
+        "checks": [],
+        "flaky": false
+      }
+    },
+    {
+      "id": "envelope.progress-empty-ok",
+      "schema": "VerdictEnvelope.json",
+      "expect": "accept",
+      "instance": {
+        "verifyVersion": "1",
+        "scope": "self-check",
+        "ranAt": "2026-07-12T00:00:00Z",
+        "seed": "sha256:0000",
+        "verdict": "fail",
+        "summary": { "checks": 1, "passed": 0, "failed": 1, "skipped": 0 },
+        "progress": {},
+        "checks": [{ "id": "x.y", "status": "fail", "diff": "expected 1 got 0" }],
+        "flaky": false
+      }
+    },
+    {
+      "id": "check.valid-pass",
+      "schema": "CheckResult.json",
+      "expect": "accept",
+      "instance": { "id": "self-check.envelope-schema", "status": "pass" }
+    },
+    {
+      "id": "check.valid-with-metric",
+      "schema": "CheckResult.json",
+      "expect": "accept",
+      "instance": {
+        "id": "coverage.rule",
+        "status": "pass",
+        "metric": "rule-coverage",
+        "value": 0.97,
+        "threshold": 0.95
+      }
+    },
+    {
+      "id": "check.missing-id",
+      "schema": "CheckResult.json",
+      "expect": "reject",
+      "instance": { "status": "pass" }
+    },
+    {
+      "id": "check.bad-status",
+      "schema": "CheckResult.json",
+      "expect": "reject",
+      "instance": { "id": "x", "status": "error" }
+    },
+    {
+      "id": "verdict.pass-accept",
+      "schema": "Verdict.json",
+      "expect": "accept",
+      "instance": "pass"
+    },
+    {
+      "id": "verdict.error-reject",
+      "schema": "Verdict.json",
+      "expect": "reject",
+      "instance": "error"
+    },
+    {
+      "id": "status.skip-accept",
+      "schema": "CheckStatus.json",
+      "expect": "accept",
+      "instance": "skip"
+    },
+    {
+      "id": "summary.negative-reject",
+      "schema": "VerdictSummary.json",
+      "expect": "reject",
+      "instance": { "checks": -1, "passed": 0, "failed": 0, "skipped": 0 }
+    },
+    {
+      "id": "progress.non-integer-reject",
+      "schema": "ConformanceProgress.json",
+      "expect": "reject",
+      "instance": { "green": 1.5, "total": 2 }
+    },
+    {
+      "id": "resourcekind.generated-accept",
+      "schema": "ResourceKind.json",
+      "expect": "accept",
+      "instance": "generated"
+    },
+    {
+      "id": "resourcekind.unknown-reject",
+      "schema": "ResourceKind.json",
+      "expect": "reject",
+      "instance": "frobnicate"
+    }
+  ]
+}

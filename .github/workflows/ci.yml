@@ -52,6 +52,9 @@ jobs:
       - name: Schema drift check (regenerate-and-diff, doc 02 §4.3)
         run: pnpm schema:drift
 
+      - name: Codegen drift check (TS contract types up-to-date)
+        run: pnpm codegen:drift
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -66,6 +69,12 @@ jobs:
 
       - name: Fidelity spike — JVM (networknt) verdicts
         run: pnpm spike:jvm
+
+      - name: Contract vectors — JVM (networknt) verdicts
+        run: pnpm vectors:jvm
+
+      - name: Decision projection spike — DMN 1.6 on KIE/Drools
+        run: pnpm decision:jvm
 
       - name: Contract breaking-change diff (oasdiff, chunk 1.4a)
         run: pnpm contract:diff

@@ -21,7 +21,11 @@
     "contract:diff": "node schemas/scripts/contract-diff.mjs",
     "contract:accept": "node schemas/scripts/contract-accept.mjs",
     "license:check": "node tools/license-check/index.mjs",
+    "codegen:ts": "pnpm --filter @ichiflow/contracts-ts generate",
+    "codegen:drift": "pnpm --filter @ichiflow/contracts-ts drift",
     "spike:jvm": "cd core && ./gradlew -q runSpike",
+    "vectors:jvm": "cd core && ./gradlew -q runContractVectors",
+    "decision:jvm": "cd core && ./gradlew -q runDecisionSpike",
     "verify": "node packages/cli/dist/cli.js verify"
   },
   "devDependencies": {

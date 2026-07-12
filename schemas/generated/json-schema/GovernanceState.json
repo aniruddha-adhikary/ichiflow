@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "GovernanceState.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "draft"
+        },
+        {
+            "type": "string",
+            "const": "in-review"
+        },
+        {
+            "type": "string",
+            "const": "released"
+        },
+        {
+            "type": "string",
+            "const": "deprecated"
+        }
+    ],
+    "description": "Governance lifecycle state of a CodeSet (§9.1)."
+}

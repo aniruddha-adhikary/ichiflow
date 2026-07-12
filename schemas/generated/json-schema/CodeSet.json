@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeSet.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "type": "string",
+            "const": "CodeSet"
+        },
+        "metadata": {
+            "$ref": "CodeSetMetadata.json"
+        },
+        "schema": {
+            "type": "string",
+            "description": "Repo-relative path to the row-shape JSON Schema, if the rows carry a declared shape (§9.2)."
+        },
+        "rows": {
+            "type": "array",
+            "items": {
+                "$ref": "CodeRow.json"
+            }
+        }
+    },
+    "required": [
+        "kind",
+        "metadata",
+        "rows"
+    ],
+    "description": "A governed CodeSet — checked in, registry-versioned, effective-dated. Decisions, Flows, and the UI\nreference it by `id@version`; they never inline its rows (§9.1)."
+}

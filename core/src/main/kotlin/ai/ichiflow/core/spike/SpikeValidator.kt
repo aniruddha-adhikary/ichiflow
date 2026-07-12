@@ -56,12 +56,15 @@ object SpikeValidator {
     }
 }
 
-fun main() {
+fun main(args: Array<String>) {
     // Working dir is the Gradle project dir (core/); the schemas + corpus live one level up.
+    // Args (both optional): [0] repo-relative corpus path, [1] core-relative output path. Defaults
+    // target the fidelity spike so `pnpm spike:jvm` stays argument-free; `pnpm vectors:jvm` passes
+    // the real-contract corpus (build plan 1.3).
     val repoRoot = File("..").canonicalFile
     val schemaDir = File(repoRoot, "schemas/generated/json-schema")
-    val corpusFile = File(repoRoot, "schemas/spike/corpus.json")
-    val outputFile = File("build/spike-results.json")
+    val corpusFile = File(repoRoot, args.getOrElse(0) { "schemas/spike/corpus.json" })
+    val outputFile = File(args.getOrElse(1) { "build/spike-results.json" })
 
     val results = SpikeValidator.validate(schemaDir, corpusFile)
 
@@ -73,5 +76,5 @@ fun main() {
 
     outputFile.parentFile.mkdirs()
     outputFile.writeText(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root) + "\n")
-    println("Wrote ${results.size} spike results to ${outputFile.path}")
+    println("Wrote ${results.size} results from ${corpusFile.name} to ${outputFile.path}")
 }

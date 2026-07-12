@@ -25,14 +25,30 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 ## Registered scopes
 
-`self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`,
-`contract-gate`. More come online phase by phase (doc 14).
+`self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
+`contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`. More come online
+phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
 
 `schema-pipeline` validates the committed OpenAPI 3.1 + JSON Schema 2020-12 artifacts (existence,
 `$ref` integrity, canonical-model reuse). Byte-level drift is a separate gate: `pnpm schema:drift`.
+
+`codegen` asserts the generated edges — TypeScript types (hey-api) and Kotlin models (Fabrikt) —
+cover every OpenAPI component schema. Regenerate with `pnpm codegen:ts` / `./gradlew generateModels`;
+byte-level drift is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModelsUpToDate` (Kotlin).
+
+`contract-vectors` cross-checks Ajv (TS) against networknt (JVM) on a corpus of accept/reject vectors
+for the _real_ contract (VerdictEnvelope & members); run `pnpm vectors:jvm` before `pnpm verify`.
+
+`reference-data` validates the committed CodeSet fixtures (`schemas/reference-data/fixtures/*.codeset.json`)
+against the emitted `CodeSet` contract and enforces cross-CodeSet `codeRef` referential integrity —
+each reference must resolve to a live row whose effective window covers the referencing row's.
+
+`decision-projection-spike` compiles the `decision-source` fixture to DMN 1.6 and executes it and a
+hand-authored reference DMN on Apache KIE / Drools, asserting identical results per input vector; run
+`pnpm decision:jvm` before `pnpm verify` to produce `core/build/decision-projection-results.json`.
 
 `contract-gate` asserts **zero breaking changes** in the emitted OpenAPI vs the released baseline
 (`schemas/contract/openapi.baseline.yaml`), using oasdiff. It reads the git-ignored results file

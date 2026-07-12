@@ -1,0 +1,39 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeRow.json",
+    "type": "object",
+    "properties": {
+        "code": {
+            "type": "string",
+            "description": "Stable code within the set, e.g. `NC_TEMP_IMPORT`."
+        },
+        "display": {
+            "$ref": "CodeDisplay.json"
+        },
+        "effective": {
+            "$ref": "EffectiveWindow.json",
+            "description": "Row-level effective window; defaults to the set's window when absent."
+        },
+        "deprecated": {
+            "type": "boolean",
+            "description": "A deprecated row is not `live`: it cannot be the target of a codeRef (§9.4)."
+        },
+        "codeRefs": {
+            "$ref": "#/$defs/RecordCodeRef",
+            "description": "Foreign-key columns keyed by column name (e.g. `country` → countries"
+        }
+    },
+    "required": [
+        "code"
+    ],
+    "description": "One code row. `codeRefs` are foreign-key-like columns into other CodeSets (§9.4).",
+    "$defs": {
+        "RecordCodeRef": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "$ref": "CodeRef.json"
+            }
+        }
+    }
+}

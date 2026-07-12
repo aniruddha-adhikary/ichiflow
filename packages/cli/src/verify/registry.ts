@@ -3,6 +3,10 @@ import { selfCheckScope } from "./scopes/self-check.js";
 import { agentKitScope } from "./scopes/agent-kit.js";
 import { schemaFidelitySpikeScope } from "./scopes/schema-fidelity-spike.js";
 import { schemaPipelineScope } from "./scopes/schema-pipeline.js";
+import { codegenScope } from "./scopes/codegen.js";
+import { contractVectorsScope } from "./scopes/contract-vectors.js";
+import { referenceDataScope } from "./scopes/reference-data.js";
+import { decisionProjectionSpikeScope } from "./scopes/decision-projection-spike.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
 /**
@@ -14,6 +18,10 @@ const SCOPES: Scope[] = [
   agentKitScope,
   schemaFidelitySpikeScope,
   schemaPipelineScope,
+  codegenScope,
+  contractVectorsScope,
+  referenceDataScope,
+  decisionProjectionSpikeScope,
   contractGateScope,
 ];
 
