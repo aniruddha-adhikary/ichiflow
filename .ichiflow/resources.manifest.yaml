@@ -61,6 +61,14 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/codegen.ts
     description: Generated TS (hey-api) + Kotlin (Fabrikt) edges cover every OpenAPI component schema.
+  - id: contract-vectors
+    kind: harness
+    path: packages/cli/src/verify/scopes/contract-vectors.ts
+    description: Cross-language accept/reject vectors for the real contract — Ajv (TS) vs networknt (JVM) must agree.
+  - id: contract-corpus
+    kind: pattern
+    path: schemas/vectors/contract-corpus.json
+    description: Labelled validation vectors for the real emitted contract (build plan 1.3).
   - id: contracts-ts
     kind: generated
     path: packages/contracts-ts/src/gen

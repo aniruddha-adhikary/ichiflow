@@ -56,6 +56,16 @@ tasks.register<JavaExec>("runSpike") {
     mainClass.set("ai.ichiflow.core.spike.SpikeValidatorKt")
 }
 
+// Validate the real-contract vector corpus (build plan 1.3) with networknt; consumed by the TS
+// `contract-vectors` scope for the cross-language agreement check.
+tasks.register<JavaExec>("runContractVectors") {
+    group = "verification"
+    description = "Validate the contract vector corpus with networknt and write core/build/contract-vector-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.spike.SpikeValidatorKt")
+    args("schemas/vectors/contract-corpus.json", "build/contract-vector-results.json")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

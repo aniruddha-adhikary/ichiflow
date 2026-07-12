@@ -25,8 +25,8 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 ## Registered scopes
 
-`self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`.
-More come online phase by phase (doc 14).
+`self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
+`contract-vectors`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -37,3 +37,6 @@ needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` 
 `codegen` asserts the generated edges — TypeScript types (hey-api) and Kotlin models (Fabrikt) —
 cover every OpenAPI component schema. Regenerate with `pnpm codegen:ts` / `./gradlew generateModels`;
 byte-level drift is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModelsUpToDate` (Kotlin).
+
+`contract-vectors` cross-checks Ajv (TS) against networknt (JVM) on a corpus of accept/reject vectors
+for the _real_ contract (VerdictEnvelope & members); run `pnpm vectors:jvm` before `pnpm verify`.
