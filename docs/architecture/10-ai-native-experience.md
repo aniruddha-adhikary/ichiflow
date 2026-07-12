@@ -211,6 +211,14 @@ server can lie"** and a `readOnlyHint` bug that mutates is catastrophic (researc
 | **1 sandbox-mutating** | `destructiveHint: false`, non-prod | usually soft-approve | **force target = staging/branch replica; block prod endpoints at the transport** |
 | **2 prod-mutating** | `destructiveHint: true` | **must** confirm | **JIT short-lived scoped credential + human approval + audit entry; kill-switch honored** |
 
+These tiers are **one of the mediation layers an org's production-access posture dials** — the *agent*
+path. A deployment's posture (`zero-direct-access` / `agents-mediated-humans-conventional` / `custom`)
+selects how strictly the mediated paths are mandatory versus how much conventional access remains; the
+tiers themselves are always enforced server-side. See
+[`09-deployment-and-topology.md`](09-deployment-and-topology.md) §6.3 and ADR-0020 for the dial, its
+levels, and the sibling mediation layers (why API, human ops console, env promotion, loud/logged
+break-glass).
+
 ### 3.4 Agents as non-human identities
 
 Every agent is a **first-class non-human identity (NHI)**, not a shared service account
@@ -307,7 +315,7 @@ second-party):
 | **Domain Modeling Copilot** | greenfield front door | Interviews a business user ("what decisions does this process make? what data do you store? who reviews exceptions?") → draft Schema + DMN skeleton + Flow with human-task steps | schema validation; parity tests before any rule is authoritative (research 06 §B.3.2) |
 | **Migration Copilot** | brownfield back door | Introspects legacy DB → proposes canonical mappings (ranked, with confidence + rationale) → expand/contract plan → reconciliation + **decision-parity** tests | Atlas lint (50+ analyzers) + pgroll execute; dry-run; never touches prod (research 06 §A.5.3) |
 | **Rule Authoring assistance** | business-user, in-context | Guides a business user authoring + testing DMN rules; suggests conditions, generates test cases | DMN simulation + decision-parity harness (cross-ref `03-decision-layer.md`) |
-| **UI / Design Copilot** | designer, in-context | Proposes a uischema/pageschema variant from a target Schema (and, later, a Figma frame); suggests a11y fixes; applies a brand across screens; drafts microcopy / `copyset` | drift lint + axe-core/contrast + token-contract lint; renders live in the playground (`07-ui-and-portals.md` §11) for approval; lands as a `contracts/ui`/`tokens` PR |
+| **UI / Design Copilot** | designer, in-context | Proposes a uischema/pageschema variant from a target Schema (optionally *seeded by* imported brand tokens or an exported Figma frame as **reference only** — not a two-way hi-fi round-trip / Code-Connect-class bridge; ADR-0019); suggests a11y fixes; applies a brand across screens; drafts microcopy / `copyset` | drift lint + axe-core/contrast + token-contract lint; renders live in the playground (`07-ui-and-portals.md` §11) for approval; lands as a `contracts/ui`/`tokens` PR |
 
 **Shared guardrail DNA** (research 06 §A.5.2, §A.5.3): a workspace where AI proposes and a human
 reviews/edits **every** object; explainability for each proposal; learning from human corrections; a

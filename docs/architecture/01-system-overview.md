@@ -224,10 +224,12 @@ rewrite. You adopt distribution only when load or team boundaries demand it.
 |---|---|---|---|
 | **Dev** | Single binary / docker-compose | SQLite / embedded | Local; no zone split |
 | **Team** | docker-compose or small K8s | PostgreSQL | Single IdP; optional split |
-| **Enterprise** | HA on K8s (Helm/operator), air-gap capable | Postgres HA + storage SPIs (ledger/search/warehouse) | SSO brokers, DMZ/intranet zones, compliance packs |
+| **Enterprise** | HA on K8s (Helm/operator), air-gap capable | Postgres HA + storage SPIs (ledger/search/warehouse) | SSO brokers, DMZ/intranet zones, compliance profile (OSS, optional install) |
 
 The application code is identical across tiers; only configuration changes ("Same code from
-laptop to zoned HA").
+laptop to zoned HA"). Tiers are **technical capability profiles, not commercial editions** — every
+tier is the one **fully-open-source** build; the compliance profile is an open-source optional install,
+not a paid pack (locked decision §15; ADR-0022).
 
 **DMZ / intranet zones.** Designed in from day one: the customer/partner **Portal and inbound
 Adapters run in the DMZ**, the Decision/Flow/Case **core runs in the intranet**, and the two
@@ -246,7 +248,7 @@ ichiflow ships in rings (full rationale in [`00-vision-and-principles.md`](00-vi
 |---|---|
 | **v1 kernel** | Schema core (TypeSpec→OpenAPI/JSON Schema) · Decisions (DMN/Drools behind the SPI) · Flows/Cases (interpreter, human-task/SLA/escalation) · **Domain entity store** (generated CRUD/list/query, ADR-0018) · **one Portal** (back-office) · **basic Adapters** (native REST, one broker, webhook) · DecisionRecord / *why* API · Dev tier · authz = **OpenFGA only** |
 | **v1-optional** (ships, off by default, SPI-bound) | Apicurio registry · Keycloak broker · **Cedar/OPA ABAC** layer · Camel-on-Quarkus heavy adapters · Debezium CDC · immudb ledger |
-| **post-v1** | GoRules ZEN 2nd engine · Zitadel · self-service SSO/SCIM · Atlas/pgroll Ring-2 · **all Copilots** (Ring-0 mapping ships as declarative data without them) · MCP Tier-2 · **Enterprise compliance pack** (OpenLineage/BCBS-239, wide-event store, trigger-based bitemporal history) |
+| **post-v1** | GoRules ZEN 2nd engine · Zitadel · self-service SSO/SCIM · Atlas/pgroll Ring-2 · **all Copilots** (Ring-0 mapping ships as declarative data without them) · MCP Tier-2 · **compliance profile** (OSS, optional install — OpenLineage/BCBS-239, wide-event store, trigger-based bitemporal history) · **BI reporting via embedded OSS BI over governed read models** (ADR-0021) |
 
 Governance defaults scale with tier: **Dev=off · Team=light · Enterprise=full** (ADR-0017,
 [`03-decision-layer.md`](03-decision-layer.md) §5.6).

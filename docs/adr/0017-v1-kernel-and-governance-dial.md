@@ -1,9 +1,9 @@
 # 0017 — The v1 kernel cut and the governance-level dial
 
-- Status: accepted
+- Status: accepted (amended 2026-07-12)
 - Date: 2026-07-12
 - Deciders: ichiflow architecture
-- Basis: design review 2026-07 (scope critique)
+- Basis: design review 2026-07 (scope critique); founder interview 2026-07 (multi-tenancy scope; v1 acceptance test)
 - Research: [../research/05-audit-observability-deployment.md](../research/05-audit-observability-deployment.md), [../research/06-migration-and-onboarding.md](../research/06-migration-and-onboarding.md)
 
 ## Context
