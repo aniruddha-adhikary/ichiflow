@@ -66,6 +66,19 @@ Make **Document issuance a first-class, API-first, extensible capability** acros
 
 Cross-cutting:
 
+- **Three placement profiles — generation is never baked into core.** The capability decomposes so that only
+  what the audit spine depends on is hard-shipped ([07](../architecture/07-ui-and-portals.md) §15.7): **(1)
+  core semantics, always shipped** — number allocation, Document lifecycle, acceptance await, audit events,
+  and the verification contract (the DecisionRecord references the Document by number + hash + version, so its
+  registry/lifecycle/verification cannot leave ichiflow); **(2) default rendering** — the pluggable engine SPI
+  + the licensing-vetted OSS default (Typst) as an **optional, installable, swappable component**, not
+  compiled into core; **(3) external delegation, designed at two depths** — *delegated rendering* (the SPI
+  implemented over an `external-task`/Adapter: ichiflow keeps numbering + lifecycle, ships the snapshot out,
+  stores the returned binary + hash) and *delegated full issuance* (an enterprise document platform owns
+  numbering/format; ichiflow records the Document metadata + hash as the audit anchor, `issuance: external`).
+  In every profile the **Document registry + lifecycle + verification stay in ichiflow**. This is the general
+  principle (BRIEF §21): **capability semantics the audit spine depends on are core; everything else is a
+  component behind an SPI with a designed external-delegation path.**
 - **API-first + PDP-scoped.** Documents list/fetch per Case through the generated API; an external org sees
   **only its own** Documents via the ReBAC row filter ([07](../architecture/07-ui-and-portals.md) §15.6);
   the **public verification endpoint** is the deliberate data-minimal exception.
@@ -93,10 +106,14 @@ Cross-cutting:
   **durable acceptance await under a clock**. Burying allocation + lifecycle in an activity abandons replay
   idempotency and the audit spine — the same reasoning that makes `external-task` canonical (ADR-0028). The
   render, which *is* pure, is the part that runs as an activity — beneath the canonical step, not as it.
-- **Bundle a document engine and make it non-swappable. Rejected.** Rendering is a **non-differentiating,
-  well-served** concern (BRIEF §17); a fixed engine forfeits licensing hygiene and the determinism/a11y
-  trade-offs that differ by engine. An SPI keeps Typst the default while WeasyPrint/others bind without a core
-  change.
+- **Bake a renderer into core (a non-swappable, always-compiled-in document engine). Rejected.** Rendering is
+  a **non-differentiating, well-served** concern (BRIEF §17); baking one in forfeits licensing hygiene and the
+  determinism/a11y trade-offs that differ by engine, and — worse — it would **prevent an enterprise from
+  reusing its existing document platform**. Only the audit-spine semantics (numbering, lifecycle, verification)
+  are core; the engine is an **optional component behind the SPI**, and the SPI has a **designed
+  external-delegation path** (delegated rendering / delegated full issuance,
+  [07](../architecture/07-ui-and-portals.md) §15.7) so the renderer can be swapped, dropped, or moved to an
+  external system without touching the step or any Flow.
 - **Default to Playwright/Chromium print-to-PDF. Rejected as default.** Chromium renders anything designers
   already know (HTML/CSS), but a bundled headless browser is **heavy** (footprint, air-gap cost), its output
   is **hard to make byte-deterministic** (defeating the render-determinism harness), and its **PDF/UA** story
@@ -113,6 +130,11 @@ Positive:
 - One capability carries **allocation + versioned lifecycle + verification + audit + delivery** for **every**
   issued instrument, over **any** rendering engine, extensible as pure Workspace artifacts — a new permit or
   letter is a `doctemplate` + a step declaration, no framework change.
+- **Generation is never baked in.** The three placement profiles ([07](../architecture/07-ui-and-portals.md)
+  §15.7) let a laptop run the thin Typst default, a compliance shop swap WeasyPrint, and an enterprise with an
+  existing CCM/document platform **delegate rendering or full issuance** — while ichiflow keeps the Document
+  registry + lifecycle + verification the DecisionRecord anchors to. The audit spine is invariant across
+  placements; only *who generates the bytes* (and, at the deep end, *who allocates the number*) moves.
 - Clean symmetry with the existing await steps: the **offer-acceptance** facet reuses the `human-task` await +
   pausable SLA (§5.7), and the **canonical-vs-compute** argument mirrors ADR-0028 exactly, so there is one
   mental model for "the interpreter owns the durable/side-effecting semantics; the pluggable part sits beneath
@@ -133,6 +155,11 @@ Negative / costs:
 - The **designer-facing template language** (Typst markup vs an HTML/CSS subset vs an engine-neutral DSL the
   SPI lowers) is **not yet fixed** ([07](../architecture/07-ui-and-portals.md) open-q9) — a `doctemplate`
   should not silently couple to one engine's syntax.
+- **Delegated full issuance cedes two guarantees.** When the external platform owns numbering + format
+  (profile 3, deep depth), ichiflow **loses byte-level render determinism and reference-number-format control**
+  for those Documents — it can still verify status + hash, but cannot re-render as-of issuance from its own
+  snapshot. This is an explicit, recorded trade (`issuance: external`), not a silent gap; delegated *rendering*
+  (shallow depth) keeps both guarantees since ichiflow still owns the snapshot + numbering.
 - As with all ichiflow-native step kinds, `issue-document` does not guarantee round-trip to other CNCF-SWF
   runtimes; its export-degradation contract is the same open question as the other native step types (doc 04
   open questions).

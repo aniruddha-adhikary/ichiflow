@@ -240,8 +240,7 @@ tested like any rule — not buried in assignment code.
 **(c) Per-reviewer scoring — a single-authority DRD, exactly the work-pass lesson (D2, first half).** One
 reviewer scoring three criteria is **one authority computing one assessment** — which
 [work-pass GAP #2](./work-pass-compass.md#gaps) established is a **DRD, not a `CompositeOutcome`**. This case
-**honors that line**: each reviewer's IER is a DRD emitting *that reviewer's* `Outcome` with a per-criterion
-breakdown, attributed to that reviewer.
+**honors that line**: each reviewer's IER is a DRD emitting *that reviewer's* attributed `Outcome`.
 
 ```text
 # decisions/reviewer-score.decision-source — per reviewer; reads scoring-criteria@2026.2.0
@@ -293,9 +292,8 @@ attributed to its authority** into the DecisionRecord ([doc 03 §2.3](../../arch
 so "which expert scored what, and how the panel composed it" is fully reconstructable.
 
 **(e) Award decision + four-eyes — the threshold is a CodeSet row (D5).** A passing composite is only a
-*provisional* award; the actual award is gated by the **budget pool** (§2.4) and, above a threshold, by a
-**second approver**. The four-eyes threshold is **not** hard-coded — it reads
-`approval-thresholds@2026.2.0`:
+*provisional* award, gated by the **budget pool** (§2.4) and, above a threshold, a **second approver**. The
+four-eyes threshold is **not** hard-coded — it reads `approval-thresholds@2026.2.0`:
 
 ```text
 # decisions/award-approval.decision-source
@@ -307,11 +305,11 @@ so "which expert scored what, and how the panel composed it" is fully reconstruc
 
 ### 2.4 The budget pool — a `QuotaLedger`, confirming the ballot's G2 (D4)
 
-A round has a **capped budget** consumed by awards. This is exactly the **cross-Case shared mutable state
-with a hard invariant** that the [ballot case flagged as its single most important missing primitive
+A round has a **capped budget** consumed by awards — exactly the **cross-Case shared mutable state with a
+hard invariant** the [ballot flagged as its most important missing primitive
 (G2)](./public-housing-ballot.md#g2--cross-case-shared-mutable-state-with-fairness-invariants--blocking) and
-proposed as a first-class **`QuotaLedger`**. **This case does not re-propose it — it confirms the need from
-a second, independent domain**, and surfaces strains beyond the ballot's (see [Gaps G3](#g3--budget-pool-residual-strains-beyond-the-quotaledger-proposal--minor-bordering-blocking)):
+proposed as a **`QuotaLedger`**. **This case does not re-propose it — it confirms the need from a second,
+independent domain** and surfaces strains beyond the ballot's ([Gaps G3](#g3--budget-pool-residual-strains-beyond-the-quotaledger-proposal--minor-bordering-blocking)):
 
 ```yaml
 # a QuotaLedger for the round budget — the primitive the ballot proposed (G2), confirmed here
@@ -411,20 +409,18 @@ steps:
 
 The **clock-stop discipline** is the D1 signature: every `awaiting-applicant` sub-state (full application,
 acceptance, claim intake, RFI, acquittal) **pauses the Agency's SLA** and is recorded distinctly
-([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md); [doc 08 §4.6](../../architecture/08-audit-and-observability.md)),
-so months of applicant wait never count against the Agency's processing budget — while the **`external-task`
-SLAs** (registry, finance) deliberately *measure the external system's own turnaround* and escalate on it
-([doc 04 §5.8](../../architecture/04-flow-and-case-layer.md)). Transport under each `external-task` is
-pluggable (HTTP/MQ in v1, SFTP file round-trip designed-now-post-v1;
-[doc 05 §11](../../architecture/05-adapters.md), ADR-0028) — relevant because finance and registry
-integrations in this sector are frequently batch/file-based.
+([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md)), so months of applicant wait never count against
+the processing budget — while the **`external-task` SLAs** (registry, finance) deliberately measure the
+*external system's own turnaround* and escalate on it ([doc 04 §5.8](../../architecture/04-flow-and-case-layer.md)).
+Transport under each is pluggable (HTTP/MQ in v1, SFTP round-trip post-v1;
+[doc 05 §11](../../architecture/05-adapters.md), ADR-0028) — relevant since finance/registry integrations here
+are frequently batch/file-based.
 
-### 2.6 doctemplates and issuance — the Letter of Offer, its variation, and the revocation notice (D5)
+### 2.6 doctemplates and issuance — the Letter of Offer, its variation, the revocation notice (D5)
 
 Issuance is **`issue-document`** binding a **doctemplate** to Case data + the DecisionRecord, producing a
-governed **Document** (the sibling capability). Three Documents matter, and the **Letter of Offer** is the
-case's hardest issuance test because **the issued Document participates in flow control** — it must be
-*accepted* before the award activates.
+governed **Document**. The **Letter of Offer** is the hardest issuance test because **the issued Document
+participates in flow control** — it must be *accepted* before the award activates.
 
 ```yaml
 # doctemplates/letter-of-offer.doctemplate.yaml
@@ -519,16 +515,11 @@ conventional:
 
 **Reviewer isolation via list-filtering.** A reviewer's Portal query for "my applications" resolves through
 the **same PDP** ([doc 06 §2.3](../../architecture/06-identity-and-access.md)); the OpenFGA `assignee`
-relation is written **only for non-conflicted assignments** (the COI Decision, §2.3b, gates the write), so
-the ReBAC filter set returns exactly the reviewer's assigned, non-conflicted applications — cross-team
-leakage is **impossible by construction**, and a reviewer cannot even enumerate an application from their
-own organisation, let alone score it.[^he-coi]
-
-**Conflict of interest as a Decision over the Team graph.** The own-organisation bar (§2.3b) reads the
-reviewer's partner-org `team` membership against the application's `applicantOrg.teamRef`/`partners[]` — a
-**Decision over Team/org relations**, resolved through the `CoiResolver` compute feature-function so the
-Decision stays a pure evaluation. *Why* a reviewer was excluded (`COI_SAME_ORG` / `COI_COLLABORATOR` /
-`COI_RECENT_COAUTHOR`) is recorded and explainable.
+relation is written **only for non-conflicted assignments** (the COI Decision §2.3b gates the write), so the
+ReBAC filter set returns exactly the reviewer's assigned, non-conflicted applications — cross-team leakage is
+**impossible by construction**, and a reviewer cannot even *enumerate* an application from their own
+organisation, let alone score it.[^he-coi] The **own-organisation bar** itself is the §2.3b Decision over
+the Team graph, so *why* a reviewer was excluded is recorded and explainable.
 
 ---
 
@@ -570,11 +561,9 @@ returns `VALID`; three assigned reviewers (none from the applicant's org) score 
 ```
 
 **What Trace A exercises:** genuine **multi-authority composition** (three attributed IERs → a `custom`
-`CompositeOutcome`), the **cohort ranking** against the round's **funding line** (rank 18 ≤ line 41), the
-**pool reserve → commit** on the funding rate `620,000 × 0.70 = 434,000`, the **Letter of Offer's
-accept-to-activate** semantics, and the first **disbursement `external-task`** to the finance system. The
-DecisionRecord stitches every reviewer's score, the pinned rate/criteria versions, the pool ledger deltas,
-and the issued Document — one causal chain.
+`CompositeOutcome`), **cohort ranking** against the funding line (rank 18 ≤ line 41), **pool reserve →
+commit** on the funding rate (`620,000 × 0.70 = 434,000`), the Letter of Offer's **accept-to-activate**
+semantics, and the first **disbursement `external-task`** — all stitched into one DecisionRecord.
 
 ### Trace B — rejected on a criterion threshold, then appeal
 
@@ -590,10 +579,9 @@ clears 10, but **Impact 2.5 < 3.0** — and a criterion failure **cannot be comp
   "members": [ /* three attributed IERs, each with per-criterion Impact < 3 */ ] }
 ```
 
-The applicant lodges an **appeal** — grounded in Horizon Europe's **evaluation-review/redress** procedure
-(a challenge to *process*, not a re-scoring on the merits). It opens a **correlated child Case**
-([doc 04 §5.6](../../architecture/04-flow-and-case-layer.md), `appeal-reasons` CodeSet) referencing the
-parent's DecisionRecord and judged **as-of the parent's pinned rules** (`scoring-criteria@2026.2.0`):
+The applicant lodges an **appeal** (Horizon's **evaluation-review/redress** — a challenge to *process*, not
+a re-scoring): a **correlated child Case** ([doc 04 §5.6](../../architecture/04-flow-and-case-layer.md),
+`appeal-reasons` CodeSet) referencing the parent's DecisionRecord, judged **as-of the parent's pinned rules**:
 
 ```jsonc
 // get_case_trace("FRDG-R2-0455-APL") → child appeal Case
@@ -606,9 +594,9 @@ parent's DecisionRecord and judged **as-of the parent's pinned rules** (`scoring
 
 **What this exercises:** the appeal is **not** a mutation of the closed parent — it is a governed child Case
 whose remedy is *striking a conflicted authority's Outcome* from the composite and re-composing, judged
-as-of the parent's pinned rules. It also **exposes a COI miss** (the assignment-time `CoiResolver` did not
-know of a recent co-authorship) — which the checks-and-balances table and Gaps both pick up. The parent
-stays denied-and-superseded; the child conditionally approves; explainability spans both.
+as-of the parent's pins. It also **exposes a COI miss** (the resolver did not know of a recent co-authorship;
+[Gap G5](#g5--reviewer-assignment-fairness--minor)). Parent stays denied-and-superseded; child approves;
+explainability spans both.
 
 ### Trace C — funded → milestone breach → clawback + revocation notice
 
@@ -627,10 +615,10 @@ obligation's deadline passes with no report.
 ```
 
 **What this exercises:** a **post-approval obligation outliving Case closure**, its **breach as a first-class
-audit event**, the **clawback Flow** recovering the disbursed float as a debt and **releasing the
-reservation back to the pool** (`release` on the `QuotaLedger`), and the **revocation notice** as an *issued
-Document* (D5) — the mirror image of the Letter of Offer. The pool release-back is exactly where D4's
-residual strains live (does returned budget reflow to a closed round, or the next? — [Gap G3](#g3--budget-pool-residual-strains-beyond-the-quotaledger-proposal--minor-bordering-blocking)).
+audit event**, the **clawback Flow** recovering the disbursed float as a debt and **releasing the reservation
+back to the pool**, and the **revocation notice** as an *issued Document* (D5) — the mirror of the Letter of
+Offer. The release-back is exactly where D4's residual strains live (reflow to a closed round, or the next?
+— [Gap G3](#g3--budget-pool-residual-strains-beyond-the-quotaledger-proposal--minor-bordering-blocking)).
 
 ---
 
@@ -661,19 +649,18 @@ strains rather than re-proposing.
 
 ### G1 — Cross-Case portfolio invariants (one org's concurrent applications) — **BLOCKING**
 
-The domain carries invariants that **span Cases**, not one Case: an applicant org may hold **no more than N
-active awards at once**; the **same cost cannot be double-funded** across two grants; a reviewer's COI and
-workload span **all** applications in a round; and a **de-committed award's budget** interacts with other
-Cases through the pool. These are **peer, many-to-many** relationships, not the parent→child correlation
+The domain carries invariants that **span Cases**: an applicant org may hold **no more than N active awards
+at once**; the **same cost cannot be double-funded** across two grants; a reviewer's COI/workload spans **all**
+applications in a round. These are **peer, many-to-many** relationships, not the parent→child correlation
 ichiflow supports today (appeal/correct/withdraw, [doc 04 §5.6](../../architecture/04-flow-and-case-layer.md))
-nor batch fan-out. This is **exactly the Case-association gap the
+nor batch fan-out — **exactly the Case-association gap the
 [insurance case flagged as its hardest finding](./motor-insurance-claim.md#8-honest-gaps)** (an SIU
-investigation spanning multiple claim Cases) — and this case **confirms it from a second domain**: there is
-**no first-class Case-link / association primitive** with its own visibility scope and DecisionRecord that
-can express "these N applications share a double-funding constraint" or "this org's portfolio is over its
-active-award cap." **Proposal (shared with insurance):** a designed **Case-association entity** (typed link
-kind, PDP-scoped, audited), plus a **portfolio-constraint check** that reads across the association set. Until
-then, "one org's concurrent applications" is enforced by ad-hoc queries outside the audited artifact layer.
+investigation spanning multiple claim Cases), now **confirmed from a second domain**: there is **no
+first-class Case-link / association primitive** with its own visibility scope and DecisionRecord to express
+"these N applications share a double-funding constraint" or "this org is over its active-award cap."
+**Proposal (shared with insurance):** a **Case-association entity** (typed link kind, PDP-scoped, audited) +
+a **portfolio-constraint check** over the association set. Until then it is ad-hoc queries outside the
+audited artifact layer.
 
 ### G2 — Multi-authority scoring: `CompositeOutcome` works, but two seams strain — **MINOR**
 
@@ -696,58 +683,49 @@ reviewers *are* N authorities, and quorum/weighted/custom compose them properly,
 
 ### G3 — Budget-pool residual strains beyond the `QuotaLedger` proposal — **MINOR (bordering blocking)**
 
-The **round budget confirms the ballot's `QuotaLedger` (G2)** from an independent domain — but a **monetary,
-ranked-draw** pool strains the ballot's count-based proposal in three ways the ballot did not surface:
-
-1. **Variable-size reservation.** Consumption is a **money amount** (`grantAmount`), not a unit, so the "does
-   the next award fit under the line?" test is arithmetic over `capacity − committed − reserved`, and the
-   **funding line** is a cohort cutoff — which also **confirms the ballot's cohort-barrier / cohort-record
-   G4** (the ranked list is a round artifact, not per-Case).
-2. **Release-back reflow across rounds.** A **clawback or under-claim** (Trace C) releases budget **back to a
-   round that has usually closed**. Whether that budget reflows to the round's **reserve list**, rolls to the
-   **next round**, or is simply returned to the treasury is **policy** the `QuotaLedger` does not model — and
-   it is a genuine fairness question (does the next reserve-list applicant get funded from a clawback?).
-3. **Effective-dated capacity + rate interaction.** The pool's capacity and the funding-rate CodeSet are both
-   effective-dated per round; a mid-round rate correction would retroactively change committed amounts. The
-   pool must pin its **rate version per commit**, which it does here, but the `QuotaLedger` primitive should
-   **declare that pinning** explicitly. **Proposal:** extend the ballot's `QuotaLedger` spec with **monetary
-   dimensions, a reserve-list draw semantics, and a declared release-back policy hook** — still one primitive,
-   but its contract must cover money and reflow, not only integer headroom.
+The round budget **confirms the ballot's `QuotaLedger` (G2)** from an independent domain, but a **monetary,
+ranked-draw** pool strains the ballot's count-based proposal three ways: **(a) variable-size reservation** —
+consumption is a money amount, so "does the next award fit?" is arithmetic over `capacity − committed −
+reserved`, and the **funding line is a cohort cutoff** (also **confirming the ballot's cohort-barrier G4** —
+the ranked list is a round artifact, not per-Case); **(b) release-back reflow** — a clawback or under-claim
+(Trace C) releases budget back to a **closed** round, and whether it reflows to the reserve list, rolls to
+the next round, or returns to treasury is **policy the ledger does not model** (a real fairness question);
+**(c) effective-dated capacity + rate** — the pool must pin its rate version **per commit**, which it does,
+but the primitive should declare that. **Proposal:** extend `QuotaLedger` with **monetary dimensions,
+reserve-list draw semantics, and a release-back policy hook** — one primitive, but covering money and reflow,
+not only integer headroom.
 
 ### G4 — Stateful issued Documents with acceptance & revocation — **BLOCKING (for the document layer)**
 
 The Letter of Offer is not a one-way emission like the work-pass pass: it is a **stateful Document that
-participates in flow control** (`issued → accepted → active`; `issued → lapsed → pool-release`), can be
-**superseded by a v2 variation**, and has a **revocation** counterpart — and acceptance is a **counter-signed,
-correlated signal** that *gates award activation* (§2.6). The **Document / doctemplate / issue-document**
-vocabulary (owned by a sibling design) is specified here as settled, but this case shows it must cover more
-than *render-and-store*: a **Document lifecycle state machine**, **accept-to-activate gating**, **multi-party
-signature** (co-applicants acceding, grounded in Horizon's accession forms[^he-pay]), **supersession
-continuity** (v1 → v2 with one DecisionRecord lineage), and **revocation-as-Document**. If the sibling
-document design models issuance as emission only, **these are blocking for this domain** and should be raised
-against it. Flagged so the two designs reconcile before v1 claims the grant lifecycle.
+participates in flow control** (`issued → accepted → active`; `issued → lapsed → pool-release`), is
+**superseded by a v2 variation**, and has a **revocation** counterpart — and acceptance is a counter-signed
+correlated signal that **gates award activation** (§2.6). The **Document / doctemplate / issue-document**
+vocabulary (a sibling design) is used here as settled, but this case shows it must cover more than
+*render-and-store*: a **lifecycle state machine**, **accept-to-activate gating**, **multi-party signature**
+(co-applicants acceding, grounded in Horizon's accession forms[^he-pay]), **supersession continuity** (v1 → v2,
+one DecisionRecord lineage), and **revocation-as-Document**. If the sibling design models issuance as emission
+only, **these are blocking for this domain** and must be raised against it before v1 claims the grant lifecycle.
 
 ### G5 — Reviewer-assignment fairness — **MINOR**
 
-The COI Decision (§2.3b) correctly answers *who may not* review — but **not** *who should*, fairly:
-reviewers have finite capacity, expertise must match sector, and load should spread across partner orgs
-without over-using one university. There is **no first-class fair-assignment primitive**; today it is a
-routing Decision plus ad-hoc balancing, and it shares shape with the **cohort/set-level** need (assign a
-*set* of reviewers across a *set* of applications, respecting per-reviewer caps) — related to
-[ballot G4](./public-housing-ballot.md#g4--cohort--set-level-decisioning-and-a-cohort-level-decisionrecord--blocking).
-Trace B also shows the COI resolver can **miss** a relationship it does not hold (recent co-authorship), so
-assignment fairness *and* COI completeness both depend on the quality of the graph the `CoiResolver` reads —
-a **data-completeness** boundary worth stating, not an architectural blocker. **Proposal:** a documented
-**set-assignment pattern** (capacity-constrained matching as a `compute` over the cohort) and an explicit note
-that COI correctness is bounded by the relationship data available to the resolver.
+The COI Decision (§2.3b) answers *who may not* review — but not *who should*, fairly: reviewers have finite
+capacity, expertise must match sector, and load should spread across partner orgs. There is **no first-class
+fair-assignment primitive**; today it is a routing Decision plus ad-hoc balancing, sharing shape with the
+**cohort/set-level** need (assign a *set* of reviewers across a *set* of applications under per-reviewer caps;
+[ballot G4](./public-housing-ballot.md#g4--cohort--set-level-decisioning-and-a-cohort-level-decisionrecord--blocking)).
+Trace B also shows the resolver can **miss** a relationship it does not hold (recent co-authorship), so COI
+correctness is **bounded by the graph data** available — a data-completeness boundary, not an architectural
+blocker. **Proposal:** a documented **set-assignment pattern** (capacity-constrained matching as a `compute`
+over the cohort) plus an explicit note on that boundary.
 
 ### Framing (must-state, non-technical)
 
 The agency and program are **fictional**, so this study does **not** name a real government system in shipped
-product (BRIEF §16) — but its **mechanics are grounded in and cited to real published Horizon Europe rules**,
-so it remains a **checkable external validation fixture**, admissible only as documentation. It must never be
-reused as an onboarding template, an ADR example, or the reference product — the fictional municipal permit
-remains canonical. This is a governance guardrail, not a technical gap.
+product (BRIEF §16) — but its mechanics are **grounded in and cited to real Horizon Europe rules**, so it
+remains a **checkable external validation fixture**, admissible only as documentation, never as an onboarding
+template or the reference product (the fictional municipal permit stays canonical). A governance guardrail,
+not a technical gap.
 
 ---
 

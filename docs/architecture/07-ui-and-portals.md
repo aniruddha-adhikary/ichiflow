@@ -655,8 +655,11 @@ template version, exactly the version-pinning discipline the rest of the framewo
 
 Rendering is a **declared SPI** (BRIEF §21, "closed core, declared extension points"): the `doctemplate`
 declares `engine:`, and the engine is swappable without touching the step, the artifact class, or any Flow.
-The v1 default and the alternatives, chosen under the licensing-hygiene lens (BRIEF §14/§15 — prefer
-Apache-2.0/MIT, avoid source-available/paid substrates):
+Crucially, **the default engine is an *optional, installable component behind the SPI, not baked into
+core*** — issuing Documents' *semantics* are core, but *generating the bytes* is a swappable dependency (the
+placement profiles in §15.7 make this explicit, including delegating rendering to an enterprise document
+platform). The v1 default and the alternatives, chosen under the licensing-hygiene lens (BRIEF §14/§15 —
+prefer Apache-2.0/MIT, avoid source-available/paid substrates):
 
 | Engine | License | Role | Why |
 |---|---|---|---|
@@ -721,6 +724,50 @@ default), the deterministic render, and the CI/a11y/determinism checks are all v
 Documents is core casework. What is **post-v1** is the *interactive* Design-Kit document authoring app; the
 v1 designer surface for a `doctemplate` is **chat + a read-only rendered preview** (§11), the same posture as
 every other designer artifact.
+
+### 15.7 Placement profiles — core semantics, default rendering, external delegation
+
+Document issuance is deliberately **not a monolith baked into the package**. It decomposes into three layers,
+so an enterprise that already runs a document platform (an enterprise CCM / customer-communications or
+document-generation system) reuses it instead of ichiflow's renderer — while ichiflow keeps exactly what the
+audit spine needs.
+
+> **The general principle** (BRIEF §21): **capability semantics the audit spine depends on are core; every
+> other part is a component behind an SPI with a designed external-delegation path.** For issuance, the
+> DecisionRecord links to the Document, so the **Document registry + lifecycle + verification must stay in
+> ichiflow**; *rendering the bytes*, and even *allocating the number*, can move outside — as long as ichiflow
+> still records the metadata + hash that anchors the audit chain.
+
+1. **Core semantics — always shipped, never delegated.** The `issue-document` step's **lifecycle ownership**:
+   reference-number allocation, Document lifecycle states (issued → superseded → revoked, + acceptance await),
+   audit events, and the **verification-endpoint contract** (doc 04 §2.9,
+   [08-audit-and-observability.md](08-audit-and-observability.md) §1.6). This is core **because the audit spine
+   depends on it** — the DecisionRecord references the Document by reference number + hash + version, so the
+   registry, lifecycle, and verification cannot leave ichiflow without breaking the causal chain.
+
+2. **Default rendering — an SPI binding + a thin default component.** The pluggable rendering-engine SPI
+   (§15.3) with the licensing-vetted OSS default (**Typst**) is an **optional, installable, swappable
+   component**, not compiled into core. A deployment can drop it, swap it (WeasyPrint), or point it elsewhere
+   (profile 3) with no change to the step or any Flow.
+
+3. **External delegation — designed, at two depths.** An enterprise document platform can be plugged in at the
+   rendering seam or the whole issuance seam:
+   - **Delegated rendering (ichiflow keeps lifecycle + numbering).** The rendering SPI is implemented **over an
+     `external-task`/Adapter** (doc 04 §2.8): ichiflow allocates the number and drives lifecycle, **sends the
+     data snapshot out** to the external platform, and **receives the rendered binary back**, storing it via
+     the object-storage SPI (doc 02 §11) and hashing it into the DecisionRecord. ichiflow **still guarantees**
+     the registry, numbering, lifecycle, verification, and determinism-of-input (the snapshot + template pin it
+     sent). This is just profile 2's SPI with a remote implementation.
+   - **Delegated full issuance (the external system owns numbering + format).** The external platform allocates
+     its own reference number and produces the instrument; ichiflow **records the issued Document's metadata +
+     hash as the audit anchor** — a `Document` whose `numberAllocation` is `external` and whose binary is
+     received, not rendered. ichiflow **still guarantees** the **Document registry, lifecycle transitions, and
+     verification** (so the DecisionRecord and the *why* API stay whole and a presenter can still verify status
+     through ichiflow), but **cedes** number-format control and byte-level render determinism to the external
+     owner — an honest trade recorded on the Document (`issuance: external`).
+
+   In both depths the **non-delegable core (profile 1)** stays in ichiflow; delegation moves *generation*, never
+   the *audit anchor*.
 
 ---
 

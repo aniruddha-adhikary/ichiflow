@@ -54,8 +54,10 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    (a Customs Clearance Permit, a grant Letter of Offer) from a data snapshot + Outcome via a governed
    **`doctemplate`**, allocating a reference number and driving a Document lifecycle — canonical (not a
    compute-variant) because it owns exactly-once-memoized number allocation + lifecycle mutation (+ the
-   offer-acceptance await), while the pure render is a **pluggable rendering-engine SPI** beneath it
-   (ADR-0029).
+   offer-acceptance await), while the pure render is a **pluggable rendering-engine SPI** beneath it — an
+   **optional component, not baked into core**, with a **designed external-delegation path** (an enterprise
+   document platform can own rendering, or full issuance, while ichiflow keeps the Document registry +
+   lifecycle + verification the audit spine anchors to) (ADR-0029).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
 4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
