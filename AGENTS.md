@@ -30,13 +30,15 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core.                             |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`. The last runs a hard JSON
-Schema probe corpus through **two** validators — Ajv (TS) and networknt (JVM) — and requires them
-to agree; run `pnpm spike:jvm` first to produce the JVM verdicts it cross-checks.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`.
+`schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
+and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
+verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
+JSON Schema 2020-12) authored once in TypeSpec.
 
 ## Layout
 
-- `schemas/` — TypeSpec authoring; emitted JSON Schema in `schemas/generated/` is the contract of record.
+- `schemas/` — TypeSpec authoring; emitted JSON Schema + OpenAPI 3.1 in `schemas/generated/` are the contract of record.
 - `packages/cli/` — the `ichiflow` CLI and the verify harness engine.
 - `core/` — the Kotlin core (Gradle).
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).

@@ -1,5 +1,5 @@
 // Regenerate-and-diff drift check for the schema pipeline (doc 02 §4.3, doc 13 §2.a).
-// Recompiles TypeSpec into a temp dir and asserts the checked-in `generated/` outputs are
+// Recompiles TypeSpec into a temp dir and asserts every checked-in `generated/` output is
 // byte-identical. Any delta is a failed check — the committed artifact is the contract of record.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, existsSync } from "node:fs";
@@ -8,8 +8,13 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const committedDir = join(projectRoot, "generated", "json-schema");
 const tmp = mkdtempSync(join(tmpdir(), "ichiflow-schema-drift-"));
+
+// Each emitter writes to its own subdir; regenerate all of them and compare the whole tree.
+const EMITTERS = [
+  { option: "@typespec/json-schema", subdir: "json-schema" },
+  { option: "@typespec/openapi3", subdir: "openapi3" },
+];
 
 function listFiles(dir) {
   if (!existsSync(dir)) return [];
@@ -26,21 +31,30 @@ try {
       join(projectRoot, "node_modules", "@typespec", "compiler", "cmd", "tsp.js"),
       "compile",
       ".",
-      "--option",
-      `@typespec/json-schema.emitter-output-dir=${tmp}`,
+      ...EMITTERS.flatMap((e) => [
+        "--option",
+        `${e.option}.emitter-output-dir=${join(tmp, e.subdir)}`,
+      ]),
     ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 
-  const committed = listFiles(committedDir);
-  const regenerated = listFiles(tmp);
   const drifted = [];
+  let matched = 0;
 
-  const allNames = new Set([...committed, ...regenerated]);
-  for (const name of allNames) {
-    const a = committed.includes(name) ? readFileSync(join(committedDir, name), "utf8") : null;
-    const b = regenerated.includes(name) ? readFileSync(join(tmp, name), "utf8") : null;
-    if (a !== b) drifted.push(name);
+  for (const { subdir } of EMITTERS) {
+    const committedDir = join(projectRoot, "generated", subdir);
+    const regenDir = join(tmp, subdir);
+    const names = new Set([...listFiles(committedDir), ...listFiles(regenDir)]);
+    for (const name of names) {
+      const rel = join(subdir, name);
+      const a = existsSync(join(committedDir, name))
+        ? readFileSync(join(committedDir, name), "utf8")
+        : null;
+      const b = existsSync(join(regenDir, name)) ? readFileSync(join(regenDir, name), "utf8") : null;
+      if (a !== b) drifted.push(rel);
+      else matched++;
+    }
   }
 
   if (drifted.length > 0) {
@@ -48,7 +62,7 @@ try {
     console.error("Run `pnpm --filter @ichiflow/schemas build` and commit the result.");
     process.exit(1);
   }
-  console.log(`Schema drift clean (${committed.length} generated file(s) match).`);
+  console.log(`Schema drift clean (${matched} generated file(s) match).`);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }
