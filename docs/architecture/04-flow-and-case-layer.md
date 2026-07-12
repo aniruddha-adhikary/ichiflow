@@ -528,6 +528,16 @@ later **superseded / revoked / accepted / declined** — each with the snapshot 
 the resolved reference number, the verification hash, and the delivery outcome, so "what instrument did we
 issue, from which data, under which template, and what is its status now" is answerable through the *why* API.
 
+**Placement — core semantics vs delegable generation.** Only the part the audit spine depends on is
+hard-shipped: **number allocation, Document lifecycle, the acceptance await, the audit events, and the
+verification contract are core** (the DecisionRecord references the Document by number + hash + version, so
+its registry, lifecycle, and verification cannot leave ichiflow). **Rendering the bytes is a swappable
+component** behind the rendering SPI, and an enterprise document platform can be delegated to at two depths —
+**delegated rendering** (ichiflow keeps numbering + lifecycle, ships the snapshot out and stores the returned
+binary) or **delegated full issuance** (the external system owns numbering/format; ichiflow records the
+Document metadata + hash as the audit anchor). Both are spelled out in
+[07-ui-and-portals.md](./07-ui-and-portals.md) §15.7; the non-delegable core stays in ichiflow in every case.
+
 ---
 
 ## 3. Flow interpretation architecture (diagram)
