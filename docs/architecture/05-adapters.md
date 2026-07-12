@@ -50,11 +50,29 @@ An **Adapter** declaration has three schema'd parts:
    - **WSDL/XSD** for SOAP.
    These align with the schema strategy in [BRIEF.md](./BRIEF.md) §5 (TypeSpec-authored,
    OpenAPI/JSON-Schema/AsyncAPI as the checked-in artifacts).
-2. **Mapping** — the **Message Translator** step, as a versioned mapping artifact:
+2. **Mapping** — the **Message Translator** step, as a versioned mapping artifact. Structural field
+   mapping (rename, restructure, default, coerce, flatten/nest) is declarative by default:
    - **JSONata** — default for JSON→JSON (portable across JS + JVM, expression-based, AI-friendly).
    - **XSLT** — for XML legacy (IBM MQ / SOAP payloads); the mature, standardized XML choice.
-   - **JOLT** — optional, for JVM structural JSON remaps where declarative shift/default specs suffice.
+   - **code** — the escape hatch when a transform genuinely exceeds declarative mapping (heavy
+     conditional/computed logic that turns JSONata write-only). It is **not** an ad-hoc code drop:
+     an `engine: code` transform is a **schema'd** (declared input/output JSON Schema), **versioned**,
+     **pure**, **trace-emitting** artifact — validated at the boundary by the same runtime validators
+     as every other adapter, emitting a `decisionLog`/trace entry on any branch (§7) exactly like a
+     declarative mapping, and carried by a versioned `ref` so a contract bump pairs with a reviewable
+     mapping change (§9).
    - **DataWeave** — import-only, to migrate customers arriving from MuleSoft; not an ichiflow runtime.
+   - **JOLT** — **not in v1** (redundant with JSONata on the JVM for structural JSON remaps); revisit
+     only if a concrete need appears.
+
+   **The purity invariant.** A mapping — declarative *or* `engine: code` — MUST be a **pure function
+   of the decoded input.** Anything that needs I/O, state across messages, or enrichment-by-lookup is
+   **not a mapping**: it is a Flow step (a `decision-eval`, or an outbound `adapter-call`), not a
+   transform. Purity is what keeps mappings testable and replay-safe; enrichment that calls a service
+   never belongs inside the transform. The boundary rule: declarative structural field-mapping is the
+   default; drop to a schema'd **pure** `engine: code` transform when the logic exceeds roughly a
+   screenful of expression or needs real branching/computation; **never** put I/O or state in a
+   mapping.
 3. **Canonical binding** — the ichiflow Canonical Data Model type this port maps to/from
    (`kind: Command | Event`, `type: loan.application.received.v1`), plus the reliability, routing,
    and observability blocks (§4–§7).
@@ -165,7 +183,7 @@ the EIP vocabulary verbatim so architects and AI agents share one language:
 | EIP pattern | Role in ichiflow |
 |---|---|
 | **Canonical Data Model** | The schema'd command/event the core speaks; every adapter maps to/from it |
-| **Message Translator** | The mapping step (JSONata/XSLT/JOLT) in each adapter |
+| **Message Translator** | The mapping step (JSONata / XSLT / pure `engine: code`) in each adapter |
 | **Message Endpoint** | The adapter boundary itself (inbound/outbound) |
 | **Content-Based Router** | Routes canonical events to Flow handlers / outbound adapters by content (§6) |
 | **Idempotent Receiver** | Dedup at the inbound edge (idempotency-key store) |
@@ -197,6 +215,22 @@ many consumers" pattern. Two requirements make this safe:
   exact same table version, that the Decision emitted — and per-authority attribution on a
   `CompositeOutcome` is preserved through the wire. A breaking change to the outcome/code shape bumps the
   canonical type version (§9) like any other contract.
+
+### 4.2 Notifications (email / SMS) are outbound Adapter port types
+
+Enterprise workflows are heavy with outbound communication — status notifications,
+request-for-information prompts, adverse-action correspondence. ichiflow does **not** invent a
+parallel delivery stack for this: **email and SMS are ordinary outbound Adapter port types**,
+declared and versioned like any other port (§1), fed a canonical outbound event from the core's
+transactional outbox (§4, §5). Message **content is templated and references governed CodeSets** for
+its coded content and its per-audience / per-locale text (the `plainLanguage` i18n map, doc 02 §9.2),
+so a notification says the same thing, in the same words, as the Portal and the why API. A provider
+adapter (SMTP/ESP, SMS gateway) is selected by `channel.protocol` exactly as for any other binding
+(§2).
+
+This covers **templated notification delivery over adapters**. Rich document generation (rendered
+PDF letters/permits, object-store retention, a full delivery-audit comms module) is a distinct,
+larger capability and is **out of scope here** — a proposed module, not part of the adapter layer.
 
 ---
 
@@ -248,8 +282,9 @@ wire where present, generated at the edge where not). Each adapter emits:
 - an OTel span per message (decode → translate → publish/deliver), tagged with `case_id`,
   `adapter_id`, canonical `type`, and delivery outcome;
 - a **decision log** entry when content-based routing or a mapping branch chooses a path
-  (`decisionLog: true`), feeding the DecisionRecord's causal chain
-  ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §7);
+  (`decisionLog: true`) — including any branch inside a schema'd `engine: code` transform (§1), so a
+  code transform lands on the same audit spine as a declarative mapping — feeding the DecisionRecord's
+  causal chain ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §7);
 - DLQ depth / redelivery metrics for alerting.
 
 This makes "which external message, transformed how, started which Case" answerable end-to-end and
@@ -288,9 +323,9 @@ Adapter contracts and canonical types are versioned artifacts in the schema **re
   → `v2`); old and new run side by side while producers/consumers migrate. FULL_TRANSITIVE
   compatibility on event schemas is enforced by the registry; `oasdiff` gates breaking REST changes
   in CI.
-- Mapping artifacts (JSONata/XSLT/JOLT) are versioned and referenced by the adapter, so a contract
-  bump pairs with an explicit, reviewable mapping change — and an AI agent regenerates the mapping
-  from the new contract for a validator to check pre-deploy.
+- Mapping artifacts (JSONata / XSLT / pure `engine: code`) are versioned and referenced by the
+  adapter, so a contract bump pairs with an explicit, reviewable mapping change — and an AI agent
+  regenerates the mapping from the new contract for a validator to check pre-deploy.
 
 ---
 

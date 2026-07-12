@@ -115,6 +115,44 @@ FEEL expressions (the DMN expression language) are the DSL's expression sublangu
 routing predicates, and data mapping, so business users use one expression syntax across Decisions
 and Flows.
 
+**The boundary rule — where YAML wins, where it degenerates.** A Flow step's YAML expresses **WHICH
+steps run and in WHAT ORDER/CONDITION** — the control-flow graph and its guards — never **HOW data is
+computed or reshaped** between steps beyond trivial field references. FEEL/JSONata are the
+guard/routing/field-mapping sublanguage; they are *not* a place to encode computation. The DSL
+degenerates exactly where YAML stops describing the graph and starts encoding logic — the failure
+modes are consistent across every workflow DSL that has tried it:
+
+1. **Complex data shuffling between steps** — a projection/merge/reshape of the outputs of several
+   prior steps expressed as inline FEEL/JSONata. The single worst failure mode.
+2. **Loops with computed state** — accumulating a running total, deduping into a set, maintaining a
+   cursor.
+3. **Conditional fan-out where the branch *set* is itself computed** (dynamic parallelism over a
+   computed list), not a fixed set of declared branches.
+4. **Error-handling that derives new state** (beyond saga-compensation-as-declared-steps, §10).
+
+Above that line, a well-named unit of **typed Kotlin/TS run behind an activity** (the same kind of
+typed activity as `decision-eval` and `adapter-call`, §2.3 table) is *more* legible and diffable than
+sprawling inline expression — and stays on the audit spine because the activity is schema'd at its
+boundary and emits a trace like any other step. Below the line (a graph of named steps, a fixed set
+of guarded branches) YAML's comprehension/audit/portability advantage dominates and the flow stays
+declarative. The concrete step-level mechanism for arbitrary inter-step computation — a first-class
+code/compute step — is a proposed DSL extension under design (Open questions); today, computation
+that a Decision or Adapter does not own is pushed into a typed activity rather than inline
+FEEL/JSONata.
+
+### 2.4 Scheduled and batch triggers
+
+Flows do not only start from an inbound canonical command. A Flow definition can declare a
+**scheduled trigger** — a cron/interval or business-calendar schedule that **maps directly to
+Temporal Schedules** — for recurring work: nightly re-scoring campaigns, obligation-deadline sweeps
+(§5.5), periodic reconciliation, and batch imports. A **batch trigger** fans a scheduled run out
+**over a set of Cases** (a `find_cases`-style selector → a child sub-flow per Case, or a bounded
+`loop` over the selection), so "re-score every open Case in region EU tonight" is a **declared Flow,
+not a bespoke cron job**. Because the trigger resolves to a Temporal Schedule and the work runs as
+ordinary interpreter steps, scheduled/batch Flows inherit the same durability, replay-audit, and
+DecisionRecord wiring as command-triggered Flows, and respect the same idempotency and per-Case
+version pinning (§2.2) as any other Flow instance.
+
 ---
 
 ## 3. Flow interpretation architecture (diagram)
@@ -492,3 +530,9 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
 - **Long-history mitigation.** Months-long, signal-heavy cases can grow large event histories;
   continue-as-new checkpointing strategy and its interaction with DecisionRecord projection need a
   concrete policy.
+- **A first-class code/compute step for inter-step computation.** §2.3 pushes non-trivial inter-step
+  computation into typed activities rather than inline FEEL/JSONata. Whether to add a first-class
+  `compute` step type — a schema'd, versioned, trace-emitting code activity alongside
+  `decision-eval`/`adapter-call`, so computation is a *declared* graph node rather than the current
+  coarse "drop to raw Temporal SDK for the whole flow" hatch — is a proposed DSL extension pending an
+  ADR.

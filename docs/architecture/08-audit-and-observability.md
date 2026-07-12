@@ -243,6 +243,12 @@ time-travel. It binds the **audit-store SPI** as an *optional as-of/bitemporal s
 want native bitemporality rather than trigger-based history — **not** the primary transactional DB
 (maturity/operational-familiarity reasons).
 
+**Phasing.** v1 core "as-of" leans on **Temporal replay + append-only records + effective-dating**,
+which covers the decision/flow core. **Trigger-based bitemporal history on *every* audited table** is
+heavy and is an **Enterprise-tier** capability, not v1-core; XTDB is the optional native-bitemporal
+binding for customers who want it. The lighter v1 stance is sufficient for the core's reconstructable
+"what did we know when."
+
 ---
 
 ## Part 4 — Observability
@@ -271,6 +277,10 @@ decision inputs, outcome, reviewer, timing, and model/agent metadata (`../resear
 **observability twin** of the DecisionRecord — the same facts, shaped for aggregate querying ("every case
 where confidence < 0.8", "every denial under policy v37") rather than per-case reconstruction.
 
+**Phasing.** The v1 default backend for this operational read model is **just Postgres** (open-q7); a
+dedicated wide-event store (ClickHouse/Honeycomb-style) is a later, scale-driven SPI binding, not a
+v1 requirement.
+
 ### 4.4 Operational dashboards vs audit queries — separate read models
 
 Dashboards and audit answer different questions and get **different read models** (CQRS projections,
@@ -292,6 +302,10 @@ For **BCBS 239 end-to-end data lineage** at the dataset/pipeline layer, ichiflow
 §2.3, §6). This complements the per-Case causal chain: OpenLineage covers *data/pipeline* lineage (how a
 dataset was produced), the DecisionRecord covers *decision* lineage (why a Case resolved as it did).
 Together they satisfy the lineage principle regulators find hardest.
+
+**Phasing.** OpenLineage / BCBS 239 lineage is an **Enterprise compliance-pack** capability, not
+v1-core — it targets bank risk-data aggregation specifically. v1 ships the per-Case DecisionRecord
+causal chain (§1); the dataset/pipeline lineage layer switches on with the compliance pack.
 
 ### 4.6 Obligation-breach and SLA-pause events are audit-first-class
 
@@ -370,9 +384,10 @@ activities stay behind adapters (`../research/07` §8).
 | Event-sourced decision/flow core (Postgres + Temporal history) | ✅ | Dedicated event store (Axon) if scale warrants |
 | Append-only audit tables + transactional outbox | ✅ | CDC projections (Debezium) as default in Team+ tiers |
 | Tamper-evident ledger SPI (immudb) | Optional | Managed ledger offering |
-| Bitemporal: trigger-based history on PG | ✅ | XTDB audit-store binding for native bitemporality |
+| Bitemporal "as-of" for the decision/flow core (Temporal replay + append-only records + effective-dating) | ✅ | **Trigger-based bitemporal history on every audited table → Enterprise tier**; XTDB binding for native bitemporality |
 | OTel all signals; `case_id↔trace_id`; wide decision event | ✅ | GenAI semantic conventions for agent spans |
-| OpenLineage data lineage | ✅ (BCBS 239 scope) | Deeper warehouse/pipeline coverage |
+| Wide-event store for the operational read model | **v1 = just Postgres** (§4.3–4.4, open-q7) | ClickHouse/Honeycomb-style store when high-cardinality aggregate scale warrants |
+| OpenLineage / BCBS 239 data lineage | **Enterprise compliance pack** (not v1-core) | Deeper warehouse/pipeline coverage |
 | Deterministic replay as forensic tool | ✅ | One-command repro env parity across tiers |
 | Crypto-shredding redaction (§7) | ✅ (design) | Automated retention-policy engine |
 
@@ -397,6 +412,7 @@ activities stay behind adapters (`../research/07` §8).
    (`../research/05` §7.2); default remains Postgres-native audit + optional immudb.
 6. **AI-Act timing.** Track OJ publication of the Digital Omnibus; **build to Aug 2, 2026** even though
    credit-scoring compliance may formally shift to Dec 2, 2027 (`../research/05` §7.5).
-7. **Wide-event backend default.** ClickHouse-based vs Honeycomb-style vs "just Postgres" for the
-   operational read model at v1 — balance the "just use Postgres" default (`../research/05` §4.2) against
-   high-cardinality aggregate query performance.
+7. **Wide-event backend default.** Resolved for v1: the operational read model is **just Postgres**
+   (§4.3–4.4); a dedicated ClickHouse/Honeycomb-style wide-event store is a later, scale-driven SPI
+   binding. The residual question is the concrete high-cardinality-aggregate signal that triggers
+   that binding (`../research/05` §4.2).

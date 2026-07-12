@@ -173,6 +173,40 @@ Convenient (insecure) dev defaults are explicit and separate from prod mode (Key
 This tier is the single biggest adoption lever and is what the < 10-minute requirement (§4) is
 measured against.
 
+**Honest dev-tier footprint.** "Single binary" cannot literally contain a JVM app *and* a Node
+runtime *and* an embedded Keycloak *and* an OpenFGA server *and* Apicurio — several locked components
+are servers. The dev tier is honest about which of the ~12 components run in-process, which are
+bundled, and which are deferred to Team+:
+
+| Component | Dev-tier footprint |
+|---|---|
+| **PostgreSQL / SQLite** | embedded store, in-process (SQLite default) |
+| **Temporal** | **bundled dev-server** started by the binary (`server start-dev`-style) |
+| **Decision core / Drools (KIE)** | JVM library, **in-process** behind the Decision Engine SPI |
+| **Flow interpreter (TS) + Case services (Kotlin)** | **in-process — but two runtimes** (Node + JVM); see the note below |
+| **Schema pipeline (TypeSpec→OpenAPI/JSON Schema), JSON Forms, generated types** | **file-based**, build-time; no server |
+| **Cedar / OPA (ABAC)** | **embedded** (a library, not a server), in-process |
+| **Keycloak (IdP broker)** | **deferred to Team+**; dev uses a **built-in dev IdP** (static users) behind the identity SPI |
+| **OpenFGA (ReBAC)** | **deferred to Team+** (a server); see the flagged authz note below |
+| **Apicurio (registry)** | **deferred to Team+**; dev uses **file-based** schema artifacts |
+| **Camel-on-Quarkus (heavy adapters)** | **deferred to Team+**; dev uses **native REST/webhook** paths |
+| **Debezium (CDC)** | **deferred to Team+** |
+| **immudb (ledger)** | **deferred to Team+** (optional even there) |
+
+Two honest admissions follow. (1) The core is genuinely **two runtimes** — a JVM (Kotlin activities,
+Drools, domain services) and Node (the TS interpreter workflow + BFFs) — so "single binary" means
+"single launch + embedded store," *not* "one runtime"; the JVM/Node split is a permanent operational
+and debugging cost, not hidden by the dev packaging. (2) Server-shaped components (Keycloak, OpenFGA,
+Apicurio, Camel-on-Quarkus, Debezium) **cannot run in-process** in the dev binary and are Team+
+bindings behind their SPIs; the dev tier substitutes lighter in-process defaults (built-in dev IdP,
+embedded Cedar/OPA, file-based schema artifacts, native adapter paths).
+
+**Flagged, not decided here.** These substitutions mean "same app code, config only" carries
+**bounded exceptions** — e.g. OpenFGA ReBAC relationship-based row-filtering is simply absent in a
+single-engine dev tier, so a list view that relies on it behaves differently in dev than in
+Enterprise. Whether to formalize those exceptions (and whether v1 collapses authz to a single engine
+with OpenFGA as a Team+ opt-in) is a founder decision, not resolved by this table.
+
 ### 3.2 Team tier — docker compose / small K8s + Postgres
 
 A `docker compose` full stack (or a minimal K8s install) brings up the same binary against a real
