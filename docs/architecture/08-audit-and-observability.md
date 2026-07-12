@@ -200,6 +200,35 @@ verifiable. The honest limit: after shredding, the verification hash can still p
 with that status and lineage, but the **content** it attested is gone by design — which is exactly the GDPR
 Art. 17 outcome, not a gap.
 
+### 1.7 Set-level records — cohort and bundle
+
+The DecisionRecord is **per-`case_id`** (§1.1): one unit of work, one causal chain. Two **set-level Case**
+shapes ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.10, ADR-0031) need a record **above**
+`case_id`, and they need it in two different shapes:
+
+- **Cohort-scoped DecisionRecord — keyed by `cohortId`.** A `cohort` gather-barrier runs **one** set-level
+  step over the whole set and emits a DecisionRecord keyed by the **`cohortId`** (the `exerciseId` /
+  `roundId`), not by any member's `case_id`. It holds the **shared set-level facts** — the ballot **seed +
+  frozen-roster hash + allocation**, or the round's **ranking + funding line** — that member Cases
+  **reference** rather than copy, so "prove my queue number" / "prove my rank" resolves to **one** cohort
+  record every member points at, not **N** smeared copies of a shared fact. The **QuotaLedger ranked-draw**
+  movements the round ranking drives (reserve/commit/draw against the pool,
+  [04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.9, ADR-0030) are recorded **on this cohort
+  record**, so the draw and the ranking it realizes share one auditable set-level chain.
+- **Bundle parent DecisionRecord — references (never merges) child records.** A `bundle` parent Case fans
+  out **N heterogeneous child Cases**, each a full independent Case with its own Flow, SLA, and causal
+  chain. Its parent DecisionRecord **references** those child records, presenting a **partial-tolerant
+  status roll-up** — a `partial` bundle (some children approved, some rejected) is a first-class, non-gated
+  end state. This is explicitly **not** a `CompositeOutcome` (§1.5): a `CompositeOutcome` composes N Outcomes
+  into **one** gated decision on **one** Case; a bundle parent record is a roll-up **view** over **N**
+  independent decisions whose codes and attributions stay on their own child records.
+
+Both shapes add a **second keying axis** above `case_id` (the cohort's `cohortId`, and the bundle parent's
+own `case_id` standing over its children), so the "why" API and task-inbox grouping must present "one logical
+cohort/bundle over N flows" — the Case-vs-Flow cardinality **Open question**
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md)). Both inherit the same append-only storage, as-of
+reconstruction, and version pinning as any DecisionRecord (§1.1, §2.2, §3).
+
 ---
 
 ## Part 2 — Storage strategy
