@@ -17,6 +17,10 @@
         {
             "type": "string",
             "const": "schema"
+        },
+        {
+            "type": "string",
+            "const": "generated"
         }
     ],
     "description": "Kind of a named resource an agent can reach for."

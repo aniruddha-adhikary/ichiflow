@@ -9,6 +9,7 @@ import { runScope, runVerify } from "../src/verify/runner.js";
 import { selfCheckScope } from "../src/verify/scopes/self-check.js";
 import { schemaFidelitySpikeScope } from "../src/verify/scopes/schema-fidelity-spike.js";
 import { schemaPipelineScope } from "../src/verify/scopes/schema-pipeline.js";
+import { codegenScope } from "../src/verify/scopes/codegen.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -76,6 +77,17 @@ describe("schema-pipeline", () => {
     const failures = checks.filter((c) => c.status !== "pass");
     expect(failures).toEqual([]);
     expect(checks.some((c) => c.id === "schema-pipeline.openapi.version-3.1")).toBe(true);
+  });
+});
+
+describe("codegen", () => {
+  it("confirms both generated edges cover every OpenAPI component schema", async () => {
+    const checks = await codegenScope.run({ repoRoot, seed: deriveSeed("codegen") });
+    const failures = checks.filter((c) => c.status !== "pass");
+    expect(failures).toEqual([]);
+    expect(checks.some((c) => c.id === "codegen.ts.covers-contract")).toBe(true);
+    expect(checks.some((c) => c.id === "codegen.kotlin.covers-contract")).toBe(true);
+    expect(checks.some((c) => c.id === "codegen.canonical-model-parity")).toBe(true);
   });
 });
 

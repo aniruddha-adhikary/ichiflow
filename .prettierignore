@@ -1,6 +1,7 @@
 **/dist/**
 **/node_modules/**
 **/generated/**
+packages/contracts-ts/src/gen/**
 **/.ichiflow/ledger/**
 core/**/build/**
 docs/**

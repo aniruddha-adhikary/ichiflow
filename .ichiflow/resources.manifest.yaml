@@ -21,6 +21,12 @@ pins:
   - id: networknt-json-schema-validator
     version: "1.5.4"
     note: Independent JVM JSON Schema 2020-12 validator for the cross-language fidelity spike.
+  - id: hey-api-openapi-ts
+    version: "0.80.0"
+    note: TypeScript contract-type generator from OpenAPI (build plan 1.2). 0.80.x is the last line supporting Node 20; bump reruns codegen drift.
+  - id: fabrikt
+    version: "26.1.0"
+    note: Kotlin contract-model generator from OpenAPI (build plan 1.2). Bump reruns ./gradlew checkModelsUpToDate.
 
 resources:
   - id: run-verify
@@ -51,3 +57,15 @@ resources:
     kind: schema
     path: schemas/service.tsp
     description: The verify status API surface (TypeSpec → OpenAPI 3.1).
+  - id: codegen
+    kind: harness
+    path: packages/cli/src/verify/scopes/codegen.ts
+    description: Generated TS (hey-api) + Kotlin (Fabrikt) edges cover every OpenAPI component schema.
+  - id: contracts-ts
+    kind: generated
+    path: packages/contracts-ts/src/gen
+    description: Generated TypeScript contract types (hey-api). Regenerate with pnpm codegen:ts; never hand-edit.
+  - id: contracts-kotlin
+    kind: generated
+    path: core/generated/src/main/kotlin
+    description: Generated Kotlin contract models (Fabrikt). Regenerate with ./gradlew generateModels; never hand-edit.
