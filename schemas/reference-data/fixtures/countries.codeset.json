@@ -1,0 +1,37 @@
+{
+  "kind": "CodeSet",
+  "metadata": {
+    "id": "countries",
+    "version": "2026.2.0",
+    "governanceState": "released",
+    "effective": { "from": "2026-01-01", "to": null },
+    "owner": { "team": "geo-registry-team", "stewards": ["u:steward-geo"] }
+  },
+  "rows": [
+    {
+      "code": "XA",
+      "display": {
+        "technical": "XA",
+        "professionalLabel": "Country Alpha",
+        "plainLanguage": { "en": "Country Alpha" }
+      }
+    },
+    {
+      "code": "XB",
+      "display": {
+        "technical": "XB",
+        "professionalLabel": "Country Bravo",
+        "plainLanguage": { "en": "Country Bravo" }
+      }
+    },
+    {
+      "code": "XZ",
+      "deprecated": true,
+      "display": {
+        "technical": "XZ",
+        "professionalLabel": "Country Zulu (retired)",
+        "plainLanguage": { "en": "Country Zulu (retired)" }
+      }
+    }
+  ]
+}

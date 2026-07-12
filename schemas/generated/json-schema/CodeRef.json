@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeRef.json",
+    "type": "object",
+    "properties": {
+        "code": {
+            "type": "string",
+            "description": "The referenced row's `code`, e.g. `XA`."
+        },
+        "codeSet": {
+            "type": "string",
+            "description": "The referenced set as `id@version`, e.g. `countries@2026.2.0`."
+        }
+    },
+    "required": [
+        "code",
+        "codeSet"
+    ],
+    "description": "A reference to a governed CodeSet row, pinning the version used (§9.3)."
+}
