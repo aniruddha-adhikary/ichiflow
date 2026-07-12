@@ -389,9 +389,10 @@ this Document — a **cancel** Case with a `cancellation-reasons` codeRef termin
 
 ### Trace A — pass at **exactly 40 points**, with per-criterion breakdown
 
-An INFOCOMM firm files for a 34-year-old candidate, fixed salary **S$11,600/month**, top-tier degree, at a
-firm where the candidate's nationality is 18% of PMETs and local-PMET share sits at the sector's 40th
-percentile; the role is **not** on the SOL and the firm claims no strategic priorities.
+A 2025 new application: an INFOCOMM firm files for a 34-year-old candidate, fixed salary
+**S$11,600/month**, top-tier degree, at a firm where the candidate's nationality is 18% of PMETs and
+local-PMET share sits **below the sector's 20th percentile**; the role is **not** on the SOL and the firm
+claims no strategic priorities.
 
 ```jsonc
 // get_case_trace("EP-4471") → Tier-0, auto (excerpt: the COMPASS DRD result + DecisionRecord)
@@ -399,12 +400,12 @@ percentile; the role is **not** on the SOL and the firm claims no strategic prio
     "floor": 8900, "salary": 11600, "pins": { "qualifying-salary-benchmarks": "2025.0.0" } },
   "compass": { "type": "approve", "total": 40,
     "breakdown": { "c1": 10, "c2": 20, "c3": 10, "c4": 0, "c5": 0, "c6": 0 },
-    "pins": { "compass-c1-benchmarks": "2026.0.0", "shortage-occupation-list": "2025.0.0" },
+    "pins": { "compass-c1-benchmarks": "2025.0.0", "shortage-occupation-list": "2025.0.0" },
     "why": {
-      "c1": "11600 ≥ v10(7500) but < v20(12500) for INFOCOMM → 10",
+      "c1": "11600 ≥ v10(6800) but < v20(12000) for INFOCOMM → 10",
       "c2": "top-tier institution → 20",
       "c3": "candidate nationality 18% of firm PMETs (5–<25%) → 10",
-      "c4": "local-PMET at 40th sector pct (<50th, ≥20th), not ≥70% floor → 0",
+      "c4": "local-PMET below 20th sector pct, not ≥70% floor → 0",
       "c5": "role not on SOL 2025.0.0 → 0",  "c6": "no strategic-priority claim → 0" } } }
 ```
 
@@ -451,12 +452,12 @@ the child approves. Explainability spans both.
 
 ### Trace C — **renewal under newer benchmarks**: the same worker scores differently
 
-Trace A's candidate holds a 2-year pass issued **2024** under the **Aug-2024 (2025.0.0)** benchmark line.
-The pass expires **2026-09**, so the renewal — a Case with `intent: RENEWAL`, `priorPassId` linking the
-entitlement Document (§2.5) — falls under MOM's rule that **renewals of passes expiring from 1 Jul 2026 use
-the Aug-2025 (2026.0.0) benchmarks**.[^mom-c1] Nothing about the candidate changed: same **S$11,600**
-salary, same firm. But the C1 90th-percentile benchmark for INFOCOMM **rose**, and the renewal is a **fresh
-determination under the current rules**:
+Trace A's candidate holds a pass issued in **2025** under the **Aug-2024 (2025.0.0)** benchmark line,
+coming up for renewal in 2026. Because the pass **expires after 1 Jul 2026**, the renewal — a Case with
+`intent: RENEWAL`, `priorPassId` linking the entitlement Document (§2.5) — falls under MOM's rule that
+**renewals of passes expiring from 1 Jul 2026 use the Aug-2025 (2026.0.0) benchmarks**.[^mom-c1] Nothing
+about the candidate changed: same **S$11,600** salary, same firm. But the C1 benchmark for INFOCOMM
+**rose**, and the renewal is a **fresh determination under the current rules**:
 
 ```jsonc
 // get_case_trace("EP-4471-RNW") → renewal child Case
@@ -464,8 +465,8 @@ determination under the current rules**:
   "compass": { "type": "deny", "total": 30,
     "breakdown": { "c1": 0, "c2": 20, "c3": 10, "c4": 0, "c5": 0, "c6": 0 },
     "pins": { "compass-c1-benchmarks": "2026.0.0" },        // CURRENT release governs a renewal
-    "why": { "c1": "11600 < v10(7500)? no — but the 2026.0.0 INFOCOMM v10 rose to 12000 → 11600 < v10 → 0",
-             "delta": "same salary, C1 20→... actually 10→0: benchmark moved, not the worker" } },
+    "why": { "c1": "under 2026.0.0 INFOCOMM v10 rose to 12000 → 11600 < 12000 → 0 (was 10 under 2025.0.0 v10=6800)",
+             "delta": "C1 10 → 0: the benchmark moved, the worker did not" } },
   "reasons": [ "COMPASS_BELOW_40" ] }
 ```
 
