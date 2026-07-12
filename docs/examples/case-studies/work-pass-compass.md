@@ -254,11 +254,12 @@ tables (each emitting a bare point score, attributed to its criterion):
 | candShare < 0.25             | 10       |
 | otherwise                    | 0        |
 
-# decisions/compass-c4.decision-source   (localFloor = employer.localPmetShare >= 0.70)
+# decisions/compass-c4.decision-source   (hit policy FIRST; ≥70%-local is a MINIMUM floor, so it sits
+#                                          AFTER the percentile rows — a ≥70% firm still scores 20 at ≥50th pct)
 | when                                          | c4Points |
-| localFloor                                    | 10       |   # ≥70%-local floor
 | localPmetPercentileVsSector >= 0.50           | 20       |
 | localPmetPercentileVsSector >= 0.20           | 10       |
+| employer.localPmetShare >= 0.70               | 10       |   # ≥70%-local floor: minimum 10 even if <20th pct
 | otherwise                                     | 0        |
 ```
 
