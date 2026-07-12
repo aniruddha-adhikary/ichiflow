@@ -1,0 +1,288 @@
+# 03 — Schema-First Foundation: IDL, Type Generation, UI Generation
+
+**Status:** Research complete — recommendation ready for review
+**Date:** 2026-07-12
+**Scope:** Schema/IDL selection, cross-language (TypeScript + Kotlin) type safety, schema-driven UI with durable designer overrides, documentation generation, runtime contract enforcement, schema registry/evolution, AI-native codegen ergonomics.
+
+---
+
+## 1. Executive Summary
+
+ichiflow should be **schema-first with a two-layer contract architecture**:
+
+1. **Authoring layer: TypeSpec** (Microsoft, 1.0 GA since May 2025, currently 1.13.x). Humans and LLM agents write contracts in TypeSpec's TypeScript-like DSL — the most concise and LLM-legible IDL available, with first-class discriminated unions (`@discriminated`) and a real versioning story (`@typespec/versioning`: `@added`/`@removed`/`@renamedFrom` project one source into N spec versions).
+2. **Canonical artifact layer: emitted OpenAPI 3.1/3.2 + JSON Schema 2020-12** (plus **AsyncAPI 3.1** for message-queue contracts). These *build artifacts, checked into the repo*, are the single source of truth that every downstream consumer reads: Kotlin codegen, TypeScript codegen, runtime validators on both sides of every adapter boundary, the UI generator, the docs pipeline, and the schema registry.
+
+This resolves the apparent tension between "author in TypeSpec" and "JSON Schema as canonical": TypeSpec is the *editing surface*; the emitted, deterministic OpenAPI/JSON Schema documents are the *contract of record*. Nothing downstream ever depends on TypeSpec directly, so any individual tool (or TypeSpec itself) can be swapped without breaking consumers.
+
+**Concrete toolchain (named versions, July 2026):**
+
+| Concern | Tool | Version |
+|---|---|---|
+| Authoring IDL | TypeSpec (`@typespec/compiler`, `http`, `openapi3`, `json-schema`, `versioning`) | 1.13.x |
+| REST contract | OpenAPI | 3.1 (target 3.2 as tooling catches up) |
+| Data-shape contract | JSON Schema | Draft 2020-12 |
+| Event contract | AsyncAPI | 3.1.0 |
+| Kotlin codegen | Fabrikt | 27.4.x |
+| TypeScript codegen | @hey-api/openapi-ts (pinned) or orval | 0.99.x / 8.0 |
+| Event models (TS + Kotlin) | AsyncAPI Modelina | current |
+| TS runtime validation | Zod v4 (via codegen plugin) + Ajv/TypeBox for raw JSON Schema | Zod 4 stable |
+| Kotlin runtime validation | OptimumCode/json-schema-validator (KMP, 2020-12) atop kotlinx.serialization; networknt on JVM-only paths | current |
+| Schema registry | Apicurio Registry (Confluent-compatible, also stores OpenAPI/AsyncAPI) | 3.3.x |
+| Schema-driven UI | JSON Forms model (`@jsonforms/core`) — separate uischema + tester/priority renderer registry | 3.8.x |
+| Docs | TypeSpec-emitted OpenAPI → Fern Docs or Scalar/Redocly; docs enriched from `@doc`/examples in TypeSpec | — |
+
+**Headline risks flagged during research:** Stainless was acquired by Anthropic (May 2026) and its hosted SDK generator is winding down — do not design around it. `openapi-fetch`/`openapi-react-query` are in maintenance mode. `zod-to-json-schema` is deprecated (Zod v4 has native `z.toJSONSchema()`). Square Wire dropped kotlinx.serialization support. hey-api is still 0.x — pin it.
+
+---
+
+## 2. Requirements Recap (what "good" means for ichiflow)
+
+- **R1 — No drift:** TS and Kotlin types generated from one source; runtime validators generated from the *same* source; CI fails on divergence.
+- **R2 — API-first:** the contract exists and is useful with no UI at all.
+- **R3 — Generated UI with durable overrides:** forms/tables/detail views auto-derived from schemas; designer customizations live *outside* the generated artifacts and survive regeneration.
+- **R4 — Excellent generated docs:** reference docs derived from the same schemas, enriched with descriptions and examples authored in the IDL.
+- **R5 — AI-native:** schemas and generated code must be legible to LLM coding agents; generation must be deterministic so agents can safely re-run it.
+- **R6 — Event contracts:** ichiflow has message-queue adapters; async contracts are first-class, not an afterthought.
+
+---
+
+## 3. IDL / Schema Language Comparison
+
+### 3.1 Comparison matrix
+
+Scale: ●●● strong, ●●○ adequate, ●○○ weak.
+
+| Criterion | TypeSpec 1.13 | OpenAPI 3.1/3.2 | JSON Schema 2020-12 | Protobuf (Editions) | GraphQL | Smithy 1.72 | AsyncAPI 3.1 |
+|---|---|---|---|---|---|---|---|
+| Validation constraints | ●●● (decorators → JSON Schema) | ●●● (full 2020-12 vocab) | ●●● (reference vocab) | ●○○ (needs protovalidate) | ●○○ (directives/custom) | ●●○ (traits) | ●●● (payloads are JSON Schema) |
+| Discriminated unions | ●●● `@discriminated` | ●●○ `oneOf`+`discriminator` (3.2 adds `defaultMapping`) | ●●○ `oneOf` (discriminator is OAS-level) | ●●○ `oneof` (no shared fields) | ●●○ unions/interfaces | ●●○ unions | ●●○ (via JSON Schema) |
+| Versioning / evolution | ●●● `@typespec/versioning` — one source, N versions | ●○○ (convention only) | ●○○ (convention only) | ●●● (wire-level; Editions 2024) | ●●○ (`@deprecated`, additive culture) | ●●○ | ●○○ (registry-enforced) |
+| Codegen → TypeScript | via emitted OAS: ●●● | ●●● (hey-api, orval, Kubb, openapi-typescript) | ●●● (TypeBox, json-schema-to-ts) | ●●● (ts-proto, Connect) | ●●● (graphql-codegen 7) | ●○○ (Developer Preview) | ●●○ (Modelina) |
+| Codegen → Kotlin | via emitted OAS: ●●● | ●●● (Fabrikt; openapi-generator) | ●●○ | ●●● (Wire, gRPC-Kotlin, protoc Kotlin DSL) | ●●● (Apollo Kotlin 5) | ●●○ (client GA) | ●●○ (Modelina) |
+| Docs generation | ●●● (via OAS toolchain; `@doc`, `@example` flow through) | ●●● (largest ecosystem: Scalar, Redocly, Fern, Stoplight) | ●●○ | ●●○ | ●●● (introspection, GraphiQL) | ●●○ | ●●○ (AsyncAPI Studio/Generator) |
+| LLM legibility | ●●● (concise TS-like syntax; a 500-line OAS file ≈ 50 lines of TypeSpec) | ●●○ (verbose YAML/JSON, but by far the most training data) | ●●○ (verbose; universally understood as tool-schema lingua franca) | ●●○ (concise, well known) | ●●● (SDL is compact) | ●○○ (little training data) | ●●○ |
+| Ecosystem maturity | ●●○ (core GA; client/server emitters still preview) | ●●● | ●●● | ●●● | ●●● | ●●○ (AWS-centric) | ●●○ (Glee archived; spec active) |
+| HTTP/REST fit | ●●● | ●●● | n/a (data only) | ●○○ (gRPC-first) | ●○○ | ●●● | n/a (events) |
+| Event/MQ fit | ●○○ (no first-party AsyncAPI emitter) | ●○○ | ●●● (payloads) | ●●● (Kafka+SR common) | ●○○ | ●●○ | ●●● |
+
+### 3.2 Per-candidate assessment
+
+**TypeSpec (Microsoft)** — 1.0 GA May 2025; stable `@typespec/compiler`, `@typespec/http`, `@typespec/openapi3` (emits 3.0 and 3.1 via `openapi-versions: ["3.1.0"]`), `@typespec/json-schema`. Protobuf emitter exists; client/server code emitters (.NET/JS/Java/Python) remain preview — which is fine, because we deliberately do codegen from the emitted OpenAPI, not from TypeSpec directly. The versioning library is the standout: annotate one model with `@added(Versions.v2)` / `@renamedFrom` and emit every historical spec version from a single source — no other IDL here has this. Weaknesses: no first-party AsyncAPI emitter (community efforts only), and its ecosystem is a fraction of raw-OpenAPI's — mitigated entirely by the two-layer design.
+
+**OpenAPI 3.1 / 3.2** — 3.1 fully aligned its Schema Object with JSON Schema 2020-12; 3.2.0 (released Sept 2025, backward compatible) improves discriminators (optional `propertyName`, new `defaultMapping`, extensible Discriminator Object). Largest tooling/docs ecosystem in existence and the most LLM-training-data of any API format. As an *authoring* format it is verbose and repetitive; as an *artifact* format it is ideal.
+
+**JSON Schema 2020-12** — still the current stable dialect in 2026; universal validator support (Ajv, networknt, jsonschema-rs, OptimumCode KMP). This is the natural contract language for ichiflow's *data shapes* — workflow payloads, rule inputs/outputs, event payloads — because one document can drive TS types, Kotlin types, runtime validation on both sides, UI generation, and LLM tool schemas (JSON Schema is the lingua franca of LLM function calling). No native versioning semantics; evolution is enforced by the registry (§6).
+
+**Protobuf / gRPC** — Editions model (`edition = "2024"`) has replaced the proto2/proto3 split; best-in-class wire-level evolution (field numbers, `buf breaking`). Kotlin support is excellent (Wire 6.2, gRPC-Kotlin, protoc Kotlin DSL) and ts-proto 2.12 (now on the `@bufbuild/protobuf` runtime) is solid for TS. But: weak validation vocabulary (needs protovalidate), awkward JSON mapping, gRPC-first posture conflicts with API-first-over-HTTP, and binary framing adds friction for LLM agents inspecting payloads. **Verdict: not the backbone; available later for hot internal RPC paths (TypeSpec has a protobuf emitter).**
+
+**GraphQL** — Apollo Kotlin 5.0 (May 2026) and graphql-codegen 7.1 are mature; Federation 2.13+ is healthy. GraphQL excels as an *aggregation/query* layer but is weak as a cross-language contract IDL: no standard validation constraints, resolver-centric server model, additive-only evolution culture. **Verdict: optional future BFF layer, not the contract source.**
+
+**Smithy (AWS)** — CLI 1.72.0; resource-oriented modeling and traits are genuinely good, Kotlin *client* codegen is GA, but TypeScript generators are still Developer Preview, adoption outside AWS is thin, and LLMs have comparatively little Smithy in training data. **Verdict: pass.**
+
+**AsyncAPI 3.1** (Jan 2026) — the only serious option for MQ contracts: channels/operations/messages with Kafka, AMQP, MQTT, WebSocket bindings; payloads are JSON Schema, so event payload schemas can be *shared by `$ref`* with the REST layer. Modelina generates Kotlin and TypeScript models from AsyncAPI/JSON Schema. Caveats: Glee (framework) is archived — use AsyncAPI for contracts + Modelina for models, not for app scaffolding; no first-party TypeSpec emitter, so AsyncAPI documents are hand-authored but `$ref` the shared JSON Schema components emitted by TypeSpec.
+
+### 3.3 Single-source-of-truth pattern comparison
+
+| Pattern | How | Pros | Cons | Verdict |
+|---|---|---|---|---|
+| **TypeSpec-first → emit OAS + JSON Schema** | `.tsp` compiled in CI; emitted specs checked in; all codegen reads emitted specs | Most expressive + concise authoring; real versioning; language-neutral (no TS/Kotlin favoritism); best LLM authoring ergonomics; downstream sees only standard formats | Extra compile step; AsyncAPI needs manual authoring against shared schemas | **Recommended** |
+| **Zod-first (TS) → `z.toJSONSchema()` → Kotlin** | Author Zod v4 in TS packages; project to JSON Schema; generate Kotlin from that | Zero-friction for TS devs; validator *is* the schema on the TS side | **Lossy projection** — `z.transform`, refinements, custom checks don't survive to JSON Schema, so Kotlin silently under-enforces (drift by construction); TS-centric politics in a two-language org | Rejected as source; Zod fine as *generated* TS validator |
+| **Kotlin-first (annotations / kotlinx-schema)** | Annotate Kotlin classes; springdoc/kotlinx-schema emit OpenAPI/JSON Schema | Server team never leaves Kotlin | Contract trails implementation (implementation-first, not API-first); TS becomes second-class; JetBrains' kotlinx-schema is promising but young | Rejected |
+| **Raw OpenAPI YAML-first** | Hand-edit `openapi.yaml` | No extra layer; maximal tool compat | Verbose, error-prone, no versioning projection, painful diffs, worst human/LLM authoring ergonomics at scale | Rejected |
+
+**What the SDK-platform vendors do** confirms the pattern: Fern compiles its own IDL *to OpenAPI and from OpenAPI*; Speakeasy and (formerly) Stainless treat OpenAPI as the canonical input and layer config on top. Industry consensus in 2026: OpenAPI/JSON Schema as interchange, richer DSL above it.
+
+- **Stainless** — **acquired by Anthropic, May 2026 (reported >$300M); hosted SDK generator winding down, new signups closed.** Previously powered OpenAI/Anthropic SDKs. **Do not design around it.**
+- **Fern** — OSS core compiler, 9 GA SDK languages; **Kotlin is not first-class (Java is)**; paid cloud from ~$250/mo. Its **docs product is its strength** — a leading candidate for ichiflow's published API docs regardless of SDK strategy.
+- **Speakeasy** — 10 languages including **first-class Kotlin** and TS SDKs with built-in **Zod runtime validation**; CLI runs air-gapped; free tier (1 language / 250 endpoints), paid ~$600/mo/language. The credible commercial fallback if in-house SDK codegen quality ever becomes a burden.
+- **Kiota** (Microsoft, MIT, free) — TS yes, **no Kotlin**, no doc-site generation. Not a fit.
+- liblab / APIMatic — no Kotlin. Not a fit.
+
+---
+
+## 4. Cross-Language Codegen Toolchain (TS + Kotlin)
+
+### 4.1 Kotlin (from emitted OpenAPI)
+
+| Tool | Version (Jul 2026) | Assessment |
+|---|---|---|
+| **Fabrikt** (fabrikt-io) | **27.4.x** | **Recommended.** KotlinPoet-based → deterministic, idiomatic output; data classes with validation annotations, **sealed interfaces for `oneOf` discriminated unions**; supports Jackson *and* kotlinx.serialization; generates Spring/Micronaut controllers, Ktor bindings, OkHttp clients. Purpose-built for exactly this job. |
+| openapi-generator | 7.24.0 | Broadest target list, least idiomatic Kotlin; ktor server target is its weakest. Fallback only. |
+| Square Wire | 6.2.0 | Excellent protobuf→Kotlin, but **dropped kotlinx.serialization support in 4.0** — relevant only if a protobuf path is added. |
+| Apollo Kotlin | 5.0.0 | GraphQL only; shelved with GraphQL. |
+| kotlinx-rpc | 0.10.2 | Pre-1.0; not enterprise-safe yet. Watch. |
+
+### 4.2 TypeScript (from emitted OpenAPI)
+
+| Tool | Version (Jul 2026) | Assessment |
+|---|---|---|
+| **@hey-api/openapi-ts** | **0.99.x** | **Recommended (pinned).** Strong momentum (used by Vercel, PayPal, AWS teams); generates types + client + **Zod v4 schemas** from one spec. Still 0.x with frequent breaking changes — **pin exactly and upgrade deliberately.** |
+| **orval** | **8.0** | **Co-recommendation / stable alternative.** Types + clients + TanStack Query hooks + Zod v4 + MSW mocks. If hey-api churn bites, orval is the drop-in. |
+| Kubb | 3.2.2 (5.0 beta) | Plugin meta-framework (Zod, MSW, clients); notably shipped a **Claude Code integration (May 2026)** — a signal of AI-native codegen direction. Evaluate at 5.0 stable. |
+| openapi-typescript | 7.13.0 | Excellent *types-only* generator; but ⚠️ **openapi-fetch / openapi-react-query are in maintenance mode** — don't build new runtime clients on them. |
+| ts-proto | 2.12.0 | Protobuf path only (now on `@bufbuild/protobuf` runtime). |
+| graphql-codegen | CLI 7.1.3 | GraphQL path only. |
+
+### 4.3 Event models (both languages)
+
+**AsyncAPI Modelina** generates Kotlin and TypeScript payload models from AsyncAPI 3.x / JSON Schema documents. Because ichiflow's AsyncAPI docs `$ref` the same JSON Schema components as the REST spec, event payload types in both languages come from the same source as API types — satisfying R1 for the messaging plane. Where Modelina's Kotlin output falls short, feed the payload JSON Schemas to Fabrikt (it accepts component schemas) instead.
+
+### 4.4 Validation libraries (runtime side)
+
+- **TypeScript:** Zod v4 (stable; 14x faster than v3; `zod/v4-mini` for bundle-sensitive code; native `z.toJSONSchema()` targeting 2020-12 — the third-party `zod-to-json-schema` is deprecated as of Nov 2025). For validating raw JSON Schema documents directly (adapter boundaries, registry-fetched schemas): **Ajv** or **TypeBox** (TypeBox schemas *are* JSON Schema 2020-12 with inferred TS types — the tightest possible type/validator coupling). Valibot 1.4.2 is fine but its codegen ecosystem is much thinner than Zod's.
+- **Kotlin:** kotlinx.serialization handles (de)serialization but performs **no constraint validation**. Pair it with **OptimumCode/json-schema-validator** — pure-Kotlin multiplatform JSON Schema validator supporting 2020-12, operating directly on `JsonElement`. On JVM-only paths, **networknt/json-schema-validator** is the mature alternative. Jakarta Bean Validation covers Spring-side bean constraints; konform is a type-safe DSL but not schema-driven (would reintroduce drift). Watch **Kotlin/kotlinx-schema** (JetBrains, new): generates JSON Schema from Kotlin via KSP — useful for the *reverse* check (assert generated Kotlin classes round-trip to the contract schema in CI).
+
+---
+
+## 5. Schema-Driven UI and the Override Model
+
+### 5.1 The core architectural question
+
+The requirement is: *regenerate the data schema often; designer customizations must survive.* That is only possible when UI customization lives in a **separate, versioned document (or registry) keyed to the data schema by reference** — never inline in generated artifacts, never in forked copies of generated components.
+
+### 5.2 Comparison matrix
+
+| Option | Version | Schema → UI | Override model | Survives regeneration? | Verdict |
+|---|---|---|---|---|---|
+| **JSON Forms** (Eclipse) | @jsonforms/core 3.8.x | JSON Schema → forms (React/Angular/Vue; Material/Vanilla/Vuetify renderer sets) | **Two independent documents**: data schema + **uischema** (layouts + Controls with JSON-Pointer `scope`); **renderer registry with tester-priority functions** — override any control by registering a higher-priority renderer | **Yes — architecturally guaranteed.** Data schema regeneration cannot touch uischema. Residual risk: renamed fields orphan scopes (lint for it) | **Winner — adopt this model** |
+| **react-jsonschema-form** | @rjsf/core 6.6.x | JSON Schema → forms; theme packages (mui, antd, chakra, fluentui) | Separate `uiSchema` + widget/field/template registries; v6 passes framework props via `rjsfSlotProps` | Mostly — uiSchema is path-keyed with **no tester fallback**, so renames go silently stale; React-only | Strong second; good source of ideas (templates/slots) |
+| **Headless build** (TanStack Form v1 + Standard Schema [Zod/Valibot/ArkType native], TanStack Table, RHF+zodResolver) | v1 / current | You write the schema→field-descriptor→component-registry mapping | Whatever you design: component registry + design tokens + per-field descriptor overrides | Yes, if you build it that way | **Complementary** — this is how ichiflow *implements* its renderer sets |
+| Uniforms | 4.0 | Multi-schema → forms | Theme packages, field overrides | Partially; low maintenance velocity | Pass |
+| AutoForm (shadcn / @autoform) | current | Zod → form | `fieldConfig` **inline with the schema** — overrides live *in* the generated artifact | **No** | Pass (anti-pattern for this requirement) |
+| refine.dev | v5 (Inferencer 7.x) | Inferencer scaffolds CRUD from API metadata | **Scaffold-then-own**: generated code is ejected and edited | **No — regeneration replaces, doesn't merge** | Good framework, wrong model |
+| react-admin | 5.15 | Guessers scaffold from data provider | Same eject model | No | Same |
+| Retool / Appsmith / Budibase / ToolJet | 2026: Retool commercial-only; Budibase best pure auto-CRUD; ToolJet pivoting to AI app-gen | DB/API → app builder | Platform-managed app JSON; no semantic dataSchema/uiSchema separation | No — re-scaffolds | Not embeddable as framework substrate |
+
+### 5.3 Recommended override architecture for ichiflow
+
+Adopt the **JSON Forms model** (and likely JSON Forms itself for the React reference implementation), hardened:
+
+1. **Generated baseline uischema.** For every schema-defined entity/workflow-step, the generator emits a *default* uischema (vertical layout, all fields, sensible controls). This file is a **starting point, generated once** (`--if-absent`), not overwritten.
+2. **Designer overrides as versioned uischema documents** — layouts, groupings, labels, rules (show/hide/enable via conditions), control options — stored beside (not inside) the generated types, in `contracts/ui/`. Each uischema records the `$id` + version of the data schema it targets.
+3. **Component/renderer registry with tester priorities.** Designers and app teams register custom renderers (`(uischema, dataSchema) → priority`); higher priority wins. Customization = *add a registration*, never fork generated code. This registry is also where the design system plugs in.
+4. **Design tokens** as the theming spine of the renderer set (headless TanStack/RHF internals + token-driven styling), so brand-level changes touch zero uischema documents.
+5. **Drift lint in CI:** validate every uischema scope (JSON Pointer) against the current data schema; renamed/removed fields fail the build with a fix-it hint — closing the one hole in the JSON Forms model.
+6. **Tables/detail views:** same pattern — a "viewschema" document (column sets, ordering, cell renderers by tester) referencing the data schema. JSON Forms doesn't ship this; ichiflow builds it on TanStack Table using the identical registry/tester architecture.
+
+This yields the required property: **regenerate contracts freely; the designer layer is data, not code, and cannot be clobbered.**
+
+---
+
+## 6. Contract Enforcement, Registry, and Evolution
+
+### 6.1 Runtime validation at adapter boundaries (no-drift ranking)
+
+1. **Best:** a single artifact that *is* both type and validator — TypeBox (JSON Schema 2020-12 native, TS types inferred) or generated Zod. Drift is impossible within TS.
+2. **Cross-language canonical (ichiflow's pattern):** JSON Schema 2020-12 as the contract of record; validate the *same document* on both sides — Ajv/TypeBox in TS, OptimumCode (KMP) or networknt in Kotlin — while static types in both languages are generated from that same document. Both the validator and the types descend from one artifact.
+3. **Acceptable but lossy:** Zod-first with `z.toJSONSchema()` — refinements/transforms don't project, so Kotlin under-enforces. Avoid as source of truth.
+4. **Avoid:** hand-maintained parallel schemas/bridges.
+
+**Enforcement points:** every ichiflow adapter boundary (HTTP handler ingress/egress, MQ consumer/producer, workflow-step payload handoff, rule-engine input/output) validates against the canonical JSON Schema. Workflow and rule payload types `$ref` the same component schemas as the API — one schema source feeds API, events, workflow state, and rules (R6 + task area 4).
+
+### 6.2 Schema registry and compatibility
+
+| Registry | Formats | Compat rules | Fit |
+|---|---|---|---|
+| **Apicurio Registry 3.3** (Apache-2.0, active Jul 2026) | Avro, Protobuf, JSON Schema, **OpenAPI, AsyncAPI**, GraphQL, WSDL/XSD | Confluent-compatible modes; **data-contracts feature added in 3.3.0** | **Recommended** — one self-hosted registry covers both message *and* API artifacts; Confluent-API-compatible so Kafka serdes work unchanged |
+| Confluent Schema Registry | Avro, Protobuf, JSON Schema | BACKWARD / FORWARD / FULL (+ TRANSITIVE variants) | The semantics to copy; product itself is Kafka-centric and licensed |
+| Buf BSR | Protobuf only | `buf breaking` + server-side push rejection | Best-in-class *if* a protobuf plane is added; not general-purpose |
+
+**Policy:** event payload schemas registered with **FULL_TRANSITIVE** compatibility (consumers and producers upgrade independently); API schemas evolve via TypeSpec versioning with `oasdiff`-style breaking-change detection in CI. The registry check is the machine-enforced complement to `@typespec/versioning`'s human-side projection.
+
+---
+
+## 7. Documentation Generation
+
+- Author `@doc`, `@summary`, `@example` (typed, checked examples) in TypeSpec — they flow into the emitted OpenAPI, so docs quality is enforced at the contract layer (lint: every public model/op must carry `@doc`).
+- Render with best-of-breed OpenAPI doc engines: **Fern Docs** (its strongest product; works from plain OpenAPI without buying Fern SDKs), or **Scalar / Redocly** for fully self-hosted. AsyncAPI docs via AsyncAPI Generator HTML template / AsyncAPI Studio.
+- Because docs, SDKs, validators, and UI all read the same emitted artifacts, docs can never describe a different API than the one that ships — the "amazingly good docs" requirement is mostly a *pipeline property*, then a rendering choice.
+
+## 8. AI-Native Codegen Ergonomics
+
+- **Authoring:** TypeSpec is the best LLM authoring surface measured by tokens-per-concept (TS-like syntax; ~10x more compact than equivalent OpenAPI YAML); Microsoft explicitly targets Copilot/agent scenarios. **Interchange:** JSON Schema/OpenAPI have the most training data of any contract format and are the lingua franca of LLM tool-calling — every ichiflow schema is directly usable as an LLM tool schema, which matters for an AI-native workflow engine.
+- **Determinism:** Fabrikt (KotlinPoet) and the modern TS generators produce stable, prettier-clean output — LLM agents can re-run generation and get clean diffs. Kubb's Claude Code integration (May 2026) and hey-api's agent-oriented docs show the ecosystem converging on agent-driven codegen.
+- **Monorepo layout — check generated code in.** Industry practice distinguishes transient build-time generation from checked-in codegen; for ichiflow, checked-in wins because LLM agents (and humans) must be able to *read* generated types without running a toolchain, and PR diffs of generated code are themselves a contract-review surface. Mitigate the classic drift risk with a CI job that regenerates and fails on diff (`git diff --exit-code`). Conventions: standardized paths, `@generated` headers with source-schema hash, no autoformatting of generated files, `linguist-generated` in `.gitattributes`.
+
+```
+contracts/
+  src/                  # TypeSpec sources (the editing surface)
+  openapi/              # emitted OpenAPI 3.1 (checked in, CI-verified)
+  jsonschema/           # emitted JSON Schema 2020-12 components
+  asyncapi/             # AsyncAPI 3.1 docs ($ref → ../jsonschema)
+  ui/                   # uischema / viewschema override documents (designer-owned)
+packages/
+  contracts-ts/         # generated: hey-api/orval output + Zod schemas
+  ui-renderers/         # tester/priority renderer registry + design tokens
+kotlin/
+  contracts-kt/         # generated: Fabrikt output (models, sealed interfaces)
+```
+
+## 9. Recommended Strategy (consolidated)
+
+1. **Author contracts in TypeSpec 1.13+**; compile in CI; **check in emitted OpenAPI 3.1 + JSON Schema 2020-12** as the canonical artifacts. Target OpenAPI 3.2 once Fabrikt/hey-api fully support it.
+2. **Hand-author AsyncAPI 3.1** channel/operation documents that `$ref` the shared JSON Schema components; generate event models with Modelina (Fabrikt fallback for Kotlin payloads).
+3. **Generate Kotlin with Fabrikt**, TS with **hey-api (pinned)** or **orval 8**, including **Zod v4** schemas on the TS side; validate with **OptimumCode/networknt** on the Kotlin side — types and validators on both languages descend from one artifact.
+4. **Enforce at every adapter boundary**; register event schemas in **Apicurio 3.3** with FULL_TRANSITIVE compatibility; breaking-change detection (oasdiff + registry) in CI.
+5. **UI:** JSON Forms-style architecture — generated-once baseline uischema, designer-owned uischema/viewschema documents, tester-priority renderer registry, design tokens, scope-drift lint.
+6. **Docs** rendered from the emitted specs (Fern Docs or Scalar/Redocly + AsyncAPI Generator), with `@doc`/`@example` lint gates in the contract layer.
+7. **Check in generated code** with regenerate-and-diff CI verification.
+
+## 10. Risks and Mitigations
+
+| # | Risk | Severity | Mitigation |
+|---|---|---|---|
+| 1 | TypeSpec ecosystem is young beside raw OpenAPI; some advanced OAS constructs need escape hatches | Med | Two-layer design: downstream consumes only emitted OpenAPI/JSON Schema; TypeSpec is swappable; `@extension` escape hatch for raw OAS |
+| 2 | **hey-api is 0.x** with frequent breaking changes | Med | Pin exact version; orval 8 is a validated drop-in alternative; codegen output is checked in, so upgrades are reviewable diffs |
+| 3 | **openapi-fetch / openapi-react-query in maintenance mode** | Med | Don't adopt; already excluded from recommendation |
+| 4 | **Stainless wound down post-Anthropic acquisition (May 2026)** | Low (avoided) | Not in the design; Speakeasy (first-class Kotlin) is the commercial fallback for polished external SDKs |
+| 5 | Zod→JSON-Schema projection is lossy if teams author Zod-first | Med | Policy: Zod is *generated output only*; contract source is TypeSpec/JSON Schema; lint against hand-authored Zod in contract packages |
+| 6 | uischema scopes go stale on field renames (the JSON Forms residual gap) | Med | CI drift lint validating every JSON Pointer scope against current schema; `@renamedFrom` metadata can drive auto-migration of scopes |
+| 7 | No first-party TypeSpec→AsyncAPI emitter; dual authoring surface for events | Med | Payload schemas are shared via `$ref` (single source for the part that matters); track TypeSpec community AsyncAPI emitters; revisit yearly |
+| 8 | Checked-in generated code can drift from source schemas | Low | Regenerate-and-`git diff --exit-code` CI gate; `@generated` + schema-hash headers |
+| 9 | Fabrikt is community-scale (not vendor-backed) | Low-Med | Deterministic checked-in output limits blast radius; openapi-generator kotlin as emergency fallback; consider upstream sponsorship |
+| 10 | Kotlin JSON Schema validators less battle-hardened than Ajv | Low-Med | Dual options (OptimumCode KMP + networknt JVM); shared cross-language conformance test suite run against both validators in CI |
+| 11 | JVM-side kotlinx-schema/kotlinx-rpc still maturing | Low | Used only as watch-list / round-trip-check tooling, not on the critical path |
+
+## 11. Sources
+
+**IDL / spec status**
+- TypeSpec 1.0 GA & releases: https://typespec.io/blog/typespec-1-0-RC-release/ · https://typespec.io/docs/release-notes/release-2025-05-06/ · https://github.com/microsoft/typespec/releases
+- TypeSpec OpenAPI 3 emitter (3.1 support): https://typespec.io/docs/emitters/openapi3/openapi/
+- TypeSpec for OpenAPI developers (discriminated unions): https://typespec.io/docs/getting-started/typespec-for-openapi-dev/
+- OpenAPI 3.2.0: https://spec.openapis.org/oas/v3.2.0.html · https://github.com/OAI/OpenAPI-Specification/releases
+- OpenAPI 3.1.0: https://spec.openapis.org/oas/v3.1.0.html
+- AsyncAPI tools & Kafka bindings: https://www.asyncapi.com/tools · https://www.asyncapi.com/docs/tutorials/kafka/bindings-with-kafka
+- Modelina (AsyncAPI/OpenAPI/JSON Schema → Kotlin/TS models): https://github.com/asyncapi/modelina · https://modelina.org/examples
+
+**Codegen**
+- Fabrikt: https://github.com/fabrikt-io/fabrikt
+- openapi-generator: https://github.com/OpenAPITools/openapi-generator
+- @hey-api/openapi-ts: https://github.com/hey-api/openapi-ts · discriminated-union issue: https://github.com/hey-api/hey-api/issues/3270
+- orval: https://orval.dev · Kubb: https://kubb.dev
+- openapi-typescript: https://github.com/openapi-ts/openapi-typescript
+- ts-proto: https://github.com/stephenh/ts-proto · Wire: https://github.com/square/wire
+- Apollo Kotlin: https://github.com/apollographql/apollo-kotlin · graphql-codegen: https://the-guild.dev/graphql/codegen
+- Smithy: https://smithy.io
+
+**Validation / types**
+- Zod v4 + native JSON Schema (2020-12 default): https://zod.dev/v4 · https://zod.dev/json-schema
+- zod-to-json-schema deprecation (Nov 2025): https://github.com/StefanTerdell/zod-to-json-schema
+- TypeBox: https://github.com/sinclairzx81/typebox · Ajv: https://ajv.js.org
+- OptimumCode/json-schema-validator (KMP, 2020-12, kotlinx.serialization): https://github.com/OptimumCode/json-schema-validator
+- networknt/json-schema-validator: https://github.com/networknt/json-schema-validator
+- Kotlin/kotlinx-schema (JetBrains): https://github.com/Kotlin/kotlinx-schema
+
+**UI generation**
+- JSON Forms: https://jsonforms.io · https://github.com/eclipsesource/jsonforms
+- react-jsonschema-form: https://rjsf-team.github.io/react-jsonschema-form/docs/
+- TanStack Form (Standard Schema): https://tanstack.com/form · Uniforms: https://uniforms.tools
+- refine.dev Inferencer: https://refine.dev/docs/packages/inferencer/ · react-admin: https://marmelab.com/react-admin/
+- Budibase: https://budibase.com · ToolJet: https://www.tooljet.ai · Appsmith: https://www.appsmith.com
+
+**Platforms / registry / patterns**
+- Fern: https://buildwithfern.com · Speakeasy: https://www.speakeasy.com · Kiota: https://learn.microsoft.com/en-us/openapi/kiota/
+- Apicurio Registry: https://www.apicur.io/registry/ · Confluent SR compatibility: https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
+- Buf breaking-change detection: https://buf.build/docs/breaking/
+- Generated code in monorepos (checked-in vs transient): https://7tonshark.com/posts/handling-generated-code-in-rush/ · https://the-guild.dev/graphql/codegen/docs/getting-started/development-workflow
+- OpenAPI + AI agents (2026): https://www.xano.com/blog/openapi-specification-the-definitive-guide/ · openapi-zod-ts (one-spec, Zod v4, deterministic output): https://github.com/codewithagents/openapi-zod-ts
