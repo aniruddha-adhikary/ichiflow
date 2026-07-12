@@ -23,6 +23,7 @@
     "codegen:drift": "pnpm --filter @ichiflow/contracts-ts drift",
     "spike:jvm": "cd core && ./gradlew -q runSpike",
     "vectors:jvm": "cd core && ./gradlew -q runContractVectors",
+    "decision:jvm": "cd core && ./gradlew -q runDecisionSpike",
     "verify": "node packages/cli/dist/cli.js verify"
   },
   "devDependencies": {
