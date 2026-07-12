@@ -354,7 +354,9 @@ ADR-0028) — relevant because government vetting integrations are frequently ba
 ### 2.5 doctemplates — the IPA letter and the pass itself
 
 Issuance is **`issue-document`** binding a **doctemplate** to Case data + the DecisionRecord, producing a
-governed **Document** (the sibling capability). Two are issued in sequence: the **In-Principle Approval
+governed **Document** (now normatively owned by [ADR-0029](../../adr/0029-document-issuance.md) /
+[04 §2.9](../../architecture/04-flow-and-case-layer.md) / [07 §15](../../architecture/07-ui-and-portals.md)).
+Two are issued in sequence: the **In-Principle Approval
 (IPA)** letter, then — after entry and medical clearance — the **Employment Pass** itself, a long-lived
 entitlement Document with a validity window.
 
@@ -555,12 +557,24 @@ require inventing a new primitive.
    breakdown to a rejected party*, a typed, ordered `scoreBreakdown[]` (criterion, points, band, reason,
    pinned-benchmark) on the Outcome would make the breakdown a **contract**, not an audit-time
    reconstruction. Recommend an `Outcome.scoreBreakdown?` extension for points-based decisions.
+
+   **Resolved (2026-07 gap-fix round):** typed **`Outcome.scoreBreakdown[]`** (`ScoreLine = { criterion,
+   points, band, whyRef }`) is now first-class in [02 §9.3](../../architecture/02-schema-foundation.md) and
+   survives `CompositeOutcome` composition — so a rejected employer's per-criterion breakdown is a typed
+   contract on the Outcome, not an audit-time reconstruction from the DecisionTrace.
 2. **`CompositeOutcome` is the wrong tool for single-authority multi-criterion scoring — say so
    explicitly.** The analysis in §2.3 concludes COMPASS is a DRD, not a composite. This is the **right**
    outcome, but the composition-policy table (doc 03 §2.3) invites the mistake because `weighted` looks
    superficially applicable. A one-line note in doc 03 — _"per-criterion scoring within one authority is a
    DRD, not a `CompositeOutcome`; composition is across authorities"_ — would prevent authors from
    modelling points systems as fake multi-authority composites.
+
+   **Resolved (2026-07 gap-fix round):** [03 §2.3](../../architecture/03-decision-layer.md) now carries the
+   two-level composition modelling rule with the explicit misuse warning — *single authority scoring N
+   criteria = a DRD (not a `CompositeOutcome`); N independent authorities = a `CompositeOutcome`; a review
+   panel = a DRD-per-reviewer composed across reviewers* — and notes that `weighted` looks superficially
+   applicable to a single-authority points tally but misattributes each criterion as an "authority." The
+   grants case is the design's first correct exercise of the composite across genuine N authorities.
 3. **Per-sector benchmark dollar values are not machine-public.** MOM publishes C1's per-sector figures
    only inside an annually-released **PDF**, not as a structured feed. The CodeSet **shape** is correct and
    the **percentile bands, qualifying salaries, and exemptions are public and cited**; but a real

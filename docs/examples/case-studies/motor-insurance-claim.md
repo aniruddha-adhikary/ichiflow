@@ -337,7 +337,9 @@ domain uses four: the **approval-of-repair letter** (to the workshop Portal), th
 (to the insured, whose signature releases the claim), the **settlement letter**, and the
 **decline letter**. Each rendered `Document` is snapshotted into the DecisionRecord so an auditor can
 reproduce exactly what was sent. _(`Document` / `doctemplate` / `issue-document` are being specified by a
-sibling design track; this case study uses the nouns ahead of their normative doc — see [§8](#8-honest-gaps).)_
+sibling design track; this case study uses the nouns ahead of their normative doc, now [ADR-0029](../../adr/0029-document-issuance.md)
+/ [04 §2.9](../../architecture/04-flow-and-case-layer.md) / [07 §15](../../architecture/07-ui-and-portals.md) —
+see [§8](#8-honest-gaps).)_
 
 ---
 
@@ -531,6 +533,13 @@ claim this case; **[MINOR]** is a known phasing or a resolvable modelling choice
   PDP-scoped, audited) before the fraud-investigation dimension is honestly "modelled." It is the single
   hardest thing this case study surfaces.
 
+  **Resolved (2026-07 gap-fix round):** adopted as the first-class **`Case association`**
+  ([ADR-0032](../../adr/0032-case-association.md), [04 §5.11](../../architecture/04-flow-and-case-layer.md)) — a
+  typed (`investigation-group`), PDP-scoped, audited many-to-many peer link whose **own visibility scope**
+  grants an investigator read **across** the linked claims without collapsing their separate ownership/audit
+  boundaries, carrying its own DecisionRecord and cross-Case invariant checks. This SIU-across-claims gap was
+  the source; the grants portfolio gap confirmed it independently. **No longer blocking.**
+
 - **[MINOR, but a real tension] Reserve-writing Decisions.** The requirement that _each state change
   re-computes the reserve_ collides with a locked property of the Decision layer: a Decision is a
   **pure evaluation with no hidden side effects** (doc 03 §3, SPI `evaluate` — "in → out, no hidden side
@@ -556,6 +565,13 @@ claim this case; **[MINOR]** is a known phasing or a resolvable modelling choice
   specified by a sibling design track; this case study uses them ahead of their owning doc. The shape
   assumed here (an `issue-document` Flow step rendering a governed `Document` from a versioned
   `doctemplate`, snapshotted into the DecisionRecord) should be reconciled with that spec when it lands.
+
+  **Resolved (2026-07 gap-fix round):** reconciled against [ADR-0029](../../adr/0029-document-issuance.md) /
+  [04 §2.9](../../architecture/04-flow-and-case-layer.md) / [07 §15](../../architecture/07-ui-and-portals.md) —
+  the assumed shape (an `issue-document` step rendering a governed `Document` from a versioned `doctemplate`,
+  snapshotted into the DecisionRecord) matches the normative definition directly, and the **discharge voucher
+  whose signature releases the claim** is the ADR-0029 **acceptance facet** (`issued → accepted`) whose
+  accepted-event gates the settlement step.
 
 - **[MINOR] PolicySnapshot as-of fidelity depends on legacy PAS history.** Reconstructing policy terms
   as of the loss date (bitemporal §1) assumes the PAS retained effective-dated endorsement history with
