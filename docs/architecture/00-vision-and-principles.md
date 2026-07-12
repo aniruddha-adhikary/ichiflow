@@ -271,18 +271,28 @@ phasing table aligned to this overview.
   declarative data without the Copilot), MCP Tier-2 prod-mutating, and the **compliance profile**
   (an open-source, optional install — OpenLineage/BCBS-239 lineage, wide-event store, trigger-based
   bitemporal history), plus **BI reporting via embedded OSS BI over governed read models**
-  ([`08-audit-and-observability.md`](08-audit-and-observability.md) §8; ADR-0021).
+  ([`08-audit-and-observability.md`](08-audit-and-observability.md) Part 7; ADR-0021).
 
 **Governance scales with tier, not by fiat:** the governance-level dial defaults to **off** (Dev),
 **light** (Team), **full** (Enterprise) — ADR-0017, [`03-decision-layer.md`](03-decision-layer.md)
 §5.6.
 
-**v1 acceptance test — one real app, end-to-end.** The v1 milestone is not a feature checklist; it is
-**the canonical reference product made real**: the outdoor-event-permit product
-([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md)) running on
-the kernel with **every layer real** — schemas → decisions → flows → portal → audit → `ichiflow-mcp`
-debug — not mocked or stubbed. v1 is "done" when a permit application flows arrival-to-resolution on
-the actual kernel and an agent can debug a stuck case through the *why* API. (ADR-0017 amendment.)
+**v1 acceptance test — two real exercises, both required.** The v1 milestone is not a feature
+checklist; **v1 is accepted only when *both* of these pass on the actual kernel** (ADR-0017 amendment):
+
+1. **The reference product, end-to-end.** The canonical outdoor-event-permit product
+   ([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md)) runs with
+   **every layer real** — schemas → decisions → flows → portal → audit → `ichiflow-mcp` debug — not
+   mocked or stubbed: a permit application flows arrival-to-resolution and an agent debugs a stuck case
+   through the *why* API.
+2. **The migration exercise — in *and* out.** A realistic legacy source (a generic
+   database-and-spreadsheet permitting/casework system with existing data and rules — **no real system
+   named**) goes through the brownfield path: **Ring 0 declarative mapping** over the existing database
+   (zero/additive DDL), legacy rules **re-expressed as DecisionModels**, and **decision-parity testing**
+   against a **golden dataset of historical outcomes** ([`11-migration-in-and-out.md`](11-migration-in-and-out.md)).
+   The **exit story** is verified on the same Workspace: export DMN / Flow JSON / schemas / data and
+   demonstrate they are consumable outside ichiflow. Anti-lock-in is a core promise, so **migration in
+   and out are both on the acceptance bar.**
 
 ## 6. Non-goals (explicit)
 

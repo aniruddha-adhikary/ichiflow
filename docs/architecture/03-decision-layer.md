@@ -700,7 +700,8 @@ a genuinely clean exit — not "one-click import."**
 4. **FEEL ambiguity pinning.** Which specific FEEL under-specifications (research 01 §7) do we pin,
    and do we publish ichiflow's chosen semantics as part of the canonical spec? Leaning yes.
 5. **Coverage thresholds as policy.** Should the release-gating coverage threshold be global, per
-   regulated vertical (compliance pack), or per DecisionModel? Under the governance-level dial
+   regulated vertical (the compliance profile — an open-source, optional install), or per
+   DecisionModel? Under the governance-level dial
    (§5.6) coverage gating is on at `full` and advisory at `light`; the residual question is the
    threshold's granularity within `full`. (§6.2)
 6. **Approval-workflow dogfooding depth.** Approval-as-a-Flow is elegant but risks a bootstrap

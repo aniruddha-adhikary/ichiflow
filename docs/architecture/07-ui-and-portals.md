@@ -204,6 +204,14 @@ enterprise screen set, each fully overridable via the registry:
 Because the **same PDP** answers both the API and the UI (BRIEF §8), the generated screen can
 never show more than the API would return — one decision source, no drift between layers.
 
+**Reporting is embedded, not generated here.** Aggregate business intelligence (counts, cycle times,
+breach rates, decision stats) is *not* a generated ichiflow screen and *not* a custom report engine:
+ichiflow **embeds proven OSS BI** (Metabase/Superset-class) over **governed read models**, authenticated
+through the same broker and scoped by the **same PDP** as every other surface, so an embedded dashboard
+can never show a row or field the API would deny. The back-office Portal hosts the embed; the read
+models and the security contract are specified in
+[`08-audit-and-observability.md`](08-audit-and-observability.md) Part 7 (locked decision §17; ADR-0021).
+
 ---
 
 ## 6. Field/row-level authz shapes what renders — and explains itself
@@ -415,6 +423,16 @@ checked-in format rather than a hand-written file:
 
 A brand change that touches zero uischema is already the architecture's promise (§4); the token
 pipeline just makes the token *source* a standard design artifact.
+
+**Figma's role is deliberately bounded — prompt-first, Figma optional (ADR-0019 amendment).** The
+**chat + live-preview playground (§11.3) is *the* designer surface**, where low-fi exploration happens
+against real schemas and mock data. Figma is an **optional adjunct at two well-defined seams, not a
+design authority**: (a) **in** — importing brand **tokens/variables** through this DTCG pipeline
+(Figma Variables is one of several producers); and (b) **out** — exporting **rendered screens / specs**
+from the playground for stakeholder review and sign-off. There is **no two-way hi-fi round-trip and no
+Code-Connect-class bridge** that would make a Figma frame a second editable representation of a
+uischema — that is exactly the round-trip-sync drift the authoring doctrine rejects (ADR-0019). The
+canonical artifact stays the uischema/pageschema, authored via chat and judged in the playground.
 
 ### 11.2 Component workbench (all states, incl. PDP states)
 

@@ -99,9 +99,13 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     templates; procurement realities (self-host, air-gap, data residency) already fit. The permit
     walkthrough ([`../examples/creating-a-permit-product.md`](../examples/creating-a-permit-product.md))
     is the **canonical reference product**. **HARD RULE: no real government systems are named.**
-    **v1 acceptance = one real app end-to-end**: the reference product running on the kernel
-    (schemas→decisions→flows→portal→audit→ichiflow-mcp debug, all real) is the v1 milestone
-    (ADR-0023, ADR-0017 amendment).
+    **v1 acceptance = TWO required exercises, both passing on the actual kernel**: (a) the **reference
+    product end-to-end** (schemas→decisions→flows→portal→audit→ichiflow-mcp debug, all real); and (b) a
+    **migration exercise, in and out** — a generic legacy database-and-spreadsheet casework source taken
+    through Ring 0 declarative mapping (zero/additive DDL), legacy rules re-expressed as DecisionModels,
+    **decision-parity testing** against a golden dataset of historical outcomes, plus a verified **exit
+    story** (export DMN/Flow JSON/schemas/data, consumable outside ichiflow). Anti-lock-in means
+    migration in *and* out are both on the bar (ADR-0023, ADR-0017 amendment).
 17. **Prefer proven open source**: when a mature OSS component exists for a **non-differentiating**
     concern, **integrate it rather than build** (BI, IdP, observability backends are the exemplars);
     the **differentiators — decision governance, DecisionRecord, Flow DSL, Copilots — are built**.

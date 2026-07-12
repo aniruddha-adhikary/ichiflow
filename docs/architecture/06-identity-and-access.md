@@ -10,8 +10,9 @@ and **what may they do here, now, on this resource** (authorization). It specifi
   Exchange (RFC 8693) for identity propagation to downstream services.
 - **AuthZ** — a central Policy Decision Point (PDP) whose contract is fixed regardless of engine mix;
   **v1 runs OpenFGA only** (relationship backbone + list-filtering + simple attribute conditions), with
-  the **Cedar/OPA ABAC** layer (rich attribute/feature/field-level policy) a post-v1/Enterprise add-on
-  behind the same interface — the hybrid being the target end-state (ADR-0010). One entitlements model
+  the **Cedar/OPA ABAC** layer (rich attribute/feature/field-level policy) a post-v1 capability-profile
+  add-on (open source, optional install) behind the same interface — the hybrid being the target
+  end-state (ADR-0010). One entitlements model
   ("features and attributes") and the rule that *one* PDP decision shapes both generated APIs and UIs.
 - **Governance** — policy authoring/testing in the Workspace, authz decision logs that feed the
   DecisionRecord, multi-tenancy, and **non-human identities** (AI agents as first-class principals).
@@ -271,12 +272,12 @@ gateway" that both the generated API layer and the generated UI layer call with
 | Concern | Engine | Phase |
 |---|---|---|
 | **Relationships / ReBAC** — "who is related to this record/tenant", "list every resource I can see"; row-level "who can see this"; multi-tenant member-of hierarchies; **coarse RBAC** (roles as relationships) and **simple attribute conditions** (OpenFGA conditional relationships) | **OpenFGA** (Zanzibar-style, Apache-2.0, CNCF) | **v1** (v1-kernel authz) |
-| **Rich attributes / features / field-level masking — ABAC**; formal analysis | **Cedar** (Apache-2.0, formally analyzable) primary; **OPA/Rego** alternative | **post-v1 / Enterprise add-on** |
+| **Rich attributes / features / field-level masking — ABAC**; formal analysis | **Cedar** (Apache-2.0, formally analyzable) primary; **OPA/Rego** alternative | **post-v1 capability-profile add-on** (open source, optional install) |
 
 - **v1 = OpenFGA only.** ReBAC backbone + list-filtering + simple attribute conditions cover v1's
   relationships, multi-tenancy, row-level access, coarse RBAC, and simple attribute gates. Field-level
   masking in v1 is limited to what OpenFGA relationships can express.
-- **Cedar/OPA ABAC = post-v1 / Enterprise add-on**, introduced **behind the same PDP facade** for rich
+- **Cedar/OPA ABAC = post-v1 capability-profile add-on** (open source, optional install), introduced **behind the same PDP facade** for rich
   attribute/feature/field-level policy and formal analysis. Adding it is a `PolicyEngine` SPI binding,
   **not a day-one dual-engine composition** — v1 does not run two engines or compose
   filter-set ∩ field-masks across them.
@@ -413,6 +414,16 @@ write-through tuple sync of §2.1.
 
 ## Part 3 — Multi-tenancy
 
+**v1 is single-org per deployment (locked decision §11; ADR-0017 amendment).** One ichiflow deployment
+serves **one organization**; hosted multi-tenant (many orgs on one deployment) is a **later** capability.
+Critically, the **seams are designed in now** so that later step is not a rework: **`tenant_id`
+discipline** is present in schemas and persistence (every resource already carries a `tenant`
+relationship, §2.2, and every store stamps it, `12-`/§4), **per-Portal IdP isolation** is already
+by-construction (realm/Organization per audience, §1.1), and **entitlement scoping** already roots every
+tuple under a tenant. In v1 the `tenant` field resolves to the single deployment's org (and to
+B2B2C *partner* sub-populations within it); the machinery to route *many* orgs through one deployment is
+what lands later. The rest of this section describes that already-present tenant plumbing.
+
 Tenancy is resolved at the **broker edge** (the realm/Organization and login hint yield `tenant` on the
 Principal, §1.4) and enforced at the **PDP** (OpenFGA tuples root every resource under a tenant; Cedar
 conditions gate cross-tenant attributes). The two layers reinforce:
@@ -461,7 +472,12 @@ An ichiflow agent identity is, by construction:
 The guardrail **tiers** (read-only / sandbox-mutating / prod-mutating-with-JIT+approval) are enforced
 server-side by `ichiflow-mcp` and detailed in `10-ai-native-experience.md`; the *identity and
 entitlement* substrate for those tiers — the NHI, its JIT scoped credential, its PDP evaluation, its
-audit attribution — is defined here. Mapping to external governance (OWASP Agentic Top-10 **ASI03
+audit attribution — is defined here. Whether agents are held *entirely* to these mediated tiers while
+humans keep conventional access, or *everyone* (human and NHI) is confined to mediated paths, is not
+fixed here — it is the org's **production-access posture dial** (`zero-direct-access` /
+`agents-mediated-humans-conventional` / `custom`), documented in
+[`09-deployment-and-topology.md`](09-deployment-and-topology.md) §6.3 and ADR-0020. This section
+supplies the NHI rails; the dial selects how mandatory they are. Mapping to external governance (OWASP Agentic Top-10 **ASI03
 Identity & Privilege Abuse**, CSA Agentic AI Identity Management, the NIST agent profile expected Q4
 2026) is designed to be clean because agents ride the standard identity/access rails rather than a
 bespoke path (`../research/07` §5.2–5.3).
@@ -474,7 +490,7 @@ bespoke path (`../research/07` §5.2–5.3).
 |---|---|---|
 | Broker per audience (Keycloak), realm-per-Portal | ✅ | Zitadel binding for heavy B2B2C multi-IdP |
 | TS-edge session (Better Auth), `AuthStrategy` SPI, legacy-wrap | ✅ | Richer strategy catalog (passkey/mTLS breadth) |
-| Central PDP: **OpenFGA only** (ReBAC + list-filtering + simple attribute conditions); API+UI enforcement; decision logs | ✅ | **Cedar/OPA ABAC** layer (rich attribute/feature/field-level, formal analysis) behind the *same* PDP interface — Enterprise/post-v1 (ADR-0010) |
+| Central PDP: **OpenFGA only** (ReBAC + list-filtering + simple attribute conditions); API+UI enforcement; decision logs | ✅ | **Cedar/OPA ABAC** layer (rich attribute/feature/field-level, formal analysis) behind the *same* PDP interface — post-v1 capability-profile add-on, open source (ADR-0010) |
 | Token exchange (RFC 8693), delegation/impersonation logging | ✅ | Cross-trust-domain chaining tooling for M&A |
 | Policy versioning + golden tests + simulation in Workspace | ✅ | Cedar formal-analysis property proofs in CI |
 | Agent NHI: JIT, short-lived, owner, kill switch, per-action audit | ✅ | Risk-scored JIT duration automation; governance-profile mapping |

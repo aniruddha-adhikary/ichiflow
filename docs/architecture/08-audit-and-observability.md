@@ -387,6 +387,59 @@ activities stay behind adapters (`../research/07` §8).
 
 ---
 
+## Part 7 — Reporting & analytics read models (embed proven OSS BI)
+
+Operational dashboards (§4.4) answer *"is the system healthy"*; the **why** API (§1) answers *"why did
+this one Case resolve so."* Neither is the third question every casework org asks: **business
+intelligence** — *"how many permits did we issue this quarter, at what median cycle time, with what
+obligation-breach rate, broken down by unit."* ichiflow answers this by **embedding proven open-source
+BI over governed read models**, not by building a report engine (locked decisions §17; ADR-0021).
+
+### 7.1 Governed read-model projections are the reporting contract
+
+ichiflow ships **schema-derived, governed read-model projections** — CQRS projections (§4.4),
+rebuildable from the audit/event log — shaped for analytical querying and versioned like any other
+contract:
+
+| Read model | Grain | Sourced from |
+|---|---|---|
+| **Cases** | one row per Case | Case lifecycle + `case_id` (`04-flow-and-case-layer.md`) |
+| **Outcomes** | one row per `Outcome` / member of a `CompositeOutcome` | Decision evaluation (§1.5) |
+| **Conditions / obligations** | one row per Condition, with state + deadline | Case obligation ledger (§4.6) |
+| **SLAs** | per-task / per-authority SLA clocks, net of pauses | SLA clock-stop events (§4.6) |
+| **Decision stats** | fired-rule / DMN-row / reason-code aggregates | DecisionRecord chain (§1.2) |
+
+These projections are the **reporting contract**: derived from the canonical Schema and CodeSets, so a
+report field means exactly what the same field means in a Case, the *why* API, and correspondence — one
+governed source of meaning, no separate "reporting definition of a permit" to drift.
+
+### 7.2 First-class integration with OSS BI — not a custom report engine
+
+ichiflow provides **first-class integration** with **Metabase / Superset-class open-source BI tools**
+over those read models, rather than a bespoke report builder:
+
+- **Embedding** — BI dashboards embed in the back-office Portal (`07-ui-and-portals.md`) as a governed
+  surface, so an analyst never leaves ichiflow to see their numbers.
+- **SSO via the broker** — the BI tool authenticates through the same identity broker
+  (`06-identity-and-access.md` §1), so reporting access is the same Principal as everything else, not a
+  second login/user directory.
+- **Row/field-level security from the *same* PDP** — the BI tool's row and field visibility is driven
+  by the **same central PDP** (`06-identity-and-access.md` §2) that guards the API and UI, so an analyst
+  can never see a row or a masked field in a report that the API would deny. There is no second,
+  divergent authorization model for analytics.
+
+**No custom report engine.** BI is a **non-differentiating concern with mature OSS** (Metabase,
+Superset), so ichiflow integrates rather than builds ("prefer proven open source," doc 00 §4;
+ADR-0021). What ichiflow owns is the **governed read models and the PDP-consistent security around the
+embed** — the parts that are actually ichiflow's value — not the charting.
+
+**Phasing.** Reporting via embedded OSS BI is a **post-v1 / compliance-profile-adjacent** capability
+(the v1 kernel ships the read models' substrate — projections are already how §4.4 works — but the
+packaged BI embed + SSO + PDP-scoped embedding lands after v1). A cross-pointer lives in
+`07-ui-and-portals.md` §5 (generated screens) since the embed surfaces in the back-office Portal.
+
+---
+
 ## Phasing (v1 vs later)
 
 | Capability | v1 | Later |
@@ -398,7 +451,8 @@ activities stay behind adapters (`../research/07` §8).
 | Bitemporal "as-of" for the decision/flow core (Temporal replay + append-only records + effective-dating) | ✅ | **Trigger-based bitemporal history on every audited table → Enterprise tier**; XTDB binding for native bitemporality |
 | OTel all signals; `case_id↔trace_id`; wide decision event | ✅ | GenAI semantic conventions for agent spans |
 | Wide-event store for the operational read model | **v1 = just Postgres** (§4.3–4.4, open-q7) | ClickHouse/Honeycomb-style store when high-cardinality aggregate scale warrants |
-| OpenLineage / BCBS 239 data lineage | **Enterprise compliance pack** (not v1-core) | Deeper warehouse/pipeline coverage |
+| OpenLineage / BCBS 239 data lineage | **compliance profile** (OSS, optional install; not v1-core) | Deeper warehouse/pipeline coverage |
+| Reporting: governed read models (cases/outcomes/conditions/SLAs/decision stats) | ✅ (projections are the §4.4 substrate) | **Embedded OSS BI** (Metabase/Superset) + SSO-via-broker + PDP-scoped embedding (Part 7, ADR-0021) — post-v1 |
 | Deterministic replay as forensic tool | ✅ | One-command repro env parity across tiers |
 | Crypto-shredding redaction (§7) | ✅ (design) | Automated retention-policy engine |
 

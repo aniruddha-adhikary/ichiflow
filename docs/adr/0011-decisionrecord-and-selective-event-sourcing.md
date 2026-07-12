@@ -1,9 +1,10 @@
 # 0011 — DecisionRecord + "why" API; selective event sourcing; outbox elsewhere; bitemporal as-of
 
-- Status: accepted
+- Status: accepted (amended 2026-07-12)
 - Date: 2026-07-12
 - Deciders: ichiflow architecture
 - Research: [../research/05-audit-observability-deployment.md](../research/05-audit-observability-deployment.md)
+- Amendment basis: founder interview 2026-07 (observability = OTel-native, BYO backend)
 
 ## Context
 
@@ -37,6 +38,20 @@ done Event Sourcing."
 - Authz decision logs ([0010](0010-hybrid-authorization-openfga-plus-policy.md)) and agent actions
   ([0015](0015-first-party-mcp-server-and-agent-kit.md)) land in the same ledger, attributed and
   approval-stamped.
+
+## Amendment (2026-07-12) — observability is OTel-native, BYO backend
+
+The observability half of this pillar ([08](../architecture/08-audit-and-observability.md) §4) is
+clarified: **all signals — traces, metrics, logs, *and* the wide decision events — export via standard
+OTLP to a bring-your-own backend** (AWS CloudWatch/X-Ray, Google Cloud Operations, Grafana, Datadog,
+any OTLP-compatible stack). **ichiflow builds no proprietary observability store and does not ship or
+bundle a Grafana-class stack as a commitment** — it provides *integration guidance*, not an owned
+monitoring product. The **Dev tier bundles only a minimal local OTel viewer**
+([09](../architecture/09-deployment-and-topology.md) §3.1). This does not change the DecisionRecord /
+*why* API decision below — the DecisionRecord remains ichiflow's own first-class domain object; what is
+BYO is the *telemetry backend*, not the decision-provenance spine. The wide-event operational read model
+(§4.3–4.4) likewise stays a BYO/SPI binding (ClickHouse/Honeycomb-class when scale warrants), never a
+bundled proprietary store.
 
 ## Alternatives considered
 

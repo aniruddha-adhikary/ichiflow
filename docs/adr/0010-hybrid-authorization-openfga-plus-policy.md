@@ -47,8 +47,10 @@ single-binary dev tier (OpenFGA is a server; a stale tuple is a wrong decision).
 - **v1 = OpenFGA only.** The ReBAC backbone (relationships, multi-tenancy, reverse-index
   list-filtering) plus **simple attribute conditions** (OpenFGA conditional relationships) cover v1's
   RBAC + row-level + coarse attribute needs.
-- **Cedar/OPA ABAC = Enterprise-tier / post-v1 add-on**, for richer attribute/feature/field-level
-  policy and formal analysis, introduced **behind the same PDP interface**.
+- **Cedar/OPA ABAC = post-v1 capability-profile add-on (open source, optional install)**, for richer
+  attribute/feature/field-level policy and formal analysis, introduced **behind the same PDP
+  interface**. "Add-on" is a *technical capability profile*, **not a paid/commercial gate** — like the
+  whole framework it is fully open source ([0022](0022-fully-open-source.md)).
 - **The PDP contract is unchanged** whether one engine or two sit behind it: the API and UI PEPs still
   call `(principal, action, resource, context)` → `allow | deny + reason`, and decision logs are
   emitted identically. Adding Cedar/OPA later is a `PolicyEngine` SPI binding, not a re-architecture.

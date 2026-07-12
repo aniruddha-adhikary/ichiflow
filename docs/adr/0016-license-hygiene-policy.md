@@ -19,6 +19,12 @@ often ones that recently *changed* license — so the policy must be explicit an
 source-available, open-core with production gating, or EOL is adopted only behind an SPI/abstraction (so
 it is swappable) and only after explicit review.
 
+> **Consistency note (2026-07-12):** this "don't embed lock-in" policy has a sibling that extends it to
+> ichiflow itself — **ichiflow is fully open source, Apache-2.0/MIT, with no gated features**
+> ([0022](0022-fully-open-source.md)). The two are one stance: refuse to embed lock-in *and* refuse to
+> be lock-in. What older docs called an "enterprise/compliance pack" is a **compliance profile — an
+> open-source, optional install**, never a paid gate.
+
 **Avoid-list (with the specific reason each fails):**
 
 | Avoid | Reason | ichiflow choice instead |
@@ -74,4 +80,4 @@ Negative / costs:
 ## References
 
 - Research 01 §9 (Apache KIE incubation / BAMOE), 02 §6–§7 (Camunda 8, Restate), 03 §3.3/§4.2 (Stainless, openapi-fetch), 04 §A.2.4/§A.4 (Redpanda connector gating), 05 §1.5 (KurrentDB, QLDB), 06 §A.4/§A.5.2/§A.6.1 (Liquibase FSL, Talend, data-diff)
-- Related: every ADR; especially [0003](0003-temporal-durable-execution-substrate.md), [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md), [0011](0011-decisionrecord-and-selective-event-sourcing.md), [0014](0014-map-first-migrate-last.md)
+- Related: every ADR; especially [0003](0003-temporal-durable-execution-substrate.md), [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md), [0011](0011-decisionrecord-and-selective-event-sourcing.md), [0014](0014-map-first-migrate-last.md), [0022](0022-fully-open-source.md) (ichiflow itself fully OSS — the consistent sibling)
