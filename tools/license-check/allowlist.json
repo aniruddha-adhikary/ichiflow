@@ -1,0 +1,17 @@
+{
+  "description": "License-allowlist gate (ADR-0016). Only these SPDX license ids are permitted for embedded/core dependencies. A dependency outside this list fails the build.",
+  "allowed": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",
+    "CC0-1.0",
+    "CC-BY-4.0",
+    "Unlicense",
+    "BlueOak-1.0.0",
+    "Python-2.0"
+  ],
+  "exceptions": {}
+}

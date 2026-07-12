@@ -1,0 +1,44 @@
+# AGENTS.md — building ichiflow
+
+ichiflow is built **harness-first** (ADR-0026, docs 13 & 14): every subsystem ships a
+deterministic verification harness **before** its implementation. You do not claim a unit is done —
+you run `ichiflow verify` and read the JSON verdict.
+
+## The one loop
+
+```
+edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → read the verdict → iterate
+```
+
+- **Verdicts are JSON, never prose.** Done-ness is an enumerable count over a suite of checks
+  (`passed/total`), not a narrated claim (doc 13 §1.2).
+- **Flake policy is retry-forbidden** (doc 13 §3.6). A check that passes on retry is a harness
+  defect — fix the determinism (seed time/data), never re-run to clear.
+- **Harness-first.** Write the harness (scope + checks) red first; turn it green with the
+  implementation. A new step type / schema / adapter ships its vectors first.
+
+## Commands
+
+| Command                                 | What it does                                              |
+| --------------------------------------- | --------------------------------------------------------- |
+| `pnpm install`                          | Install the TS workspace.                                 |
+| `pnpm build`                            | Build every workspace package.                            |
+| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.         |
+| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses). |
+| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).         |
+| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
+| `./core/gradlew -p core build`          | Build the Kotlin core.                                    |
+
+## Layout
+
+- `schemas/` — TypeSpec authoring; emitted JSON Schema in `schemas/generated/` is the contract of record.
+- `packages/cli/` — the `ichiflow` CLI and the verify harness engine.
+- `core/` — the Kotlin core (Gradle).
+- `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
+- `.ichiflow/resources.manifest.yaml` — version pins + named resources (doc 10 §2.5).
+
+## Rules
+
+- Never edit files under any `generated/` directory by hand — regenerate and commit (drift check gates this).
+- Add a new verify scope by registering it in `packages/cli/src/verify/registry.ts` with its checks.
+- Keep every dependency on the license allowlist (`tools/license-check/allowlist.json`).

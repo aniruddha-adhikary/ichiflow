@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ts:
+    name: TS edges — build · lint · test · verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: License allowlist gate (ADR-0016)
+        run: pnpm license:check
+
+      - name: Build (schemas + CLI)
+        run: pnpm build
+
+      - name: Schema drift check (regenerate-and-diff, doc 02 §4.3)
+        run: pnpm schema:drift
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: ichiflow verify — full loop (every registered scope green)
+        run: node packages/cli/dist/cli.js verify --json
+
+  core:
+    name: Kotlin core — build · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Gradle build
+        working-directory: core
+        run: ./gradlew build --console=plain --no-daemon

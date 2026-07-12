@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Resource.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Resource id, e.g. `run-verify`, `SeededAllocate`."
+        },
+        "kind": {
+            "$ref": "ResourceKind.json"
+        },
+        "path": {
+            "type": "string",
+            "description": "Repo-relative path to the resource's definition, if it has one."
+        },
+        "description": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "id",
+        "kind"
+    ],
+    "description": "A named, discoverable resource in the Workspace."
+}

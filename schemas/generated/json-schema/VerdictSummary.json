@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "VerdictSummary.json",
+    "type": "object",
+    "properties": {
+        "checks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "passed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "failed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "skipped": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        }
+    },
+    "required": [
+        "checks",
+        "passed",
+        "failed",
+        "skipped"
+    ],
+    "description": "Count summary across the scope's checks."
+}

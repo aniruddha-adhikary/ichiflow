@@ -1,0 +1,11 @@
+**/dist/**
+**/node_modules/**
+**/generated/**
+**/.ichiflow/ledger/**
+core/**/build/**
+docs/**
+archive/**
+LICENSE
+pnpm-lock.yaml
+core/gradlew
+core/gradlew.bat

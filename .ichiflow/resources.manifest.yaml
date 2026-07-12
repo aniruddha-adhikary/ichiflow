@@ -1,0 +1,38 @@
+# The resources manifest (doc 10 §2.5, BRIEF §12): version pins + named resources an agent may
+# reach for. Schema-validated against @ichiflow/schemas/resources-manifest by the agent-kit scope.
+version: "1"
+
+pins:
+  - id: node
+    version: "20"
+    note: TS-edge runtime; engine-strict in .npmrc.
+  - id: pnpm
+    version: "9.15.0"
+    note: Workspace package manager (packageManager field pins it).
+  - id: typespec
+    version: "0.62.0"
+    note: Schema authoring compiler + json-schema emitter (ADR-0006). Bump reruns schema drift.
+  - id: jdk
+    version: "17"
+    note: Kotlin core / future KIE embedding baseline (ADR-0007).
+  - id: gradle
+    version: "8.10.2"
+    note: Kotlin core build (wrapper pinned in core/gradle/wrapper).
+
+resources:
+  - id: run-verify
+    kind: skill
+    path: .claude/skills/run-verify/SKILL.md
+    description: Run ichiflow verify and read the JSON verdict.
+  - id: add-schema
+    kind: skill
+    path: .claude/skills/add-schema/SKILL.md
+    description: Author a canonical type in TypeSpec and regenerate.
+  - id: verdict-envelope
+    kind: schema
+    path: schemas/verdict.tsp
+    description: The verify verdict envelope contract (doc 13 §3.2).
+  - id: self-check
+    kind: harness
+    path: packages/cli/src/verify/scopes/self-check.ts
+    description: The meta-harness — the harness that judges harnesses.

@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Verdict.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "pass"
+        },
+        {
+            "type": "string",
+            "const": "fail"
+        }
+    ],
+    "description": "pass | fail — the only two verdicts a scope may emit."
+}

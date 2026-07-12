@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CoverageProgress.json",
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+        },
+        "threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+        },
+        "met": {
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "value",
+        "threshold",
+        "met"
+    ],
+    "description": "Coverage ratio against a declared threshold."
+}

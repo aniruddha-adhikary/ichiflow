@@ -1,0 +1,55 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "VerdictEnvelope.json",
+    "type": "object",
+    "properties": {
+        "verifyVersion": {
+            "type": "string",
+            "description": "Envelope schema version."
+        },
+        "scope": {
+            "type": "string",
+            "description": "The scope that produced this verdict (e.g. `self-check`, `schema-pipeline`)."
+        },
+        "ranAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 UTC timestamp of the run."
+        },
+        "seed": {
+            "type": "string",
+            "description": "Seed for deterministic time/data (§3.6); recorded so a run is reproducible."
+        },
+        "verdict": {
+            "$ref": "Verdict.json"
+        },
+        "summary": {
+            "$ref": "VerdictSummary.json"
+        },
+        "progress": {
+            "$ref": "Progress.json"
+        },
+        "checks": {
+            "type": "array",
+            "items": {
+                "$ref": "CheckResult.json"
+            }
+        },
+        "flaky": {
+            "type": "boolean",
+            "description": "Must always be false — a flaky check is a harness defect, not a retry (§3.6)."
+        }
+    },
+    "required": [
+        "verifyVersion",
+        "scope",
+        "ranAt",
+        "seed",
+        "verdict",
+        "summary",
+        "progress",
+        "checks",
+        "flaky"
+    ],
+    "description": "The verdict envelope emitted by every verify scope."
+}
