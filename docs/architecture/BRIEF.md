@@ -1,7 +1,12 @@
-# ichiflow Architecture Brief (shared context for all architecture docs)
+# ichiflow Architecture Brief (canonical quick-reference: locked decisions + core vocabulary)
 
-> Internal coordination document. Every architecture doc must be consistent with this brief.
-> Research inputs live in `docs/research/01..07`. Cite them by relative path where relevant.
+> This is the **canonical quick-reference** for ichiflow's design: the locked decisions, the core
+> vocabulary, the personas, and the doc conventions that the architecture docs (`00`–`13`) and the
+> ADRs are written against. Read it first if you want the decisions and the shared nouns without the
+> prose. It is referenced throughout the set (by section, e.g. "BRIEF §14") and every architecture
+> doc must stay consistent with it. The **normative record of each decision is its ADR**
+> ([`../adr/`](../adr/)); this brief is the fast index into them, not a substitute. Research inputs
+> live in [`../research/`](../research/) (`01`–`07`) — cite them by relative path where relevant.
 
 ## What ichiflow is
 
