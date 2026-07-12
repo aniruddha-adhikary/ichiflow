@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/ichiflow-hero.png" alt="ichiflow — AI-native enterprise workflows" width="100%">
+</p>
+
 # 🍓 ichiflow
 
 > No relation with Homebrew.
