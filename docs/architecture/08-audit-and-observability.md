@@ -314,9 +314,10 @@ For **BCBS 239 end-to-end data lineage** at the dataset/pipeline layer, ichiflow
 dataset was produced), the DecisionRecord covers *decision* lineage (why a Case resolved as it did).
 Together they satisfy the lineage principle regulators find hardest.
 
-**Phasing.** OpenLineage / BCBS 239 lineage is an **Enterprise compliance-pack** capability, not
-v1-core — it targets bank risk-data aggregation specifically. v1 ships the per-Case DecisionRecord
-causal chain (§1); the dataset/pipeline lineage layer switches on with the compliance pack.
+**Phasing.** OpenLineage / BCBS 239 lineage is a **compliance-profile** capability (an open-source,
+optional install; ADR-0022), not v1-core — it targets bank risk-data aggregation specifically. v1
+ships the per-Case DecisionRecord causal chain (§1); the dataset/pipeline lineage layer switches on
+with the compliance profile.
 
 ### 4.6 Obligation-breach and SLA-pause events are audit-first-class
 

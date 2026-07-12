@@ -27,8 +27,10 @@ must be supported from day one (research 05 §5).
 - **Tier ladder as config, not code rewrites** (research 06 §B.2): **Dev** (single binary, embedded
   SQLite, boots in seconds, no Docker for hello-world — the Temporal dev-server model) → **Team**
   (modular monolith on one Postgres, [0012](0012-postgresql-first-storage-spis.md)) → **Enterprise**
-  (split modules / HA / DMZ-intranet zones / SSO / compliance packs). The **same app code** runs across
-  tiers; enterprise capability is additive config/profiles + SPIs, never a forked programming model.
+  (split modules / HA / DMZ-intranet zones / SSO / the compliance profile — an OSS optional install,
+  [0022](0022-fully-open-source.md)). The **same app code** runs across tiers; tiers are technical
+  capability profiles, not commercial editions — enterprise capability is additive config/profiles +
+  SPIs, never a forked programming model or a paid gate.
 - **Zone separation supported from day one.** The Portal module and case/rules core module are deployable
   to different zones with only **async event/message contracts** between them (no synchronous RPC assuming
   a return path). This is the same seam that later enables a service split — zone separation and

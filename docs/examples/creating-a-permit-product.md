@@ -6,6 +6,16 @@
 > ([`../architecture/BRIEF.md`](../architecture/BRIEF.md) and `00`–`11`); where a reader wants the
 > normative depth behind a moment here, the prose links to the doc that owns it. Nothing here runs
 > yet — it is what building an **outdoor event permit** product should **look like** when v1 lands._
+>
+> _**This walkthrough is the CANONICAL reference product, not just an example.** ichiflow's
+> design-target first adopter is **government / public-sector casework** (permitting, licensing,
+> benefits, inspections), with regulated finance the adjacent second (BRIEF §16; ADR-0023). This permit
+> product is therefore the anchor the framework is designed toward, and it is the **(a)-clause of the v1
+> acceptance test**: v1 is accepted only when this product runs end-to-end on the real kernel
+> (schemas→decisions→flows→portal→audit→ichiflow-mcp debug) **and** a companion migration exercise —
+> mapping a generic legacy casework source in, re-expressing its rules as DecisionModels, decision-parity
+> testing on a golden dataset, and verifying the exit story — also passes (BRIEF §16; ADR-0017
+> amendment). **No real government system is named** anywhere here, by rule._
 
 The domain is a municipal **Outdoor Event Permit**: a resident or event company applies to hold an
 event in a public space. The city checks eligibility, computes a fee, and routes the application to

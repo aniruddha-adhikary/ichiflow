@@ -579,12 +579,15 @@ and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
 5. **"Why hidden" disclosure limits.** Surfacing the denial *reason* to end users can itself leak
    policy structure. Which reasons are user-facing vs. audit-only (and per-audience) is a policy
    question the PDP + Portal config must jointly answer.
-6. **Designer authoring surface — resolved (ADR-0019).** Designers do **not** hand-edit uischema JSON,
-   and there is **no visual inspector / drag-and-drop canvas** — an editable canvas is a non-goal. The
-   authoring surface is **AI chat**; uischema/viewschema is the compile target; the playground renders
-   a **read-only live preview** the designer judges (diff + preview). The UI/Design Copilot (doc 10 §7,
-   post-v1) drives the chat under the propose/approve guardrails; direct uischema editing remains a
-   developer path.
+6. **Designer authoring surface — resolved (ADR-0019, amended).** Designers do **not** hand-edit
+   uischema JSON, and there is **no visual inspector / drag-and-drop canvas** — an editable canvas is a
+   non-goal. The authoring surface is **AI chat** and the **playground is *the* designer surface**
+   (prompt-first, low-fi exploration against real schemas/mock data); uischema/viewschema is the compile
+   target; the playground renders a **read-only live preview** the designer judges (diff + preview).
+   **Figma is optional and bounded** — brand tokens/variables *in* (§11.1), rendered screens/specs *out*
+   for stakeholder review — with **no two-way hi-fi round-trip / Code-Connect-class bridge** (ADR-0019
+   amendment). The UI/Design Copilot (doc 10 §7, post-v1) drives the chat under the propose/approve
+   guardrails; direct uischema editing remains a developer path.
 7. **Scoped designer approval authority.** §12 defines a low-risk `contracts/ui` + `tokens` change
    class the framework can prove cannot break the contract. Whether a design lead may approve that
    class **without** engineering sign-off is an org/governance (trust/liability) decision for the

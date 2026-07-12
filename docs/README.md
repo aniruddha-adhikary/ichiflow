@@ -61,6 +61,13 @@ Full list with one-line summaries in [`adr/README.md`](adr/README.md).
 | [0014](adr/0014-map-first-migrate-last.md) | Map first, migrate last: three-ring brownfield model; decision parity testing; exit story. |
 | [0015](adr/0015-first-party-mcp-server-and-agent-kit.md) | First-party `ichiflow-mcp` server + in-repo agent kit; three server-enforced guardrail tiers. |
 | [0016](adr/0016-license-hygiene-policy.md) | License hygiene: Apache-2.0/MIT substrate preference; the avoid-list and CI allowlist. |
+| [0017](adr/0017-v1-kernel-and-governance-dial.md) | The v1 kernel cut + governance-level dial; single-org per deployment; v1 acceptance = reference product end-to-end + migration in/out. |
+| [0018](adr/0018-domain-entity-store.md) | Domain entity store: schema-defined entities, PostgreSQL-first generated repositories; CRUD+outbox not event-sourced. |
+| [0019](adr/0019-ai-chat-first-authoring.md) | AI-chat-first authoring for all personas; live preview to judge; no visual-builder canvases; designer flow prompt-first, Figma optional. |
+| [0020](adr/0020-prod-access-posture-dial.md) | Production-access posture is a configurable dial; ichiflow ships the mediation layers (why API, ops console, MCP tiers, env promotion, loud/logged break-glass). |
+| [0021](adr/0021-reporting-via-oss-bi.md) | Reporting = embed proven OSS BI over governed read models; SSO via broker + row/field security via the same PDP; no custom report engine. |
+| [0022](adr/0022-fully-open-source.md) | ichiflow is fully open source (Apache-2.0/MIT), all of it; tiers are technical capability profiles, not commercial editions; monetize services not features. |
+| [0023](adr/0023-public-sector-first.md) | Design-target first adopter is government / public sector; regulated finance is the adjacent second; permit walkthrough is the canonical reference product. |
 
 ## Research inputs (read-only)
 

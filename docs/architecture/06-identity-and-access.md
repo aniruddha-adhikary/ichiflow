@@ -418,7 +418,8 @@ write-through tuple sync of §2.1.
 serves **one organization**; hosted multi-tenant (many orgs on one deployment) is a **later** capability.
 Critically, the **seams are designed in now** so that later step is not a rework: **`tenant_id`
 discipline** is present in schemas and persistence (every resource already carries a `tenant`
-relationship, §2.2, and every store stamps it, `12-`/§4), **per-Portal IdP isolation** is already
+relationship, §2.2, and every store stamps it alongside `case_id` —
+[`09-deployment-and-topology.md`](09-deployment-and-topology.md) §5.3), **per-Portal IdP isolation** is already
 by-construction (realm/Organization per audience, §1.1), and **entitlement scoping** already roots every
 tuple under a tenant. In v1 the `tenant` field resolves to the single deployment's org (and to
 B2B2C *partner* sub-populations within it); the machinery to route *many* orgs through one deployment is

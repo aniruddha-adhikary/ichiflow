@@ -1,9 +1,9 @@
 # 0019 — AI-chat-first authoring; live preview to judge; no visual-builder canvases
 
-- Status: accepted
+- Status: accepted (amended 2026-07-12)
 - Date: 2026-07-12
 - Deciders: ichiflow architecture
-- Basis: design review 2026-07 (designer-experience and declarative-boundary critiques)
+- Basis: design review 2026-07 (designer-experience and declarative-boundary critiques); founder interview 2026-07 (prompt-first designer flow, Figma optional)
 - Research: [../research/03-schema-and-types.md](../research/03-schema-and-types.md), [../research/07-ai-native-operations.md](../research/07-ai-native-operations.md)
 
 ## Context
@@ -39,6 +39,18 @@ with live rendered screens where uischema is a compile target, not a canvas
 ([07](../architecture/07-ui-and-portals.md) §11). It is the same "AI proposes; deterministic tools +
 humans dispose" contract the Copilots ([10](../architecture/10-ai-native-experience.md) §7) are built
 on, stated as the v1 interaction pattern.
+
+## Amendment (2026-07-12) — designer flow is prompt-first; Figma optional (no hi-fi round-trip)
+
+Refining (not contradicting) this doctrine for the **designer** persona: the **chat + live-preview
+playground ([07](../architecture/07-ui-and-portals.md) §11.3) is *the* designer surface** — prompt-first,
+rapid low-fi exploration against real schemas and mock data. **Figma is optional and bounded to two
+seams:** (a) importing brand **tokens/variables *in*** through the DTCG pipeline
+([07](../architecture/07-ui-and-portals.md) §11.1), and (b) exporting **rendered screens/specs *out***
+for stakeholder review. There is **no two-way hi-fi round-trip and no Code-Connect-class bridge** that
+would make a Figma frame a second editable representation of a uischema — that is exactly the
+round-trip-sync drift this ADR rejects. The canonical artifact remains the uischema/pageschema,
+AI-authored via chat and judged in the playground.
 
 ## Alternatives considered
 
