@@ -344,8 +344,8 @@ steps:
 ### 4.1 Issuing the ballot-result notice via `issue-document`
 
 The ballot result reaches the applicant as a **Document** rendered from a governed **doctemplate** via
-the **`issue-document`** operation (the Document/doctemplate/issue-document vocabulary owned by the
-sibling document-layer design). The notice is *not* free text — it renders coded outcomes (queue
+the **`issue-document`** operation (the Document/doctemplate/issue-document vocabulary, now
+normatively owned by [ADR-0029](../../adr/0029-document-issuance.md) / [04 §2.9](../../architecture/04-flow-and-case-layer.md) / [07 §15](../../architecture/07-ui-and-portals.md)). The notice is *not* free text — it renders coded outcomes (queue
 position, or "unsuccessful this exercise" with a coded reason) and, for the unsuccessful, the coded
 consequence (e.g. does a 2BC accrue). Because it is an `issue-document`, the emitted Document is
 **recorded in the DecisionRecord** and reproducible as-of the issue instant, so "what were they told,
