@@ -1,41 +1,37 @@
 # Design-validation case study — a competitive R&D grant program (multi-stage, panel-reviewed)
 
 > _**Genre note — this is a design-VALIDATION case study, not the reference product and not a shipped
-> template.** It models a **competitive research-and-innovation grant program** run by a granting agency,
-> to stress ichiflow against dimensions no sibling covers: a **multi-stage lifecycle over months**
-> (eligibility → detailed application → panel review → conditional award → offer acceptance → disbursement
-> claims → acquittal/audit → clawback), **genuine multi-authority scoring** across independent panel
-> reviewers, **several organizations on one deployment** (agency departments + external reviewers from
-> universities/industry as partner-org Teams + applicant orgs), and a **capped round budget consumed by
-> awards**._
+> template.** It models a **competitive research-and-innovation grant program** to stress ichiflow against
+> dimensions no sibling covers: a **multi-stage lifecycle over months** (eligibility → detailed application
+> → panel review → conditional award → offer acceptance → disbursement claims → acquittal/audit → clawback),
+> **genuine multi-authority scoring** across independent panel reviewers, **several organizations on one
+> deployment** (agency departments + external university/industry reviewers as partner-org Teams + applicant
+> orgs), and a **capped round budget consumed by awards**._
 >
-> _**Grounding.** Following the `BRIEF.md` §16 rule that **no real government system is named in shipped
-> product**, the agency and program here are **fictional** — the **National Research & Innovation Agency
-> ("the Agency")** running the **Frontier R&D Grant ("FRDG")**. But every mechanic is **grounded in one
-> real, deeply-published program family — the EU's Horizon Europe** — and cited inline: the three-criterion
-> 0–5 expert scoring with per-criterion thresholds, the independent-evaluator **conflict-of-interest**
-> rules, the funding-rate structure, the **pre-financing → interim → final** payment circuit with
-> retention and recovery, and the central **legal-entity validation** service. This mirrors the
-> [insurance case study](./motor-insurance-claim.md)'s posture (fictional insurer, real published GIA/BOLA
-> frameworks): the domain facts are checkable against public rules, but nothing here ships as an ichiflow
-> product or onboarding template — the canonical reference product stays the fictional municipal
-> [permit](../creating-a-permit-product.md). The document exists to find gaps, and it does
-> ([Gaps](#gaps-honest-account))._
+> _**Grounding.** Per the `BRIEF.md` §16 rule that **no real government system is named in shipped product**,
+> the agency and program are **fictional** — the **National Research & Innovation Agency ("the Agency")**
+> running the **Frontier R&D Grant ("FRDG")** — but every mechanic is **grounded in one real, deeply-published
+> program family, the EU's Horizon Europe**, cited inline: three-criterion 0–5 expert scoring with
+> thresholds, independent-evaluator **conflict-of-interest** rules, the funding-rate structure, the
+> **pre-financing → interim → final** payment circuit, and central **legal-entity validation**. This mirrors
+> the [insurance case](./motor-insurance-claim.md)'s posture (fictional insurer, real published GIA/BOLA):
+> checkable against public rules, but nothing here ships as a product or template — the canonical reference
+> product stays the fictional municipal [permit](../creating-a-permit-product.md)._
 >
-> _All artifacts are written to be consistent with [`../../architecture/BRIEF.md`](../../architecture/BRIEF.md)
-> and docs `00`–`13`. The **Document / doctemplate / issue-document** nouns are the capability a sibling
-> design is specifying; they are used here as settled vocabulary. Domain figures are grounded as of
-> **July 2026** and cited; where a value is illustrative the **shape** is what is load-bearing._
+> _Artifacts are consistent with [`../../architecture/BRIEF.md`](../../architecture/BRIEF.md) and docs
+> `00`–`13`. The **Document / doctemplate / issue-document** nouns (a sibling design) are used as settled
+> vocabulary. Figures are grounded as of **July 2026** and cited; where illustrative, the **shape** is
+> load-bearing._
 
 ---
 
 ## 1. Why this domain, and what it stresses
 
-The permit walkthrough and the work-pass case are **single-decision, single-authority** shapes: one
-applicant, one determination, one issuance. A competitive grant is a different animal — a **months-long,
-multi-party lifecycle** where the decision is *made by a panel*, the *money is finite*, and the Case keeps
-living long after the award (claims, audits, clawback). It breaks assumptions the siblings never test, and
-it does so along dimensions each sibling deliberately left to this one:
+The permit and work-pass cases are **single-decision, single-authority** shapes: one applicant, one
+determination, one issuance. A competitive grant is a different animal — a **months-long, multi-party
+lifecycle** where the decision is *made by a panel*, the *money is finite*, and the Case lives long after the
+award (claims, audits, clawback). It breaks assumptions the siblings never test, along dimensions each
+sibling deliberately left to this one:
 
 | # | Dimension | What a grant program forces | Sibling that punted it here |
 |---|---|---|---|
@@ -69,9 +65,8 @@ Grounding facts used below (checkable against public Horizon Europe rules):
 ### 2.1 Schemas — the application, the org graph, the reviewer, the claim
 
 The application is one canonical Schema (TypeSpec-authored; [doc 02 §1](../../architecture/02-schema-foundation.md)).
-Three sub-shapes matter: the **applicant org** (which the registry validation and the COI check read), the
-**work-plan with milestones** (which become tracked Conditions), and the **budget** (which the funding-rate
-CodeSet and the pool read).
+Three sub-shapes matter: the **applicant org** (read by registry validation + the COI check), the **work-plan
+with milestones** (which become tracked Conditions), and the **budget** (read by the funding-rate CodeSet + pool).
 
 ```typespec
 // contracts/src/frdg.tsp
@@ -112,9 +107,9 @@ enum ActivityType { research: "RESEARCH", innovation: "INNOVATION", support: "SU
 enum ClaimType { preFinancing: "PRE_FINANCING", interim: "INTERIM", final: "FINAL" }
 ```
 
-Field-level provenance rides on the Case (attesting party per field; [doc 08 §1](../../architecture/08-audit-and-observability.md)):
-the applicant attests `workPlan`/`requestedBudget`, the registry validation attests `applicantOrg.pic`
-status, and each reviewer attests exactly their own IER — which keeps the multi-authority audit (D2) honest.
+Field-level provenance rides on the Case ([doc 08 §1](../../architecture/08-audit-and-observability.md)): the
+applicant attests `workPlan`/`requestedBudget`, registry validation attests `applicantOrg.pic` status, and
+each reviewer attests exactly their own IER — keeping the multi-authority audit (D2) honest.
 
 ### 2.2 CodeSets — the effective-dated dependency graph, with owning Teams
 
@@ -127,7 +122,7 @@ condition → clawback trigger — with publish-time referential integrity ([doc
 # codesets/eligible-sectors.yaml (owner: programme-policy; effective: {from: 2026-07-01} — the Round-2 line)
 rows:
   - sector: ADVANCED_MFG   activityTypes: [RESEARCH, INNOVATION]   codeRef: { funding-rates: "by activityType" }
-  - sector: CLEAN_ENERGY   activityTypes: [RESEARCH, INNOVATION, SUPPORT]
+  - sector: CLEAN_ENERGY   activityTypes: [RESEARCH, INNOVATION, SUPPORT]   # + HEALTH_TECH, etc.
 ---
 # codesets/funding-rates.yaml (owner: programme-finance; HIGH governance — money) — grounded in HE rates[^he-rates]
 rows:
@@ -179,8 +174,7 @@ edit — and because it is **effective-dated per round**, Round 3's rates can me
 
 ### 2.3 DecisionModels — eligibility, COI-assignment, per-reviewer scoring, panel composition, award
 
-Five DecisionModels, all authored as **decision source** (the LLM-friendly projection over full DMN 1.6;
-[doc 03 §2.6](../../architecture/03-decision-layer.md#26-the-decision-source--an-llm-friendly-authoring-projection-over-the-full-dmn-16-surface)).
+Five DecisionModels, all authored as **decision source** (the LLM-friendly full-DMN-1.6 projection; [doc 03 §2.6](../../architecture/03-decision-layer.md#26-the-decision-source--an-llm-friendly-authoring-projection-over-the-full-dmn-16-surface)).
 
 **(a) Eligibility — AI-assisted, competent-authority-validated (D6).** A DMN decision reads the validated
 org facts, sector eligibility, and budget ceiling and emits a canonical `Outcome`. Where the proposal text
@@ -201,12 +195,11 @@ decision of record; the officer's confirmation is, both on the audit spine attri
 ```
 
 **(b) COI reviewer-assignment — a Decision over Team/org relations (D3).** Which reviewers may score an
-application is a **routing Decision** (assignment routing is itself a Decision,
-[doc 04 §5.3](../../architecture/04-flow-and-case-layer.md)) — but its *inputs* are **relationships in the
-OpenFGA Team graph**, and a Decision is a pure evaluation over schema'd inputs, not a graph-walker. So the
-same seam the ballot used for its household graph applies ([its G3](./public-housing-ballot.md#g3--eligibility-over-a-householdentity-graph--minor)):
-a **`compute` feature-function** resolves the reviewer↔applicant relationship into typed COI facts, and the
-Decision keys on them.
+application is a **routing Decision** ([doc 04 §5.3](../../architecture/04-flow-and-case-layer.md)) — but its
+*inputs* are **relationships in the OpenFGA Team graph**, and a Decision is a pure evaluation over schema'd
+inputs, not a graph-walker. So the same seam the ballot used for its household graph applies
+([its G3](./public-housing-ballot.md#g3--eligibility-over-a-householdentity-graph--minor)): a **`compute`
+feature-function** resolves the reviewer↔applicant relationship into typed COI facts the Decision keys on.
 
 ```text
 # compute feature-function  ref: kt://frdg/CoiResolver@1.0.0  — reads OpenFGA (reviewer's partner-org Team vs
@@ -243,9 +236,8 @@ outcome: Outcome{
 
 **(d) Panel composition — a genuine `CompositeOutcome` across N authorities (D2, second half).** *Now* the
 composite is the right tool, because the members are **N independent reviewers = N authorities**
-([doc 03 §2.3](../../architecture/03-decision-layer.md#23-composite-decisions-multiple-authorities-one-compositeoutcome)).
-The case exercises **three** composition policies beyond `all-must-approve`, each mapped to a real panel
-mechanic:
+([doc 03 §2.3](../../architecture/03-decision-layer.md#23-composite-decisions-multiple-authorities-one-compositeoutcome)) —
+the case exercises **three** composition policies beyond `all-must-approve`, each mapped to a real panel mechanic:
 
 | Policy | Where it applies | Panel mechanic |
 |---|---|---|
@@ -274,8 +266,7 @@ so "which expert scored what, and how the panel composed it" is fully reconstruc
 *provisional* award, gated by the **budget pool** (§2.4) and, above a threshold, a **second approver**. The
 four-eyes threshold is **not** hard-coded — the `award-approval` decision-source keys on
 `approval-thresholds@2026.2.0`: `grantAmount > FOUR_EYES_AWARD.amount → two-approver (assessor ≠ approver1 ≠
-approver2)`, otherwise `single-approver`. Change the threshold and the control surface moves with it, under
-`programme-finance` governance — no Flow edit.
+approver2)`, else `single-approver`. Change the threshold and the control surface moves with it — no Flow edit.
 
 ### 2.4 The budget pool — a `QuotaLedger`, confirming the ballot's G2 (D4)
 
@@ -297,22 +288,19 @@ operations:
   release: { on: offer-declined | offer-lapsed | clawback-recovered | claim-underspend }
 ```
 
-Two mechanics differ from a permit fee pool and even from the ballot. **(1) Monetary, not integer:** the
-pool consumes **variable grant amounts**, so "does the next ranked award fit?" is `capacity − committed −
-reserved ≥ grantAmount`, not `headroom ≥ 1`. **(2) A ranked draw against the line is a cohort/set-level
+Two mechanics differ from a permit fee pool and even the ballot. **(1) Monetary, not integer:** the pool
+consumes **variable grant amounts**, so "does the next ranked award fit?" is `capacity − committed − reserved
+≥ grantAmount`, not `headroom ≥ 1`. **(2) A ranked draw against the line is a cohort/set-level
 operation:** the round **ranks** every scored application (weighted, §2.3d) and **draws down the pool in rank
 order** until the budget is exhausted; the rest fall **below the funding line** onto a **reserve list**
-(`BELOW_BUDGET_LINE`, distinct from a quality failure). That ranking-against-a-capped-line is precisely the
-**cohort barrier + cohort-scoped DecisionRecord** the
-[ballot flagged as G4](./public-housing-ballot.md#g4--cohort--set-level-decisioning-and-a-cohort-level-decisionrecord--blocking) —
-the funding line belongs to the *round*, not any one application — so this case **confirms G4 too**.
+(`BELOW_BUDGET_LINE`, distinct from a quality failure) — precisely the **cohort barrier + cohort-scoped
+DecisionRecord** the [ballot flagged as G4](./public-housing-ballot.md#g4--cohort--set-level-decisioning-and-a-cohort-level-decisionrecord--blocking)
+(the funding line belongs to the *round*), so this case **confirms G4 too**.
 
 ### 2.5 The staged Flow — a multi-stage lifecycle with sub-flows (D1)
 
-One application is **one Case** flowing through a **staged root Flow**; each stage delegates to a sub-flow.
-Registry validation and disbursement are **`external-task`** delegations
-([doc 04 §2.8](../../architecture/04-flow-and-case-layer.md#28-the-external-task-delegation-step--offload-work-to-an-external-system));
-RFIs **clock-stop** the SLA ([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md)); lateness **escalates**.
+One application is **one Case** flowing through a **staged root Flow**, each stage a sub-flow. Registry
+validation and disbursement are **`external-task`** delegations ([doc 04 §2.8](../../architecture/04-flow-and-case-layer.md#28-the-external-task-delegation-step--offload-work-to-an-external-system)); RFIs **clock-stop** the SLA; lateness **escalates**.
 
 ```yaml
 # flows/frdg.flow.yaml  (authored-in: yaml; canonical Flow JSON is the executed artifact — doc 04 §2.5)
@@ -375,23 +363,21 @@ steps:
   - { id: acquittal, type: human-task, subState: awaiting-applicant }        # final acquittal report; CLOCK-STOPS[^acquittal]
   - id: audit, type: human-task, assignBy: assign-auditor@1.0.0             # independent audit; can re-open (D6)
   - { id: release-retention, type: external-task, when: "audit.clean" }      # 10% retention on clean acquittal[^he-pay]
-  # ── Stage 7 — Breach → clawback → revocation reachable from Conditions (§2.7, Trace C) ────────
+  # Stage 7 — Breach → clawback → revocation is reachable from Conditions (§2.7, Trace C)
 ```
 
 The **clock-stop discipline** is the D1 signature: every `awaiting-applicant` sub-state (full application,
-acceptance, claim intake, RFI, acquittal) **pauses the Agency's SLA** and is recorded distinctly
-([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md)), so months of applicant wait never count against
-the processing budget — while the **`external-task` SLAs** (registry, finance) deliberately measure the
-*external system's own turnaround* and escalate on it ([doc 04 §5.8](../../architecture/04-flow-and-case-layer.md)).
-Transport under each is pluggable (HTTP/MQ in v1, SFTP round-trip post-v1;
-[doc 05 §11](../../architecture/05-adapters.md), ADR-0028) — relevant since finance/registry integrations here
-are frequently batch/file-based.
+acceptance, claim intake, RFI, acquittal) **pauses the Agency's SLA** ([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md)),
+so months of applicant wait never count against the processing budget — while the **`external-task` SLAs**
+(registry, finance) deliberately measure the *external system's turnaround* and escalate on it (§5.8).
+Transport under each is pluggable (HTTP/MQ v1, SFTP round-trip post-v1; [doc 05 §11](../../architecture/05-adapters.md),
+ADR-0028) — finance/registry integrations here are frequently batch/file-based.
 
 ### 2.6 doctemplates and issuance — the Letter of Offer, its variation, the revocation notice (D5)
 
-Issuance is **`issue-document`** binding a **doctemplate** to Case data + the DecisionRecord, producing a
-governed **Document**. The **Letter of Offer** is the hardest issuance test because **the issued Document
-participates in flow control** — it must be *accepted* before the award activates.
+Issuance is **`issue-document`** binding a **doctemplate** to Case data + the DecisionRecord. The **Letter of
+Offer** is the hardest issuance test because **the issued Document participates in flow control** — it must be
+*accepted* before the award activates.
 
 ```yaml
 # doctemplates/letter-of-offer.doctemplate.yaml
@@ -416,19 +402,18 @@ copyset: frdg-copy@1.0.0
 ```
 
 The Letter of Offer's **acceptance semantics** are load-bearing: `issue-loo` emits the Document `issued`;
-`await-acceptance` blocks on the applicant's counter-signature (an idempotent correlated signal); acceptance
+`await-acceptance` blocks on the applicant's counter-signature (idempotent correlated signal); acceptance
 transitions it to `accepted` **and only then** does `activate-award` `commit()` the reservation and start
 disbursement — grounded in "grant enters into force on signature."[^he-pay] A **variation** (amend,
 [doc 04 §5.6](../../architecture/04-flow-and-case-layer.md)) produces a **v2** via `award-variation`,
 superseding v1 with DecisionRecord continuity; a **clawback** issues a **revocation notice**. All three are
-**issued Documents recorded in the DecisionRecord** — so "what were they offered, what did they accept, what
-was revoked and why" is reproducible as-of each issue instant.
+**issued Documents recorded in the DecisionRecord**, reproducible as-of each issue instant.
 
 ### 2.7 Conditions — milestone obligations, breach, and the clawback branch
 
 The panel's `conditional-approve` carries **Conditions** ([doc 04 §5.5](../../architecture/04-flow-and-case-layer.md)):
-milestone obligations are **`post-approval-obligation`** with **deadlines**, tracked *after* the Case's
-substantive decision, each linked by `codeRef` to the clawback reason its breach triggers.
+milestone obligations are **`post-approval-obligation`** with **deadlines**, tracked *after* the substantive
+decision, each linked by `codeRef` to the clawback reason its breach triggers.
 
 ```yaml
 # Conditions on the award Outcome (canonical shapes from doc 02 §9.3)
@@ -444,22 +429,21 @@ event ([doc 08 §4.6](../../architecture/08-audit-and-observability.md)), and op
 remediation Case that computes the recoverable amount, **releases the un-disbursed reservation back to the
 pool**, recovers disbursed funds as a debt, and **issues the revocation notice** (§2.6). Because the breach
 is a first-class audit event and the obligation outlived Case closure, "why was this grant clawed back, and
-what returned to the round" is answerable through the why API.
+what returned to the round" is answerable via the why API.
 
 ---
 
 ## 3. Multiple organizations on one deployment (D3)
 
-One deployment, **one org** (BRIEF §11), but structured into **Teams** — departments, and **partner
-organizations** whose reviewers federate through a partner IdP
-([doc 06 Part 4](../../architecture/06-identity-and-access.md), §1.5). Three **Portals**
-([doc 07 §5](../../architecture/07-ui-and-portals.md)), each with its own IdP config and entitlements:
+One deployment, **one org** (BRIEF §11), structured into **Teams** — departments and **partner organizations**
+whose reviewers federate through a partner IdP ([doc 06 Part 4](../../architecture/06-identity-and-access.md), §1.5).
+Three **Portals** ([doc 07 §5](../../architecture/07-ui-and-portals.md)), each with its own IdP + entitlements:
 
 ```text
 CUSTOMER PORTAL (applicant orgs)      PARTNER PORTAL (external reviewers)     BACK-OFFICE PORTAL (Agency staff)
   • file GrantApplication               • reviewers from univ-* / industry-*    • programme-policy: eligibility, award
   • accept the Letter of Offer          • see ONLY assigned, non-conflicted      • programme-finance: claims, disburse, pool
-  • submit Claims, acquittal              applications (list-filtering, §below)   • panel-secretariat: moderate consensus
+  • submit Claims, acquittal              applications (list-filtered, below)     • panel-secretariat: moderate consensus
   • see own Case only                   • submit their IER only                  • programme-audit: read-ALL, can re-open
 ```
 
@@ -581,8 +565,7 @@ Offer. The release-back is where D4's residual strains live ([Gap G3](#g3--budge
 | **Audit team can re-open** | `programme-audit` Team has **read-all**; acquittal audit can re-open a closed Case (§2.5) | re-open event + auditor identity |
 | **Budget-pool integrity** | `QuotaLedger` `reserve`/`commit`/`release` with `committed ≤ capacity` invariant; ranked draw at the funding line (§2.4) | ledger deltas + cohort ranking record (ballot G2/G4) |
 | **Issuance / acceptance** | Letter of Offer is a **stateful Document**; award activates **only on acceptance**; variation → v2; clawback → revocation Document (D5) | Document lifecycle transitions recorded as-of each issue |
-| **Effective-dated rules / RFI wait** | funding-rates / scoring-criteria pinned **per round**; `awaiting-applicant` clock-stops exclude applicant/RFI wait ([doc 04 §5.7](../../architecture/04-flow-and-case-layer.md)) | pinned `codeSet@version` + distinct clock-stop events |
-| **Rule-change governance** | funding-rate/criteria change = approval Case routed to owning-Team stewards; deprecation → impact analysis ([doc 03 §5.8](../../architecture/03-decision-layer.md)) | approval-Flow + impact set on the spine |
+| **Effective-dating & rule-change governance** | funding-rates / scoring-criteria pinned **per round**; `awaiting-applicant` clock-stops exclude RFI wait; a rate change = approval Case routed to owning-Team stewards, deprecation → impact analysis ([doc 03 §5.7–§5.8](../../architecture/03-decision-layer.md)) | pinned `codeSet@version` + clock-stops + approval-Flow on the spine |
 
 ---
 
@@ -609,7 +592,7 @@ applications share a double-funding constraint" or "this org is over its active-
 ### G2 — Multi-authority scoring: `CompositeOutcome` works, but two seams strain — **MINOR**
 
 This case is the design's **first correct exercise of `CompositeOutcome`** (D2), and it **holds** — N
-reviewers *are* N authorities, and quorum/weighted/custom compose them properly, honoring
+reviewers *are* N authorities, quorum/weighted/custom compose them properly, honoring
 [work-pass GAP #2](./work-pass-compass.md#gaps)'s line that single-authority scoring is a DRD. Two strains:
 
 1. **Nested composition is real but unnamed.** Each member Outcome is *itself* a DRD score (§2.3c) and the
@@ -687,8 +670,7 @@ not a technical gap.
 
 ---
 
-<!-- Sources — EU Horizon Europe and grant-administration references (accessed July 2026) -->
-
+<!-- Sources — Horizon Europe + grant-administration references (accessed July 2026) -->
 [^he-eval]: European Commission, Horizon Europe proposal evaluation — three award criteria (Excellence,
     Impact, Quality & Efficiency of Implementation), each 0–5 (half-point), per-criterion threshold 3/5 and
     overall 10/15, no compensation; 3–4 independent experts write Individual Evaluation Reports then agree
