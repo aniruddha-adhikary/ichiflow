@@ -1,6 +1,9 @@
 **/dist/**
 **/node_modules/**
 **/generated/**
+# The released contract baseline is a verbatim copy of the emitted OpenAPI (via `pnpm
+# contract:accept`); it must stay byte-identical to `generated/`, so exempt it from formatting too.
+schemas/contract/**
 **/.ichiflow/ledger/**
 core/**/build/**
 docs/**

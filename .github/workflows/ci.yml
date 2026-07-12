@@ -31,6 +31,16 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # oasdiff (pinned in .ichiflow/resources.manifest.yaml) powers the contract-gate scope.
+      - name: Install oasdiff (breaking-change detector, chunk 1.4a)
+        run: |
+          OASDIFF_VERSION=1.21.0
+          curl -fsSL -o /tmp/oasdiff.tar.gz \
+            "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/oasdiff.tar.gz -C /tmp oasdiff
+          sudo install /tmp/oasdiff /usr/local/bin/oasdiff
+          oasdiff --version
+
       - run: pnpm install --frozen-lockfile
 
       - name: License allowlist gate (ADR-0016)
@@ -56,6 +66,9 @@ jobs:
 
       - name: Fidelity spike — JVM (networknt) verdicts
         run: pnpm spike:jvm
+
+      - name: Contract breaking-change diff (oasdiff, chunk 1.4a)
+        run: pnpm contract:diff
 
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json

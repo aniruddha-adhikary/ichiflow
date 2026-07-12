@@ -3,6 +3,7 @@ import { selfCheckScope } from "./scopes/self-check.js";
 import { agentKitScope } from "./scopes/agent-kit.js";
 import { schemaFidelitySpikeScope } from "./scopes/schema-fidelity-spike.js";
 import { schemaPipelineScope } from "./scopes/schema-pipeline.js";
+import { contractGateScope } from "./scopes/contract-gate.js";
 
 /**
  * The scope registry — the harness catalog (doc 13 §2) as it comes online phase by phase.
@@ -13,6 +14,7 @@ const SCOPES: Scope[] = [
   agentKitScope,
   schemaFidelitySpikeScope,
   schemaPipelineScope,
+  contractGateScope,
 ];
 
 export function allScopes(): Scope[] {

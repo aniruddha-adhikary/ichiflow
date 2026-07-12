@@ -18,6 +18,8 @@
     "format:write": "prettier --write \"**/*.{ts,tsx,json,md,yaml,yml}\"",
     "schema:build": "pnpm --filter @ichiflow/schemas build",
     "schema:drift": "pnpm --filter @ichiflow/schemas drift",
+    "contract:diff": "node schemas/scripts/contract-diff.mjs",
+    "contract:accept": "node schemas/scripts/contract-accept.mjs",
     "license:check": "node tools/license-check/index.mjs",
     "spike:jvm": "cd core && ./gradlew -q runSpike",
     "verify": "node packages/cli/dist/cli.js verify"
