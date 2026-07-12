@@ -8,6 +8,7 @@ import { deriveSeed, pass } from "../src/verify/check.js";
 import { runScope, runVerify } from "../src/verify/runner.js";
 import { selfCheckScope } from "../src/verify/scopes/self-check.js";
 import { schemaFidelitySpikeScope } from "../src/verify/scopes/schema-fidelity-spike.js";
+import { schemaPipelineScope } from "../src/verify/scopes/schema-pipeline.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -66,6 +67,15 @@ describe("schema-fidelity-spike (Ajv side)", () => {
     expect(tsChecks.length).toBeGreaterThanOrEqual(20);
     const tsFailures = tsChecks.filter((c) => c.status !== "pass");
     expect(tsFailures).toEqual([]);
+  });
+});
+
+describe("schema-pipeline", () => {
+  it("passes on the committed OpenAPI 3.1 + JSON Schema artifacts", async () => {
+    const checks = await schemaPipelineScope.run({ repoRoot, seed: deriveSeed("pipeline") });
+    const failures = checks.filter((c) => c.status !== "pass");
+    expect(failures).toEqual([]);
+    expect(checks.some((c) => c.id === "schema-pipeline.openapi.version-3.1")).toBe(true);
   });
 });
 

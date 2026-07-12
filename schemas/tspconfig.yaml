@@ -1,7 +1,13 @@
 emit:
   - "@typespec/json-schema"
+  - "@typespec/openapi3"
 options:
   "@typespec/json-schema":
     emitter-output-dir: "{project-root}/generated/json-schema"
     file-type: "json"
     int64-strategy: "number"
+  "@typespec/openapi3":
+    emitter-output-dir: "{project-root}/generated/openapi3"
+    file-type: "yaml"
+    openapi-versions:
+      - "3.1.0"

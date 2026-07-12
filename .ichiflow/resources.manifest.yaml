@@ -10,8 +10,8 @@ pins:
     version: "9.15.0"
     note: Workspace package manager (packageManager field pins it).
   - id: typespec
-    version: "0.62.0"
-    note: Schema authoring compiler + json-schema emitter (ADR-0006). Bump reruns schema drift.
+    version: "0.67.0"
+    note: Schema authoring compiler + json-schema/openapi3 emitters (ADR-0006). Bump reruns schema drift.
   - id: jdk
     version: "17"
     note: Kotlin core / future KIE embedding baseline (ADR-0007).
@@ -43,3 +43,11 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/schema-fidelity-spike.ts
     description: Cross-language JSON Schema fidelity — Ajv (TS) vs networknt (JVM) must agree.
+  - id: schema-pipeline
+    kind: harness
+    path: packages/cli/src/verify/scopes/schema-pipeline.ts
+    description: Emitted contract artifacts (OpenAPI 3.1 + JSON Schema 2020-12) exist and are well-formed.
+  - id: verify-api
+    kind: schema
+    path: schemas/service.tsp
+    description: The verify status API surface (TypeSpec → OpenAPI 3.1).
