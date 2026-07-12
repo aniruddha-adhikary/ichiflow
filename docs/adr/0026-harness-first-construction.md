@@ -99,6 +99,10 @@ Negative / costs:
 ## References
 
 - Founder ask 2026-07: deterministic harness loops for whether/what/how-much/correctness.
+- The decision-layer harness set is elaborated for the default engine (Drools/Apache KIE) in
+  [13](../architecture/13-agent-harness-loops.md) §2.b — DMN-TCK (pinned TCK + KIE version),
+  FEEL-semantics vectors, DRL/rule-unit + CEP harnesses, and the green-gated engine-upgrade harness —
+  paired with the pinned `resources` manifest ([10](../architecture/10-ai-native-experience.md) §2.5).
 - Related: [0002](0002-pluggable-decision-engine-spi-drools-default.md) (engine SPI — now with a
   shipped conformance suite), [0004](0004-declarative-flow-dsl-on-temporal.md) (interpreter
   determinism/replay), [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md)

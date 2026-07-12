@@ -121,10 +121,14 @@ guaranteed automation · MCP = external services · Plugin = the packaging unit.
 | **`.claude/hooks/*`** | Hooks | **guaranteed guardrails**: block edits to generated/audit code, run **regenerate-and-diff** + schema-validation + `ichiflow verify` on stop, enforce **repro-before-fix** | Hooks are the *only* layer with guaranteed execution — the place for "must/never/always" |
 | **ichiflow plugin** (+ marketplace) | Plugin | bundles skills + subagents + hooks + the `ichiflow-mcp` server config into one namespaced installable (`/ichiflow:debug-case`) | One install wires up the whole agent surface incl. the runtime MCP server |
 | **SessionStart hook + `ichiflow verify` skill** | Hooks/Skills | ensure a fresh session can build, run tests, launch the dev server | Productive in minute one (esp. Claude Code on the web / CI) |
+| **`resources` manifest** (`resources/`) | Pinned reference pointers | a schema'd, versioned topic→authoritative-reference map (§2.5), **pinned to the dependency version in use** (Drools/Apache KIE, Temporal, OpenFGA, adapters); skills consult it before non-trivial authoring; air-gapped installs resolve to vendored copies | Give agents version-matched authoritative refs instead of stale training data on fast-moving deps |
 
 The five **core build-time skills** map one-to-one onto the declarative artifacts: `add-schema`
 (TypeSpec + regenerate), `add-decision` (**decision source** authoring — full-DMN projection, or a
-first-class AI-authorable DRL/rule-unit/CEP escape hatch — + simulate, doc 03 §2.6, §4.3),
+first-class AI-authorable DRL/rule-unit/CEP escape hatch — + simulate, doc 03 §2.6, §4.3; the skill
+**tells the agent to consult `resources: decision-layer` (§2.5) before authoring non-trivial FEEL or
+any engine-native artifact**, so it reasons from the pinned DMN/FEEL/Drools references, not training
+recall),
 `add-flow` (typed flow-builder code or Serverless-Workflow YAML → canonical JSON, with a `compute`
 step or a declared `x-<org>/<stepType>` extension step for typed computation, doc 04 §2.5–§2.7),
 `add-adapter` (AsyncAPI/OpenAPI port + boundary validation), `run-parity-tests` (decision parity
@@ -132,7 +136,7 @@ harness, research 06 §A.6.3 — legacy-vs-migrated DMN over a golden dataset).
 
 **Artifact-type discovery is one call.** An agent onboarding to a Workspace enumerates every governed
 artifact class — Schema, DecisionModel, CodeSet, Flow, compute-step, uischema/viewschema/pageschema/
-copyset, Entitlement, Portal, Adapter, tokens, Harness — with each class's canonical JSON Schema,
+copyset, Entitlement, Portal, Adapter, tokens, Harness, resources manifest — with each class's canonical JSON Schema,
 authoring surfaces, and declared extension seams via **`ichiflow artifacts list --json`** (CLI) or the
 Tier-0 MCP **`list_artifact_types`** tool ([02-schema-foundation.md](02-schema-foundation.md) §10). This
 is the *global* artifact-type index that complements the per-CodeSet dependency graph (doc 02 §9.4), so
@@ -182,6 +186,57 @@ Two test-data capabilities round out the DX story:
   domain (not only the scaffolded sample) and derive a safe, anonymized subset of production data for
   local testing — closing the gap between the scaffold's demo data and a real domain.
 
+### 2.5 The `resources` manifest — pinned, authoritative reference pointers
+
+An agent authoring against a fast-moving dependency reasons from **training recall**, which goes stale
+— nowhere more sharply than the decision layer, whose engine is **Apache KIE / Drools, an
+Apache-incubation project mid-consolidation** (research [01](../research/01-rule-engines.md) §1.1, §9:
+Kogito → Apache KIE, SonataFlow renames, DMN 1.6, KIE 10.2.0). A model trained a year earlier "knows"
+a Kogito/`org.kie.kogito` world that no longer matches the pinned artifacts. The fix is a first-class
+agent-kit artifact: a **`resources` manifest** — a **schema'd, versioned** map of **topics →
+authoritative references**, scaffolded into the Workspace (`resources/`) beside `AGENTS.md` and
+`.claude/`, and governed like any other contract.
+
+For the decision layer, `resources: decision-layer` points at, among others:
+
+- **Apache KIE / Drools docs** and the **version-matched release notes** for the pinned KIE version
+  (10.2.0);
+- the **OMG DMN 1.6 specification** and the **DMN-TCK repository** (the conformance source the
+  engine-conformance harness pins, [13](13-agent-harness-loops.md) §2.b);
+- a **FEEL reference** (and ichiflow's own **published FEEL-ambiguity resolutions**, doc 03 open-q4 —
+  the semantics the FEEL-vectors harness freezes);
+- **DRL / rule-units / CEP** authoring guides (the engine-native escape-hatch surface, doc 03 §4.3);
+- **ichiflow's own decision-source spec** (doc 03 §2.6) and the **decision-layer harness fixtures**
+  (the TCK subset, projection-coverage construct set, golden datasets) — so first-party references sit
+  next to upstream ones.
+
+The **doctrine**:
+
+- **Pointers are PINNED to the dependency version in use.** The manifest carries the same pin as the
+  engine (KIE 10.2.0), and **the manifest updates when the KIE pin updates** — the resource bump is
+  part of the same gated change as the engine bump (the engine-upgrade harness,
+  [13](13-agent-harness-loops.md) §2.b). A pointer never floats to "latest"; a v10.2 Workspace links
+  v10.2 docs, not whatever the doc site serves today.
+- **Skills reference manifest topics, not URLs.** A skill says *consult `resources: decision-layer`*
+  (e.g. `add-decision` before non-trivial FEEL or any DRL/rule-unit/CEP artifact, §2.2), so the
+  authoritative reference is resolved through the pinned manifest rather than baked into the skill or
+  recalled from training.
+- **Air-gapped installs resolve to vendored offline copies.** In a disconnected/self-hosted
+  deployment (BRIEF §3) the manifest resolves each topic to a **vendored offline snapshot** shipped
+  with the release, so the agent has the same references with no outbound network — the pin makes the
+  offline copy unambiguous.
+
+**This mechanism is generic — every subsystem gets a manifest.** Temporal, OpenFGA, and the Adapter
+substrates each carry their own pinned `resources` topic on the identical schema; **the decision layer
+(Drools/Apache KIE) is the exemplar and the one v1-mandatory manifest**, because its dependency churns
+fastest and its authoring surface is the highest-value LLM path (ADR-0027). Other subsystems' manifests
+follow the same doctrine as they harden.
+
+At run time the same pointers are one call away: **`ichiflow-mcp` exposes a Tier-0 `get_resources(topic)`
+tool** (§3.2) returning the pinned reference set for a topic, so a runtime agent debugging a decision
+gets the *same* version-matched references a build-time agent authored against — one source of truth
+for "where is the authoritative doc," build time and run time.
+
 ---
 
 ## 3. Run time — the `ichiflow-mcp` server
@@ -212,6 +267,10 @@ Following the Temporal-MCP pattern (small default set, opt-in for power; researc
   known, outcome — the *same* object a human/auditor UI renders (doc 08).
 - `get_workflow_history(workflow_id, limit=200, page?)` → Temporal-style event history, paginated.
 - `list_stuck_cases(since, stage?, error_class?)` → structured, filtered triage feed.
+- `get_resources(topic)` → the **pinned, authoritative reference set** for a topic (§2.5) — e.g.
+  `decision-layer` returns the version-matched Drools/DMN/DMN-TCK/FEEL/decision-source pointers (or
+  their vendored offline copies in an air-gapped install), so a runtime agent reasons from the same
+  references a build-time agent authored against.
 - (+ `query_workflow_state`, `find_cases(filter)`, deeplink generators, `get_otel_trace` — the
   `case_id`↔`trace_id` join is ichiflow's value-add over a generic OTel MCP.)
 

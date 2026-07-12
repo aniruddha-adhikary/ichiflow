@@ -158,7 +158,13 @@ conformant. So the SPI **ships with a conformance suite as part of its contract*
   verifiable claim: Drools passes it (v1, reference); ZEN's JDM projection passes the projectable
   subset (later); a future engine passes it or is rejected. Fixtures: the TCK subset cases + ichiflow
   envelope round-trip cases. Verdict: `tck_cases_green / tck_total` per engine, plus
-  capability-descriptor conformance (a declared `supports.inference` must actually infer).
+  capability-descriptor conformance (a declared `supports.inference` must actually infer). **Both the
+  DMN-TCK version and the KIE/Drools version are pinned in the harness manifest** — the DMN-TCK repo
+  at a pinned commit and Apache KIE 10.2.0 (research [01](../research/01-rule-engines.md) §3.1, §5) —
+  and the pointers to both live in the decision-layer **resource manifest**
+  ([10](10-ai-native-experience.md) §2.5), so "which TCK, which engine" is a diffable fact, not
+  ambient knowledge. Results are enumerable counts against those exact pins; bumping either pin reruns
+  the suite (the **engine-upgrade harness** below).
 - **Decision-source projection-coverage harness (the "100% AI-authorability" proof).** Because the
   **decision source** projection ([03](03-decision-layer.md) §2.6; ADR-0027) must cover the **full DMN
   1.6 feature set** — not decision tables only — its completeness is a **verified metric, not a claim.**
@@ -184,9 +190,51 @@ conformant. So the SPI **ships with a conformance suite as part of its contract*
   input snapshot, CodeSet id+version, model identity). A run that produces a malformed or absent trace
   is a failed check, because the DecisionRecord/why API depends on it (§2.g). Fixtures: sample
   evaluations with expected trace schemas.
-- **Differential testing.** Imported/cross-engine models run the differential harness
-  ([03](03-decision-layer.md) §6.4): same model on two engines, outputs must match golden. Verdict:
-  `divergences: [...]`.
+- **Differential-engine harness.** Imported/cross-engine models run the differential harness
+  ([03](03-decision-layer.md) §6.4): the **same DecisionModel evaluated on Drools and on a second
+  engine when one is present** (ZEN's JDM projection, later; or a source engine's golden outputs for
+  an import), outputs must match golden — the machine-readable proof behind the migration-fidelity /
+  anti-lock-in story ([11](11-migration-in-and-out.md) §OUT; ADR-0001). With only the default engine
+  deployed the harness degenerates to golden-replay against recorded Drools outputs; it activates
+  fully the moment a second engine sits behind the SPI. Verdict: `divergences: [...]`.
+
+Because **Drools / Apache KIE is the default / reference engine** ([03](03-decision-layer.md) §4.1),
+it carries a **default-engine harness set** beyond the SPI-generic suites above — the concrete
+Drools-specific verification the founder asked ship *with* the engine. Each pins its KIE/TCK versions
+via the decision-layer resource manifest ([10](10-ai-native-experience.md) §2.5) and emits enumerable
+counts:
+
+- **FEEL semantics vectors.** The known DMN/FEEL **interchange-ambiguity cases** — under-specified
+  built-ins that conformant engines resolve differently (list/`sort` ordering, and the other spots the
+  DMN-TCK exists to pin; research [01](../research/01-rule-engines.md) §7) — are frozen as
+  **regression vectors** asserting the default engine's *chosen, published* semantics
+  ([03](03-decision-layer.md) open-q4). Fixtures: the ambiguity-case FEEL snippets + expected results
+  under ichiflow's pinned resolution. Verdict: `feel_vectors_green / total`. A KIE bump that silently
+  shifts one of these results fails loudly here rather than in production traffic.
+- **DRL compile-check + rule-unit scenario harness.** The engine-native escape hatches
+  ([03](03-decision-layer.md) §4.3) are AI-authorable governed paths, so they verify like any
+  artifact: a **DRL / rule-unit compile-check** (a malformed artifact fails `validate` pre-deploy —
+  already contributed to the projection-coverage suite above) plus a **rule-unit scenario harness**
+  running the model's scenario specs + coverage + golden datasets ([03](03-decision-layer.md) §6) on
+  the same footing as a DMN model. Fixtures: DRL/rule-unit sources + their scenario specs. Verdict:
+  `compile: pass|fail`, `scenarios_pass / total`, `coverage`. Quarantine marks *portability*, never
+  authorability, so an escape-hatch model is enumerable-done exactly like a DMN one.
+- **CEP temporal-rule vectors.** Complex-event / temporal models ([03](03-decision-layer.md) §8) —
+  sliding windows, interval-vs-point events, "N events in a window" — are verified with **seeded event
+  streams**: an ordered `{event, timestamp}` sequence fed into a stateful session under **seeded
+  time** (the same determinism discipline as Temporal time-skip, §3.6), asserting the emitted
+  signals/Outcomes. Fixtures: seeded event-stream vectors + expected activations. Verdict:
+  `cep_vectors_green / total`. Wall-clock is never a harness input; the seed is recorded in the
+  verdict.
+- **Engine-upgrade harness.** A **KIE/Drools version bump is a gated change**: the harness reruns the
+  *entire* decision-layer suite (TCK conformance, FEEL vectors, projection-coverage, per-model
+  scenarios, CEP vectors, differential) against the candidate engine version and **diffs every verdict
+  against the incumbent's**. Any changed verdict — a TCK case that flips, a FEEL result that shifts, a
+  coverage regression — blocks the upgrade until reconciled. Fixtures: the pinned incumbent verdict
+  set as the baseline. Verdict: `verdicts_unchanged / total`, `regressions: [...]`. **Upgrades are
+  gated on green**, which is what lets ichiflow ride a fast-moving Apache-incubation project (research
+  [01](../research/01-rule-engines.md) §9) without inheriting its churn as production risk; the manifest's
+  KIE pin and this harness move together.
 
 ### 2.c Flow layer — interpreter conformance vectors, determinism, DSL validation, compute contracts
 
