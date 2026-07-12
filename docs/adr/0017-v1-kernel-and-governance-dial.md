@@ -48,10 +48,41 @@ Migration Copilot), DMN is authored directly, uischema/pageschema are authored d
 adoption therefore survives the deferral. In v1, assistance is the AI-chat authoring doctrine
 ([0019](0019-ai-chat-first-authoring.md)), not a packaged Copilot.
 
-**Compliance-pack items are an Enterprise pack, not v1-core:** OpenLineage / BCBS-239 lineage,
-the wide-event store (ClickHouse/Honeycomb-class), and trigger-based bitemporal history on audited
-tables. v1 "as-of" is served by Temporal replay + append-only records + effective-dating; Postgres is
-the v1 audit/analytics default.
+**Compliance-profile items are post-v1, not v1-core:** OpenLineage / BCBS-239 lineage, the wide-event
+store (ClickHouse/Honeycomb-class), and trigger-based bitemporal history on audited tables. These form
+the **compliance profile — an open-source, optional install ([0022](0022-fully-open-source.md)), not a
+paid pack.** v1 "as-of" is served by Temporal replay + append-only records + effective-dating; Postgres
+is the v1 audit/analytics default.
+
+## Amendment (2026-07-12) — kernel is single-org; v1 acceptance is two real exercises
+
+Two founder-interview decisions refine the kernel scope and its acceptance bar:
+
+**Multi-tenancy: single-org per deployment in v1, seams designed now.** The v1 kernel serves **one
+organization per deployment**; hosted multi-tenant (many orgs on one deployment) is a **later**
+capability. The seams are built now so that step is not a rework: **`tenant_id` discipline** in
+schemas/persistence, **per-Portal IdP isolation** (already present,
+[06](../architecture/06-identity-and-access.md) §1.1), and **entitlement scoping** under a tenant
+([06](../architecture/06-identity-and-access.md) §2.2, Part 3). This keeps v1 scope honest without
+foreclosing hosted multi-tenant.
+
+**v1 acceptance = TWO required exercises, both passing on the actual kernel** (not a feature
+checklist):
+
+1. **The reference product, end-to-end.** The canonical outdoor-event-permit product
+   ([../examples/creating-a-permit-product.md](../examples/creating-a-permit-product.md)) runs with
+   every layer real — schemas → decisions → flows → portal → audit → `ichiflow-mcp` debug — not mocked:
+   a permit flows arrival-to-resolution and an agent debugs a stuck case through the *why* API.
+2. **The migration exercise — in *and* out.** A **generic** legacy source (a database-and-spreadsheet
+   permitting/casework system with existing data and rules — **no real system named**) goes through
+   the brownfield path ([0014](0014-map-first-migrate-last.md),
+   [11](../architecture/11-migration-in-and-out.md)): **Ring 0 declarative mapping** over the existing
+   DB (zero/additive DDL), legacy rules **re-expressed as DecisionModels**, and **decision-parity
+   testing** against a **golden dataset of historical outcomes**. The **exit story** is verified on the
+   same Workspace — export DMN / Flow JSON / schemas / data and demonstrate they are consumable outside
+   ichiflow. Anti-lock-in is a core promise, so **migration in and out are both on the acceptance bar.**
+
+(Public-sector-first design target and the canonical reference product: [0023](0023-public-sector-first.md).)
 
 ## Alternatives considered
 
@@ -91,5 +122,7 @@ Negative / costs:
 - Related: [0002](0002-pluggable-decision-engine-spi-drools-default.md),
   [0010](0010-hybrid-authorization-openfga-plus-policy.md) (v1 authz phasing),
   [0011](0011-decisionrecord-and-selective-event-sourcing.md),
-  [0014](0014-map-first-migrate-last.md) (Ring-0 mapping as data),
-  [0018](0018-domain-entity-store.md), [0019](0019-ai-chat-first-authoring.md).
+  [0014](0014-map-first-migrate-last.md) (Ring-0 mapping as data; migration acceptance),
+  [0018](0018-domain-entity-store.md), [0019](0019-ai-chat-first-authoring.md),
+  [0022](0022-fully-open-source.md) (tiers = capability profiles, not editions),
+  [0023](0023-public-sector-first.md) (public-sector-first; canonical reference product).
