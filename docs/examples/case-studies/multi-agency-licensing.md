@@ -571,6 +571,15 @@ parent-Case** (licensing) as two points on one "set-level Case" design.
 via the catalog, joined by **partial-tolerant status aggregation, not `CompositeOutcome`**, with the parent
 DecisionRecord **referencing** (not merging) child records.
 
+**Resolved (2026-07 gap-fix round):** adopted as the **`bundle`** set-level Case shape
+([ADR-0031](../../adr/0031-set-level-cases.md), [04 §5.10](../../architecture/04-flow-and-case-layer.md)) — a
+computed **heterogeneous** sub-Case fan-out (one child per computed element, each `caseType` resolved through
+the CaseType catalog G1, each its own agency Flow/SLA/lifecycle), joined by a **partial-tolerant status
+roll-up view** that is explicitly **not** a `CompositeOutcome`; the **bundle parent DecisionRecord references**
+(never merges) its child records ([08 §1.7](../../architecture/08-audit-and-observability.md)). This is the
+fan-out shape of the single "set-level Case" ADR, with the housing G4 cohort as its adjacent fan-in shape —
+exactly the one-ADR framing this note recommended.
+
 ### G3 — **per-Team env-pins** (independent release cadence) — **MINOR (adopt)**
 Artifact **ownership** is per-Team, but artifact **activation** is per-deployment: the env-pin that releases
 a version is a single checked-in file (`environments/prod.pins.yaml`,
@@ -582,6 +591,13 @@ own bundle versions independently while the deployment composes them — preserv
 write path" (BRIEF §21) but scoping activation to the ownership boundary that already governs edit/approve.
 This is the direct strain surfaced in §2.1 and the one place agency-as-Team most wants to be more
 tenant-like without crossing the tenancy line.
+
+**Resolved (2026-07 gap-fix round):** adopted as the **per-Team env-pin partition**
+([09 §6.3](../../architecture/09-deployment-and-topology.md), [03 §5.7](../../architecture/03-decision-layer.md),
+[ADR-0025](../../adr/0025-reference-data-ownership-and-teams.md) Consequences amendment) — env-pins partition
+by owning Team (`environments/prod/<team>.pins.yaml`) so agencies promote their own bundle versions
+independently while the deployment composes them, preserving "version control is the write path" (BRIEF §21a)
+scoped to the ownership boundary that already governs edit/approve, without crossing the tenancy line.
 
 ### Minor modelling notes (not architectural)
 1. **Issuance-verification asymmetry.** Depth-1 (platform) licences get the full Document registry +
