@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CodeDisplay.json",
+    "type": "object",
+    "properties": {
+        "technical": {
+            "type": "string",
+            "description": "Technical/system label for back-office and machine audiences."
+        },
+        "professionalLabel": {
+            "type": "string",
+            "description": "Professional label for expert operators."
+        },
+        "plainLanguage": {
+            "$ref": "#/$defs/RecordString",
+            "description": "Plain-language, per-locale label (BCP-47 key → text) for lay/customer audiences."
+        }
+    },
+    "description": "Per-audience display metadata for a code — one source for every Portal audience (§9.2).",
+    "$defs": {
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        }
+    }
+}

@@ -33,7 +33,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).    |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -42,6 +42,9 @@ types (hey-api) and Kotlin models (Fabrikt) — cover every OpenAPI component sc
 reproducibility is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModelsUpToDate` (Kotlin).
 `contract-vectors` runs a real-contract validation corpus through the same two validators (Ajv +
 networknt) and requires agreement; run `pnpm vectors:jvm` first to produce the JVM verdicts.
+`reference-data` validates the committed CodeSet fixtures against the emitted `CodeSet` contract and
+enforces cross-CodeSet `codeRef` referential integrity — every reference must resolve to a live row
+whose effective window covers the referencing row's (bitemporal, ADR-0025 / doc 02 §9.4).
 
 ## Layout
 

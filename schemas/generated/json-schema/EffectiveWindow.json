@@ -1,0 +1,27 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EffectiveWindow.json",
+    "type": "object",
+    "properties": {
+        "from": {
+            "type": "string",
+            "format": "date"
+        },
+        "to": {
+            "anyOf": [
+                {
+                    "type": "string",
+                    "format": "date"
+                },
+                {
+                    "type": "null"
+                }
+            ]
+        }
+    },
+    "required": [
+        "from",
+        "to"
+    ],
+    "description": "Effective-dated window. `from` is inclusive; `to` is exclusive and `null` means open-ended.\nReferential integrity is bitemporal against this window, not \"exists today\" (§9.4)."
+}

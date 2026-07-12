@@ -1,0 +1,34 @@
+{
+  "kind": "CodeSet",
+  "metadata": {
+    "id": "natures-covered",
+    "version": "1.0.0",
+    "governanceState": "released",
+    "effective": { "from": "2026-08-01", "to": null },
+    "owner": { "team": "trade-policy-team", "stewards": ["u:steward-ap"] }
+  },
+  "rows": [
+    {
+      "code": "NC_TEMP_IMPORT",
+      "display": {
+        "technical": "TIMP",
+        "professionalLabel": "Temporary import",
+        "plainLanguage": { "en": "Temporary import" }
+      },
+      "codeRefs": {
+        "country": { "code": "XA", "codeSet": "countries@2026.2.0" }
+      }
+    },
+    {
+      "code": "NC_RE_EXPORT",
+      "display": {
+        "technical": "REXP",
+        "professionalLabel": "Re-export",
+        "plainLanguage": { "en": "Re-export" }
+      },
+      "codeRefs": {
+        "country": { "code": "XB", "codeSet": "countries@2026.2.0" }
+      }
+    }
+  ]
+}

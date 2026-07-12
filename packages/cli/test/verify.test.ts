@@ -11,6 +11,12 @@ import { schemaFidelitySpikeScope } from "../src/verify/scopes/schema-fidelity-s
 import { schemaPipelineScope } from "../src/verify/scopes/schema-pipeline.js";
 import { codegenScope } from "../src/verify/scopes/codegen.js";
 import { contractVectorsScope } from "../src/verify/scopes/contract-vectors.js";
+import { referenceDataScope } from "../src/verify/scopes/reference-data.js";
+import {
+  checkReferentialIntegrity,
+  windowCovers,
+  type CodeSetDoc,
+} from "../src/verify/reference-data.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -87,6 +93,87 @@ describe("contract-vectors (Ajv side)", () => {
     const tsChecks = checks.filter((c) => c.id.startsWith("contract.ts."));
     expect(tsChecks.length).toBeGreaterThanOrEqual(15);
     expect(tsChecks.filter((c) => c.status !== "pass")).toEqual([]);
+  });
+});
+
+describe("reference-data scope", () => {
+  it("passes on the committed CodeSet fixtures (schema + referential integrity)", async () => {
+    const checks = await referenceDataScope.run({ repoRoot, seed: deriveSeed("reference-data") });
+    expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+    expect(checks.some((c) => c.id === "reference-data.graph.no-dangling")).toBe(true);
+  });
+});
+
+describe("referential-integrity engine", () => {
+  const countries = (rows: CodeSetDoc["rows"]): CodeSetDoc => ({
+    kind: "CodeSet",
+    metadata: {
+      id: "countries",
+      version: "1.0.0",
+      governanceState: "released",
+      effective: { from: "2026-01-01", to: null },
+    },
+    rows,
+  });
+  const referrer = (
+    ref: { code: string; codeSet: string },
+    effective = { from: "2026-08-01", to: null } as const,
+  ): CodeSetDoc => ({
+    kind: "CodeSet",
+    metadata: { id: "natures", version: "1.0.0", governanceState: "released", effective },
+    rows: [{ code: "N1", codeRefs: { country: ref } }],
+  });
+
+  it("resolves a live, in-window reference", () => {
+    const { checks } = checkReferentialIntegrity([
+      countries([{ code: "XA" }]),
+      referrer({ code: "XA", codeSet: "countries@1.0.0" }),
+    ]);
+    const c = checks.find((x) => x.from.includes("natures"))!;
+    expect(c.resolves).toBe(true);
+    expect(c.effectiveCovered).toBe(true);
+  });
+
+  it("flags a dangling reference to a missing code", () => {
+    const { checks } = checkReferentialIntegrity([
+      countries([{ code: "XA" }]),
+      referrer({ code: "NOPE", codeSet: "countries@1.0.0" }),
+    ]);
+    expect(checks[0].resolves).toBe(false);
+    expect(checks[0].effectiveCovered).toBeNull();
+  });
+
+  it("refuses a reference to a deprecated (non-live) row", () => {
+    const { checks } = checkReferentialIntegrity([
+      countries([{ code: "XA", deprecated: true }]),
+      referrer({ code: "XA", codeSet: "countries@1.0.0" }),
+    ]);
+    expect(checks[0].resolves).toBe(false);
+    expect(checks[0].resolveDetail).toContain("deprecated");
+  });
+
+  it("flags a reference whose window is not covered by the target", () => {
+    const { checks } = checkReferentialIntegrity([
+      countries([{ code: "XA", effective: { from: "2027-01-01", to: null } }]),
+      referrer({ code: "XA", codeSet: "countries@1.0.0" }, { from: "2026-08-01", to: null }),
+    ]);
+    expect(checks[0].resolves).toBe(true);
+    expect(checks[0].effectiveCovered).toBe(false);
+  });
+
+  it("windowCovers is bitemporal (open-ended target covers, bounded target does not)", () => {
+    expect(windowCovers({ from: "2026-01-01", to: null }, { from: "2026-08-01", to: null })).toBe(
+      true,
+    );
+    expect(
+      windowCovers({ from: "2026-01-01", to: "2026-12-31" }, { from: "2026-08-01", to: null }),
+    ).toBe(false);
+    expect(
+      windowCovers(
+        { from: "2026-01-01", to: "2026-12-31" },
+        { from: "2026-08-01", to: "2026-10-01" },
+      ),
+    ).toBe(true);
   });
 });
 
