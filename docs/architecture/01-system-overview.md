@@ -66,7 +66,7 @@ flowchart TB
 
   subgraph CORE["Intranet zone — modular monolith (Kotlin core)"]
     BUS(["Canonical command/event bus"])
-    FLOW["Flow & Case layer<br/>(DSL interpreter on Temporal)"]
+    FLOW["Flow & Case layer<br/>(DSL interpreter on Temporal — deterministic TS workflow;<br/>Kotlin activity + Case services)"]
     DEC["Decision layer<br/>(DMN via Engine SPI — Drools)"]
     CASE["Case + Task store<br/>(manual review, SLA, escalation)"]
     AUDIT["Audit & DecisionRecord<br/>(why API, bitemporal)"]

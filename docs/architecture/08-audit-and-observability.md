@@ -81,7 +81,7 @@ shape (authored in TypeSpec, emitted to JSON Schema per `BRIEF.md` §5):
       "canonicalIn": "creditReport.v2#…", "snapshotRef": "audit://…" },
     { "seq": 3, "kind": "authz.decision", "decision_id": "d:…", "principal": "u:reviewer-3",
       "action": "case.view", "effect": "allow", "reason": "assignee(u:reviewer-3, case)" },
-    { "seq": 4, "kind": "rule.trace", "ruleset": "eligibility@12",
+    { "seq": 4, "kind": "rule.trace", "decisionModel": "eligibility@12",
       "fired": ["min-income", "dti-cap"], "won": "dti-cap",
       "inputs": { "dti": 0.47, "cap": 0.43 } },
     { "seq": 5, "kind": "dmn.result", "decision": "riskGrade",
