@@ -60,6 +60,9 @@ jobs:
       - name: Fidelity spike — JVM (networknt) verdicts
         run: pnpm spike:jvm
 
+      - name: Contract vectors — JVM (networknt) verdicts
+        run: pnpm vectors:jvm
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

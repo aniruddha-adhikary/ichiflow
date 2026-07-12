@@ -27,18 +27,21 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses). |
 | `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).         |
 | `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.      |
+| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.     |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api). |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).          |
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).    |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
 JSON Schema 2020-12) authored once in TypeSpec. `codegen` asserts the generated edges — TypeScript
 types (hey-api) and Kotlin models (Fabrikt) — cover every OpenAPI component schema; byte-level
 reproducibility is gated by `pnpm codegen:drift` (TS) and `./gradlew checkModelsUpToDate` (Kotlin).
+`contract-vectors` runs a real-contract validation corpus through the same two validators (Ajv +
+networknt) and requires agreement; run `pnpm vectors:jvm` first to produce the JVM verdicts.
 
 ## Layout
 
