@@ -631,6 +631,14 @@ real fairness question); **(c)** the pool must pin its **rate version per commit
 primitive should declare it. **Proposal:** extend `QuotaLedger` with **monetary dimensions, reserve-list draw
 semantics, and a release-back policy hook** — one primitive, but covering money and reflow, not only headroom.
 
+**Resolved (2026-07 gap-fix round):** folded into **`QuotaLedger`**
+([ADR-0030](../../adr/0030-quota-ledger.md), [04 §5.9](../../architecture/04-flow-and-case-layer.md)) — a
+**`kind: monetary`** dimension whose variable-size reservation fits `capacity − committed − reserved ≥
+grantAmount`, a **ranked reserve-list draw** that runs as the set-level step under the cohort barrier
+(ADR-0031), the **rate version pinned per commit**, and a **declared release-back reflow policy** hook. The
+exact reflow-policy vocabulary and **cross-round** reflow governance (money returning to a closed round)
+remain an **Open question** (doc 04 §5.9), flagged rather than invented.
+
 ### G4 — Stateful issued Documents with acceptance & revocation — **BLOCKING (for the document layer)**
 
 The Letter of Offer is not a one-way emission like the work-pass pass: it is a **stateful Document that
@@ -643,6 +651,14 @@ vocabulary (a sibling design) is used here as settled, but this case shows it mu
 **revocation-as-Document**. If the sibling design models issuance as emission only, **these are blocking for
 this domain** and must be raised against it before v1 claims the grant lifecycle.
 
+**Resolved (2026-07 gap-fix round):** verified against [ADR-0029](../../adr/0029-document-issuance.md) — the
+sibling design does **not** model issuance as emission only. Its **acceptance facet** (`issued → accepted |
+declined`) participates in the Flow and covers **accept-to-activate**; **variation** (v2 reissue, `superseded`
+with DecisionRecord continuity) and **revocation** are core lifecycle; and the **multi-party countersignature**
+(co-applicants acceding) is covered as a small extension of the acceptance facet
+([04 §2.9.2](../../architecture/04-flow-and-case-layer.md) + ADR-0029). Every requirement this gap raised is
+met — **no longer blocking**.
+
 ### G5 — Reviewer-assignment fairness — **MINOR**
 
 The COI Decision (§2.3b) answers *who may not* review — not *who should*, fairly: reviewers have finite
@@ -654,6 +670,13 @@ Trace B also shows the resolver can **miss** a relationship it does not hold (re
 correctness is **bounded by the graph data** available — a data-completeness boundary, not a blocker.
 **Proposal:** a documented **set-assignment pattern** (capacity-constrained matching as a `compute` over the
 cohort) plus a note on that boundary.
+
+**Resolved (2026-07 gap-fix round):** documented as the **reviewer/workload-aware assignment** note in
+[03 §2.4](../../architecture/03-decision-layer.md) — assignment-routing Decisions may consume
+load/capacity/expertise features via feature-functions (capacity-constrained matching as a `compute` over the
+cohort), with the explicit honesty note that COI/fairness correctness is **bounded by graph data quality**
+(a resolver can only exclude relationships it holds; the Trace B missed co-authorship is a data-completeness
+boundary, not a rule bug).
 
 ### Framing (must-state, non-technical)
 
