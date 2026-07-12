@@ -342,6 +342,35 @@ mapping (§3.2), the capability descriptor, and the conformance harness a bindin
 — so "pluggable engine" is an open, self-serve seam and not merely documentation of ichiflow's own two
 engines.
 
+### 3.5 The engine ships with its conformance harness and a pinned resource manifest
+
+The Decision Engine SPI does not ship as a bare contract. It ships with **both** the machinery to
+*verify* an engine and the machinery to *author against* it correctly — the founder's "harnesses and
+pointers to resources for Kogito/Drools and testing ability" requirement, made concrete:
+
+- **A conformance harness travels with the SPI.** The **DMN-TCK conformance suite** (§3.4), the
+  **decision-source projection-coverage** suite (§2.6), the **FEEL-semantics vectors**, the
+  **DRL/rule-unit compile-check + scenario harness**, the **CEP temporal-rule vectors**, the
+  **differential-engine** harness, and the **engine-upgrade** gate are one governed
+  set — specified in [`13-agent-harness-loops.md`](./13-agent-harness-loops.md) §2.b. The default
+  engine (Drools/Apache KIE, §4.1) ships green against all of them, and a bump of the KIE version
+  reruns the whole set and is **gated on green** — so ichiflow rides a fast-moving
+  Apache-incubation project (research [01](../research/01-rule-engines.md) §9) without inheriting its
+  churn as production risk.
+- **A pinned resource manifest travels with it too.** The engine's authoritative references — Apache
+  KIE / Drools docs + the version-matched release notes, the OMG DMN 1.6 spec, the DMN-TCK repo, a
+  FEEL reference (plus ichiflow's own published FEEL-ambiguity resolutions, Q4), the DRL/rule-units/CEP
+  guides, and ichiflow's own decision-source spec + harness fixtures — are enumerated in the
+  **`resources: decision-layer` manifest** ([`10-ai-native-experience.md`](./10-ai-native-experience.md)
+  §2.5), **pinned to the KIE version in use** and updated with it. Authoring skills consult the manifest
+  before non-trivial FEEL or any engine-native artifact, and `ichiflow-mcp` exposes the same pointers
+  at run time via `get_resources(decision-layer)` — so both a build-time and a runtime agent reason
+  from version-matched references, not stale training recall, and air-gapped installs resolve to
+  vendored offline copies.
+
+Together these make the pluggable-engine claim self-contained: an engine arrives with a way to *prove*
+it conformant and every agent that touches it arrives with the *right, pinned* references in hand.
+
 ---
 
 ## 4. Engines

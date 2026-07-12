@@ -60,5 +60,5 @@ Negative / costs:
 
 - Research 01 §3 (Drools/Kogito capability surface: DMN, DRL, rule units, CEP), §5 (standards), §6 (LLM-authorability), §7 (interchange caveats)
 - Research 07 §3.3 ("declare, don't code"; LLM-legible authoring surfaces)
-- Doc 03 §2.1–§2.2, §2.6 (decision source), §4.3 (AI-authorable escape hatches), §5.3, §8 (CEP); Doc 13 §2.b (projection-coverage harness); Doc 02 §1 (two-layer pattern)
+- Doc 03 §2.1–§2.2, §2.6 (decision source), §3.5 (shipped conformance harness + pinned resource manifest), §4.3 (AI-authorable escape hatches), §5.3, §8 (CEP); Doc 13 §2.b (projection-coverage + FEEL-semantics/DRL-rule-unit/CEP/engine-upgrade harnesses); Doc 10 §2.5 (pinned `resources` manifest; `get_resources`); Doc 02 §1 (two-layer pattern)
 - Related: [0001](0001-canonical-rule-representation-dmn.md), [0004](0004-declarative-flow-dsl-on-temporal.md), [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md), [0019](0019-ai-chat-first-authoring.md), [0026](0026-harness-first-construction.md)
