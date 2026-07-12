@@ -79,50 +79,38 @@ CodeSet and the pool read).
 ```typespec
 // contracts/src/frdg.tsp
 @jsonSchema
-@doc("A Frontier R&D Grant application flowing through the staged grant Flow.")
 model GrantApplication {
   id: string;                                   // global correlation id → Case.case_id
   roundId: string;                              // the call/round cohort, e.g. "FRDG-2026-R2"
   activityType: ActivityType;                   // RESEARCH | INNOVATION | SUPPORT — codeRef → funding-rates
   sector: SectorCode;                           // codeRef → eligible-sectors → activity-types
-  applicantOrg: Organisation;                   // validated against the registry (§2.3); COI subject (§4)
+  applicantOrg: Organisation;                   // validated against the registry (§2.5); COI subject (§3)
   partners: Organisation[];                     // co-applicants; each independently COI-relevant
-  workPlan: Milestone[];                        // becomes post-approval-obligation Conditions (§2.7)
-  requestedBudget: BudgetLine[];                // eligible cost by category; funding rate applied per §2.3
+  workPlan: Milestone[];                        // milestones become post-approval-obligation Conditions (§2.7)
+  requestedBudget: BudgetLine[];                // eligible cost; funding rate applied per §2.3
 }
-
 model Organisation {
   legalName: string;
   pic?: string;                                 // Participant Identification Code; PROVISIONAL until validated
   registryId?: string;                          // national company-registry id — resolved via external-task (§2.5)
   orgKind: OrgKind;                             // FOR_PROFIT | NON_PROFIT | RESEARCH_ORG | PUBLIC_BODY
-  teamRef?: string;                             // if this org is also a partner Team (a reviewer's employer) — COI edge (§4)
+  teamRef?: string;                             // if this org is also a partner reviewer Team — the COI edge (§3)
 }
+model Milestone { milestoneId: string; dueBy: plainDate; claimTrigger: ClaimType; }   // deadline → Condition (§2.7)
 
-model Milestone {
-  milestoneId: string;
-  title: string;
-  dueBy: plainDate;                             // deadline — a breach flips the Condition to `breached` (§2.7)
-  claimTrigger: ClaimType;                      // which disbursement this milestone unlocks (INTERIM/FINAL)
-}
-
-@jsonSchema
-@doc("One reviewer's scored assessment — the per-authority Outcome that composes into the panel (§2.4).")
-model IndividualEvaluationReport {           // IER — grounded in Horizon Europe's expert report[^he-eval]
+@jsonSchema  // IER — one reviewer's scored assessment = the per-authority Outcome that composes (§2.3d)[^he-eval]
+model IndividualEvaluationReport {
   applicationId: string;
-  reviewerId: string;                           // a member of a partner-org reviewer Team (§4)
+  reviewerId: string;                           // a member of a partner-org reviewer Team (§3)
   scores: CriterionScore[];                     // Excellence / Impact / Implementation — each 0..5, half-point
-  integrityFlag?: string;                       // a reviewer can raise a research-integrity concern (blocks §2.4)
+  integrityFlag?: string;                       // a reviewer may raise a research-integrity concern (blocks §2.3d)
 }
-
 @jsonSchema
-model Claim {                                   // a disbursement request against an active award
+model Claim {                                    // a disbursement request against an active award
   awardId: string;                              // the activated Letter of Offer (§2.6)
   claimType: ClaimType;                         // PRE_FINANCING | INTERIM | FINAL — codeRef → claim-types
-  periodReport: PeriodReport;                   // cost declared for the reporting period
-  evidencedMilestones: string[];                // milestoneIds this claim evidences
+  periodReport: PeriodReport;   evidencedMilestones: string[];
 }
-
 enum ActivityType { research: "RESEARCH", innovation: "INNOVATION", support: "SUPPORT" }
 enum ClaimType { preFinancing: "PRE_FINANCING", interim: "INTERIM", final: "FINAL" }
 ```
@@ -202,13 +190,13 @@ Five DecisionModels, all authored as **decision source** (the LLM-friendly proje
 [doc 03 §2.6](../../architecture/03-decision-layer.md#26-the-decision-source--an-llm-friendly-authoring-projection-over-the-full-dmn-16-surface)),
 `authored-in: decision-source`.
 
-**(a) Eligibility — AI-assisted, competent-authority-validated (D6).** A DMN decision reads the (validated)
+**(a) Eligibility — AI-assisted, competent-authority-validated (D6).** A DMN decision reads the validated
 org facts, sector eligibility, and budget ceiling and emits a canonical `Outcome`. Where the proposal text
 must be *screened for scope fit*, an **AI agent** produces a **recommendation** (a non-human principal under
 [BRIEF §8/§12](../../architecture/BRIEF.md); [doc 06 Part 5](../../architecture/06-identity-and-access.md)) that a
-**program officer Task validates** — "AI proposes, deterministic tools + humans dispose" (BRIEF §12). The
-AI's suggestion is *never* the decision of record; the officer's confirmation is, and both land on the audit
-spine attributed to their respective principals.
+**program officer Task validates** — "AI proposes, humans dispose." The AI's suggestion is *never* the
+decision of record; the officer's confirmation is, and both land on the audit spine attributed to their
+principals.
 
 ```text
 # decisions/eligibility.decision-source (rendered decision-table view) — output: Outcome
@@ -299,10 +287,9 @@ rolledUp:
 
 The **consensus** step is where **competent-authority validation** meets D2: where reviewer scores diverge
 beyond `divergenceBand` (1.5), a **rapporteur** (an Agency `panel-secretariat` officer) runs a moderated
-**consensus Task** — the officer does not *re-score*, but validates that the panel reached an agreed score
-and records it, exactly as Horizon's consensus/panel step moderates independent IERs.[^he-eval] The
-composite keeps **each reviewer's Outcome attributed to its authority** all the way into the DecisionRecord
-([doc 03 §2.3](../../architecture/03-decision-layer.md), [doc 08 §1](../../architecture/08-audit-and-observability.md)),
+**consensus Task** — validating that the panel reached an agreed score, not re-scoring, exactly as Horizon's
+consensus step moderates independent IERs.[^he-eval] The composite keeps **each reviewer's Outcome
+attributed to its authority** into the DecisionRecord ([doc 03 §2.3](../../architecture/03-decision-layer.md)),
 so "which expert scored what, and how the panel composed it" is fully reconstructable.
 
 **(e) Award decision + four-eyes — the threshold is a CodeSet row (D5).** A passing composite is only a
@@ -363,43 +350,36 @@ RFIs **clock-stop** the SLA ([doc 04 §5.7](../../architecture/04-flow-and-case-
 id: frdg
 case: GrantApplication
 steps:
-  # ── Stage 0 — Eligibility + registry validation (external system) ───────────────────────────
+  # ── Stage 0 — Eligibility + registry validation (external system, D3) ────────────────────────
   - { id: validate, type: validate, schema: schema://frdg/GrantApplication/1 }
-  - id: registry-check                     # national company-registry lookup (external system, D3)
-    type: external-task                    # PIC / legal-entity validation analog[^he-pic]
+  - id: registry-check                     # national company-registry / PIC-validation analog[^he-pic]
+    type: external-task
     request:  { schema: schema://registry/EntityCheck/1,  adapter: adapter://registry/submit }
     response: { schema: schema://registry/EntityResult/1, inbound: adapter://registry/reply }
-    correlation: { inject: { as: header, name: x-correlation-id, from: "case_id & '/' & step.id" },
-                   extract: "response.correlationId" }
-    sla: { budget: P10D, onTimeout: chain/registry-esc-1 }     # external system's own turnaround (doc 04 §5.8)
-    onMalformed: dlq
+    correlation: { inject: { as: header, name: x-correlation-id, from: "case_id & '/' & step.id" } }
+    sla: { budget: P10D, onTimeout: chain/registry-esc-1 }, onMalformed: dlq   # external turnaround (doc 04 §5.8)
   - id: eligibility, type: decision-eval, model: eligibility@2026.2.0
-  - id: officer-screen                     # COMPETENT-AUTHORITY validation of AI-assisted screening (D6)
-    type: human-task, assignBy: assign-programme-officer@1.0.0    # routing is a Decision (doc 04 §5.3)
-    when: "eligibility.type == 'refer'"
-    sla: { budget: P5D }
+  - { id: officer-screen, type: human-task, when: "eligibility.type == 'refer'",   # COMPETENT-AUTHORITY validation (D6)
+      assignBy: assign-programme-officer@1.0.0, sla: { budget: P5D } }         # routing is a Decision (doc 04 §5.3)
   - { id: gate0, type: condition-gate, on: "eligibility.type == 'deny'", deny: emit-rejection }
 
-  # ── Stage 1 — Detailed application (two-stage: concept gate, then full) ──────────────────────
-  - id: full-application, type: human-task, subState: awaiting-applicant   # applicant completes; CLOCK-STOPS
-    sla: { budget: P30D }
+  # ── Stage 1 — Detailed application ───────────────────────────────────────────────────────────
+  - { id: full-application, type: human-task, subState: awaiting-applicant, sla: { budget: P30D } }  # CLOCK-STOPS
 
-  # ── Stage 2 — Panel review (multi-authority; §2.3, §2.4) ────────────────────────────────────
+  # ── Stage 2 — Panel review (multi-authority; §2.3, §2.4) ─────────────────────────────────────
   - id: assign-reviewers, type: decision-eval, model: coi-assignment@1.0.0   # COI filter over Team graph (D3)
-  - id: collect-iers                       # each reviewer scores on the PARTNER Portal; list-filtered (§4)
+  - id: collect-iers                       # each reviewer scores on the PARTNER Portal; list-filtered (§3)
     type: parallel, over: "assignedReviewers"
     body: { humanTask: reviewer-score, sla: { budget: P21D, onTimeout: chain/reviewer-esc-1 } }  # SLA ESCALATION
-    join: { quorum: 3 }                    # quorum(k): ≥3 non-conflicted IERs to proceed (§2.4)
-  - id: consensus, type: human-task        # rapporteur moderates divergence (competent-authority, D6)
-    when: "divergence(collect-iers) > scoring-criteria.divergenceBand"
-    assignBy: assign-rapporteur@1.0.0
+    join: { quorum: 3 }                    # quorum(k): ≥3 non-conflicted IERs to proceed (§2.3d)
+  - { id: consensus, type: human-task, assignBy: assign-rapporteur@1.0.0,    # rapporteur moderates divergence (D6)
+      when: "divergence(collect-iers) > scoring-criteria.divergenceBand" }
   - id: panel, type: decision-eval, model: panel-composition@2026.2.0        # CompositeOutcome (§2.3d)
   - { id: gate2, type: condition-gate, on: "panel.type == 'deny'", deny: emit-rejection }
 
   # ── Stage 3 — Ranking, budget line, award approval (cohort + pool; §2.4) ─────────────────────
-  - id: rank-and-fund, type: compute       # COHORT step: rank round, draw pool, set funding line (§2.4, ballot G4)
-    ref: kt://frdg/RankAndFund@1.0.0
-    onBelowLine: { emit: emit-rejection, code: BELOW_BUDGET_LINE }
+  - { id: rank-and-fund, type: compute, ref: kt://frdg/RankAndFund@1.0.0,    # COHORT: rank round, draw pool (ballot G4)
+      onBelowLine: { emit: emit-rejection, code: BELOW_BUDGET_LINE } }
   - id: reserve-budget, type: compute, ref: kt://frdg/QuotaReserve@1.0.0     # reserve() grant amount (ttl P30D)
   - id: award-approval, type: decision-eval, model: award-approval@2026.2.0  # four-eyes if > threshold (§2.3e)
   - id: approve, type: human-task, assignBy: assign-award-approvers@1.0.0    # 1 or 2 approvers; assessor≠approver
@@ -407,26 +387,26 @@ steps:
   # ── Stage 4 — Letter of Offer: issue → ACCEPT → activate (D5) ────────────────────────────────
   - id: issue-loo, type: issue-document, template: letter-of-offer@1.0.0     # doctemplate → Document (§2.6)
     binds: { decisionRecord: "${case.decisionRecord}", conditions: "${panel.conditions}" }
-  - id: await-acceptance, type: human-task, subState: awaiting-applicant     # applicant counter-signs; CLOCK-STOPS
-    sla: { budget: P30D, onTimeout: chain/offer-lapsed }                     # unaccepted → offer-lapsed (releases pool)
+  - { id: await-acceptance, type: human-task, subState: awaiting-applicant,  # applicant counter-signs; CLOCK-STOPS
+      sla: { budget: P30D, onTimeout: chain/offer-lapsed } }                 # unaccepted → offer-lapsed (releases pool)
   - id: activate-award, type: compute, ref: kt://frdg/QuotaCommit@1.0.0      # commit() on acceptance → award active
 
-  # ── Stage 5 — Disbursement claims (external finance system; RFI clock-stop) ──────────────────
+  # ── Stage 5 — Disbursement claims (external FINANCE system; RFI clock-stop) ──────────────────
   - id: claims, type: loop, over: "workPlan.claimTriggers"                   # PRE_FINANCING → INTERIM* → FINAL
     body:
-      - id: claim-intake, type: human-task, subState: awaiting-applicant     # applicant files a Claim; CLOCK-STOPS
-      - id: finance-validate, type: human-task, assignBy: assign-finance-officer@1.0.0   # finance validates (D6)
-        onRFI: { subState: awaiting-applicant }                              # RFI CLOCK-STOP (doc 04 §5.7)
+      - { id: claim-intake, type: human-task, subState: awaiting-applicant }  # applicant files a Claim; CLOCK-STOPS
+      - { id: finance-validate, type: human-task, assignBy: assign-finance-officer@1.0.0,   # finance validates (D6)
+          onRFI: { subState: awaiting-applicant } }                          # RFI CLOCK-STOP (doc 04 §5.7)
       - id: disburse, type: external-task                                    # external FINANCE system (D3)
         request:  { schema: schema://finance/PaymentOrder/1,  adapter: adapter://finance/submit }
         response: { schema: schema://finance/PaymentResult/1, inbound: adapter://finance/reply }
         sla: { budget: P14D, onTimeout: chain/finance-esc-1 }, onNegativeAck: compensate
 
-  # ── Stage 6 — Acquittal / audit (independent audit team can RE-OPEN; §4) ─────────────────────
-  - id: acquittal, type: human-task, subState: awaiting-applicant           # final acquittal report; CLOCK-STOPS[^acquittal]
+  # ── Stage 6 — Acquittal / audit (independent audit team can RE-OPEN; §3) ─────────────────────
+  - { id: acquittal, type: human-task, subState: awaiting-applicant }        # final acquittal report; CLOCK-STOPS[^acquittal]
   - id: audit, type: human-task, assignBy: assign-auditor@1.0.0             # independent audit; can re-open (D6)
-  - id: release-retention, type: external-task, when: "audit.clean"          # 10% retention released on clean acquittal[^he-pay]
-  # ── Stage 7 — Breach → clawback → revocation (branch reachable from Conditions §2.7) ─────────
+  - { id: release-retention, type: external-task, when: "audit.clean" }      # 10% retention on clean acquittal[^he-pay]
+  # ── Stage 7 — Breach → clawback → revocation reachable from Conditions (§2.7, Trace C) ────────
 ```
 
 The **clock-stop discipline** is the D1 signature: every `awaiting-applicant` sub-state (full application,
@@ -475,15 +455,14 @@ binds:
   amountRecoverable: "${clawback.amount}"     # recoverable as a debt[^clawback]
 ```
 
-The Letter of Offer's **acceptance semantics** are load-bearing: `issue-loo` emits the Document in state
-`issued`; `await-acceptance` blocks on the applicant's counter-signature (an idempotent, correlated
-signal); acceptance transitions the Document to `accepted` **and only then** does `activate-award`
-`commit()` the budget reservation and start the disbursement stage — grounded in Horizon Europe's "grant
-enters into force on signature."[^he-pay] A **variation** (amend, [doc 04 §5.6](../../architecture/04-flow-and-case-layer.md))
-produces a **v2** Letter of Offer via `award-variation`, superseding v1 with DecisionRecord continuity; a
-**clawback** issues a **revocation notice** Document. Both the variation and the revocation are **issued
-Documents recorded in the DecisionRecord** — so "what were they offered, what did they accept, what was
-revoked and why" is reproducible as-of each issue instant, exactly like a decision.
+The Letter of Offer's **acceptance semantics** are load-bearing: `issue-loo` emits the Document `issued`;
+`await-acceptance` blocks on the applicant's counter-signature (an idempotent correlated signal); acceptance
+transitions it to `accepted` **and only then** does `activate-award` `commit()` the reservation and start
+disbursement — grounded in "grant enters into force on signature."[^he-pay] A **variation** (amend,
+[doc 04 §5.6](../../architecture/04-flow-and-case-layer.md)) produces a **v2** via `award-variation`,
+superseding v1 with DecisionRecord continuity; a **clawback** issues a **revocation notice**. All three are
+**issued Documents recorded in the DecisionRecord** — so "what were they offered, what did they accept, what
+was revoked and why" is reproducible as-of each issue instant.
 
 ### 2.7 Conditions — milestone obligations, breach, and the clawback branch
 

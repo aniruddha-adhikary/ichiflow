@@ -941,8 +941,8 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
 - **Document reissue numbering + gap-free allocation under replay.** For `issue-document` (§2.9) the residual
   detail is the **reference-number policy on reissue/variation** — carry the original number with a version
   suffix vs. mint a fresh number — likely per number-allocation contract; and how **gap-free** allocation
-  (§2.9.1) stays exactly-once under interpreter replay and continue-as-new checkpointing (§long-history) so a
-  contiguous statutory register never double-allocates nor holes. Tracked in ADR-0029.
+  (§2.9.1) stays exactly-once under interpreter replay and continue-as-new checkpointing (the long-history
+  open question below) so a contiguous statutory register never double-allocates nor holes. Tracked in ADR-0029.
 - **Case aggregate vs Flow instance cardinality.** §5.6 establishes that post-decision operations
   (appeal / correct / withdraw) spawn **correlated child Cases**, so a Case is *not* strictly 1:1 with a
   root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows
