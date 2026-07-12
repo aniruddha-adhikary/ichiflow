@@ -186,6 +186,19 @@ stitches workflow event history + fired-rule traces + DMN results + human review
 actions into one causal chain keyed by `case_id`, queryable via the "why" API, answerable
 *as-of* the decision time. If a step cannot be reconstructed, it is a bug.
 
+### "Version control is the write path."
+Every governed artifact change lands as a **git commit** — a Schema, DecisionModel, Flow,
+CodeSet, uischema, policy, adapter declaration, *and* the **environment pin** that activates a
+released version. Promotion to production is therefore **commit-the-pin + deploy of the artifact
+bundle**, never editing prod in place: the runtime rule/artifact registry is a **downstream
+pin/gate, a cache of the committed artifacts — never an authority or a write surface.**
+Effective-dating decouples merge-time from activation-time; the emergency path is an **expedited PR
++ loud, logged break-glass** reconciled by a back-filled commit (ADR-0020). **Runtime business
+data** — Case/Task lifecycle, entity rows, Tier-2 actuations, PDP decisions — flows the *other*
+way, through the **audited runtime path** (the append-only DecisionRecord/ledger keyed by
+`case_id`), never git. Content and activation both trace to a commit; runtime data traces to the
+audit spine; nothing else writes.
+
 ### "Map first, migrate last."
 Adoption never begins with "alter your production schema." A declarative schema-mapping / ACL
 layer projects the legacy database onto the canonical model with zero or additive-only DDL
@@ -204,6 +217,18 @@ SPIs — but every SPI ships a supported default (Apache KIE/Drools, Temporal, P
 Keycloak, OpenFGA). A newcomer is productive with zero plugin choices; an enterprise
 can swap any layer without forking. (**v1 authz is OpenFGA only**; Cedar/OPA ABAC is a post-v1 /
 Enterprise add-on behind the same PDP interface — ADR-0010, ADR-0017.)
+
+### "Closed core, declared extension points."
+A canonical core stays **closed for interpretability** — the interpreter must understand every Flow
+step, the engine every DMN construct, the PDP every relation. But closure is a **decision to argue,
+not a default to drift into.** The review rule: **every closed vocabulary is either argued
+closed-correct in its own doc, or carries a declared, schema'd, discoverable extension point** — an
+`x-`/SPI seam with an extension schema and a discovery affordance, so the extension is *additive and
+enumerable*, never a fork or a silent omission. The exemplars are already load-bearing: the Decision
+Engine SPI, the five storage SPIs, the renderer/tester registry, composition-policy-via-DMN, the
+code-activity worker SPI, **extension Flow step types**, the **Adapter-binding SPI**, and the **MCP
+tool-extension SPI**. A vocabulary closed *silently* is the tell of accidental, not principled,
+closure — and fails this test.
 
 ### "Same code from laptop to zoned HA."
 There is one application codebase. The Dev tier (single binary, embedded store), Team tier

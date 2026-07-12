@@ -105,6 +105,20 @@ runtime sprawl for the ability to terminate any protocol an enterprise throws at
 ([../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md) §A.4 risk:
 "polyglot runtime sprawl" — mitigated by making the bus + contract the invariant).
 
+**The binding is a declared SPI — new binding runtimes are additive, not a core change.** Camel-on-
+Quarkus and the native paths are the **v1 implementations** of an **Adapter-binding SPI**, not a closed
+pair. A new protocol-binding runtime (a third binding class) is added by implementing the SPI:
+consume/produce on its transport, and **publish/consume the *same* canonical events** through the bus,
+honouring the Adapter declaration's contract + mapping + reliability blocks (§1, §4–§5). `channel.protocol`
+selects the binding at runtime, so a port re-homes between bindings by configuration and the core never
+notices — exactly the "closed core, declared extension points" doctrine (BRIEF §21;
+[00-vision-and-principles.md](./00-vision-and-principles.md) "Closed core, declared extension points")
+that governs the Decision Engine SPI and storage SPIs. A binding is admitted only when it passes the
+adapter contract/idempotency/DLQ harness ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.d)
+against its declared ports, so "add a binding runtime" is a verifiable, self-serve seam. This is what
+makes the Redpanda-Connect-class question below an **SPI matter** (does a candidate runtime clear the
+license-allowlist and pass the harness?) rather than a bespoke core decision.
+
 ### 2.1 Legacy structured-message profile (segment / positional EDI-family)
 
 The catalogue is not only REST / MQ / Kafka / SOAP / file. Some inbound channels are **fixed-field or

@@ -98,8 +98,11 @@ Temporal workflow — loads a Flow definition, walks its graph, and drives activ
 
 ### 2.3 Step types (the DSL catalogue)
 
-The v1 Flow DSL supports a fixed, schema-defined set of step types. Every step maps to a
-deterministic interpreter operation and/or an activity invocation.
+The v1 Flow DSL supports a **closed, schema-defined canonical set** of step types — closed *by design*
+so the deterministic interpreter understands every step it must replay (ADR-0004). Every step maps to a
+deterministic interpreter operation and/or an activity invocation. The set is closed but **not a dead
+end**: genuinely new step *kinds* are additive at a declared seam (§2.7 extension step types), not a
+fork to the raw Temporal SDK.
 
 | Step type | Meaning | Maps to |
 |---|---|---|
@@ -219,6 +222,47 @@ layer-specific hatches (BRIEF vocabulary "compute step / code activity", ADR-000
 non-portability discipline as the DRL/feature-function hatch — schema'd I/O + golden datasets so
 behaviour is *specified* even though the code does not port, denting the workspace portability score
 (G6).
+
+**The code-activity worker is a declared SPI (new languages are additive).** The `ref` scheme is
+**language-parameterised** (`<lang>://…`) and the contract is language-neutral — a schema'd input/output
+boundary plus an emitted trace, never the worker's language, is the audit boundary. New worker languages
+are therefore **additive behind that same schema'd-boundary + trace contract** (BRIEF §4, §21), not a
+core change: a language registers a worker that honours the boundary + trace, and its `compute`
+activities are contract-tested identically ([13-agent-harness-loops.md](./13-agent-harness-loops.md)
+§2.c). **Kotlin and TS are the only v1 implementations** (`kt://`, `ts://`); **Python is the expected
+first post-v1 addition** (`py://`), specifically for ML feature-prep in scoring/underwriting
+feature-functions, which today would otherwise force reimplementation. The worker SPI is what keeps
+"move computation to typed code" from silently meaning "kt/ts only forever."
+
+### 2.7 Extension step types — custom step kinds at a declared seam
+
+The canonical step-type set (§2.3) is closed for interpretability, and `compute` is the sanctioned
+computation hatch — so *most* new needs are already met without a new step kind. But a genuinely new
+step kind (an org-specific orchestration primitive) has a **declared, schema'd extension seam** rather
+than only "drop the whole flow to the raw Temporal SDK" (ADR-0004 last resort) or an un-owned fork:
+
+- **Custom step types are declared compute-variants under an extension namespace.** A Workspace
+  declares `x-<org>/<stepType>` (e.g. `x-acme/geo-fence-check`) as a **schema'd, interpreter-registered
+  compute-variant**: it carries an input/output JSON Schema, is backed by the **unified code-activity
+  contract** (§2.6, a versioned `ref` on the code-activity worker SPI), and is **validated + trace-
+  emitting exactly like `compute`**. The interpreter dispatches it through the same generic
+  code-activity path, so determinism (§2.2) and the audit spine are preserved by construction.
+- **Additive and discoverable, not a fork.** Because the extension is a declared artifact with a schema,
+  it shows up in the artifact-type catalog and DSL-schema validation
+  ([02-schema-foundation.md](./02-schema-foundation.md) §10, `list_artifact_types`), a reviewer sees the
+  step in the graph like any built-in, and `ichiflow verify` runs its vectors
+  ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.c) — so a new step kind is enumerable and
+  governed, never a silent core change (BRIEF §21).
+- **The line stays where §2.3 draws it.** An extension step type is for a genuinely new *named*
+  step-kind an app wants first-class in its graph; ordinary inter-step computation still uses plain
+  `compute`. Both ride the same worker + trace contract; the extension namespace just gives a recurring
+  computation a stable, declared step identity.
+
+This is the same "closed core, declared extension points" doctrine as the Decision-Engine SPI and the
+renderer registry (BRIEF §21; [00-vision-and-principles.md](./00-vision-and-principles.md) "Closed core,
+declared extension points") applied to the Flow step vocabulary. The CNCF-SWF conformance question — how
+these `x-` extensions degrade on export to other SWF runtimes — is the same extension-namespace concern
+tracked in the open questions.
 
 ---
 
@@ -587,8 +631,12 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
 
 - **DSL coverage vs CNCF-SWF fidelity.** How strictly does the v1 DSL track CNCF Serverless Workflow
   1.0 vs. adding ichiflow-specific step types (human-task, decision-eval)? Strict fidelity maximizes
-  portability; extensions maximize expressiveness. Likely: a conformant core + a clearly-marked
-  ichiflow extension namespace, with the extensions degrading gracefully on export.
+  portability; extensions maximize expressiveness. The shape is now decided — a conformant core + a
+  clearly-marked ichiflow extension namespace, which is also the seam for **user-declared extension
+  step types** (§2.7, `x-<org>/<stepType>`, decided per BRIEF §21). The residual open detail is the
+  **export-degradation contract**: exactly how ichiflow-native and `x-`-extension step kinds degrade
+  (documented-but-non-portable vs. lowered to a portable approximation) when a Flow is exported to
+  another SWF runtime.
 - **Case aggregate vs Flow instance cardinality.** §5.6 establishes that post-decision operations
   (appeal / correct / withdraw) spawn **correlated child Cases**, so a Case is *not* strictly 1:1 with a
   root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows

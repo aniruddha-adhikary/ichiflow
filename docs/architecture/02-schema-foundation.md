@@ -217,6 +217,14 @@ ichiflow, **checked-in wins**:
 The classic drift risk is closed by a **regenerate-and-diff CI gate**: CI recompiles TypeSpec,
 regenerates all outputs, and runs `git diff --exit-code`. Any uncommitted delta fails the build.
 
+**Incremental regen keeps the local loop tight.** So the regenerate step never taxes an agent doing
+many micro-edits, the CLI ships an **`ichiflow watch` / incremental-regen affordance**: it recompiles
+and regenerates only the artifacts affected by the changed source (dependency-scoped, not the whole
+tree), targeting a sub-second local edit→typed-feedback loop. The full regenerate-and-diff remains the
+CI gate of record; `watch` is the fast inner loop that keeps an agent's *edit → regenerate → validate
+→ `ichiflow verify`* cycle (§10; [10-ai-native-experience.md](10-ai-native-experience.md) §2.1) from
+paying a full-tree regen cost per keystroke.
+
 **Conventions for generated files:** standardized paths (§7); `@generated` header carrying the
 **source-schema hash**; `linguist-generated` in `.gitattributes`; **no autoformatting** of
 generated files (formatting churn would defeat the diff gate).
@@ -267,6 +275,15 @@ burden.
 One self-hosted, Apache-2.0 registry stores **Avro, Protobuf, JSON Schema, OpenAPI, AsyncAPI** —
 covering ichiflow's message *and* API artifacts in a single place. It is Confluent-API-compatible
 (Kafka serdes work unchanged) and added a data-contracts feature in 3.3.0.
+
+**Invariant — the registry never holds an artifact version that did not arrive by git merge.** The
+pipeline is one-directional: `TypeSpec → canonical checked-in artifacts → Registry` (§2 diagram). The
+registry is a **downstream consumer + CI gate + pin surface**, *never* an editing surface and never a
+parallel source of truth: an Adapter or CodeSet that "points at a versioned artifact in the registry"
+([05-adapters.md](05-adapters.md) §9) references registry *coordinates*, but the artifact's authored
+form is the checked-in file. Nothing publishes a schema version to the registry except the CI job that
+runs on a merged commit — so version control remains the sole write path for contracts (BRIEF §21;
+[00-vision-and-principles.md](00-vision-and-principles.md) "Version control is the write path").
 
 ### 6.2 Compatibility policy
 
@@ -469,6 +486,8 @@ model CodeDisplay {
   @doc("Short professional-facing label.") professionalLabel: string;
   @doc("Plain-language explanation for lay audiences, per locale (i18n map).")
   plainLanguage: Record<string>;
+  @doc("Declared extension audiences, keyed by audience id (e.g. x-partnerLabel, x-voiceScript). Open at a declared seam; the three reserved keys above always exist.")
+  extensions?: Record<AudienceDisplay>;
 }
 ```
 
@@ -476,6 +495,14 @@ The UI selects the layer by Portal audience — technical code + professional la
 back-office audiences, plain-language + i18n for lay / customer audiences
 ([07-ui-and-portals.md](07-ui-and-portals.md) §11) — but no rendering duplicates the code meaning: it
 all resolves against the referenced CodeSet.
+
+**Audience layers are open at a declared seam** (BRIEF §21; the "closed core, declared extension
+points" rule). The three layers above are **reserved keys** covering the professional/lay split; a
+*new* audience (a partner label, a voice/IVR script, a screen-reader long-form) is added as an
+`extensions` entry **keyed by audience id under an `x-` namespace**, not by editing `CodeDisplay`'s
+closed shape — so a new audience is additive and discoverable (a Portal audience declares which layer
+key it renders, [07-ui-and-portals.md](07-ui-and-portals.md) §4.1) rather than forcing a schema
+change on every CodeSet.
 
 ### 9.3 Canonical `Outcome` and `CompositeOutcome`
 
@@ -487,7 +514,7 @@ ad-hoc `{outcome, reasonCodes}` pairs:
 @jsonSchema
 @doc("The typed result of a Decision.")
 model Outcome {
-  @doc("Open outcome type.") type: OutcomeType;   // approve | deny | refer | conditional-approve | partial | ...
+  @doc("Reserved canonical types + declared x-<org>/<type> extensions (see below).") type: OutcomeType;   // approve | deny | refer | conditional-approve | partial | x-<org>/<type>…
   @doc("Machine-readable reasons drawn from governed CodeSets.") reasons: CodeRef[];
   @doc("Attached, individually-stateful conditions (see doc 04).") conditions: Condition[];
   @doc("Set when this Outcome is a member of a CompositeOutcome.") authority?: string;
@@ -505,6 +532,16 @@ model CompositeOutcome {
 @doc("A reference to a governed CodeSet row, pinning the version used.")
 model CodeRef { code: string; codeSet: string; }   // e.g. codeSet: "obligations@4.3.0"
 ```
+
+**`OutcomeType` is open at a declared seam, not silently open** (BRIEF §21; the "closed core, declared
+extension points" rule). The reserved canonical types (`approve | deny | refer | conditional-approve |
+partial`) are closed-vocabulary and understood by every downstream consumer; a domain that needs a new
+outcome kind declares it under an **`x-<org>/<type>` extension namespace** in the Workspace, so the
+extension is enumerable and discoverable rather than an ad-hoc string. Unknown-type handling is
+defined: **CompositeOutcome roll-up** treats an unrecognised member type as `refer`-equivalent (never
+silently `approve`) so an unknown never clears a composition; **per-audience rendering** falls back to
+the code's own `CodeDisplay` label (§9.2) and, absent a declared renderer, to a safe "needs-attention"
+presentation — so an unknown type degrades to *visible + non-approving*, never to a false positive.
 
 `Condition` (its `kind`/`state` lifecycle) and the composition semantics live with the Case and Decision
 layers that own them ([04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5.5,
@@ -583,6 +620,14 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
 - **Interchange over training data.** Downstream consumers see only OpenAPI/JSON Schema/AsyncAPI —
   the formats with by far the most LLM training data — so agents reason about the *artifacts*
   fluently even though the *source* is the less-common TypeSpec.
+- **A machine-readable artifact-type catalog for discovery.** An agent onboarding to a Workspace can
+  enumerate *every* governed artifact class in one call: `ichiflow artifacts list --json` (and the
+  MCP Tier-0 `list_artifact_types`) returns each class — Schema, DecisionModel, CodeSet, Flow,
+  compute-step/code-activity, uischema, viewschema, pageschema, copyset, Entitlement, Portal, Adapter,
+  tokens, Harness — with its canonical JSON Schema, its authoring surfaces, and its declared extension
+  seams (the `x-`/SPI points of BRIEF §21). This complements the per-CodeSet dependency graph (§9.4,
+  "what depends on this code?") with a *global* artifact-type index, so an agent discovers what it can
+  author without reading the docs first (cross-ref [10-ai-native-experience.md](10-ai-native-experience.md) §2.2).
 
 ---
 
