@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-TCK subset (build plan 2.1). Compliance-level-2 construct: a decision table with the UNIQUE
+  hit policy over a numeric input, using FEEL range/comparison unary tests. Rows are disjoint so
+  exactly one fires. Curated as a conformance vector for the Decision Engine SPI reference engine.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/"
+             xmlns:feel="https://www.omg.org/spec/DMN/20240513/FEEL/"
+             namespace="https://ichiflow.ai/dmn/tck/grade"
+             id="grade"
+             name="grade">
+
+  <inputData id="idScore" name="Score">
+    <variable name="Score" typeRef="number"/>
+  </inputData>
+
+  <decision id="decGrade" name="Grade">
+    <variable name="Grade" typeRef="string"/>
+    <informationRequirement>
+      <requiredInput href="#idScore"/>
+    </informationRequirement>
+    <decisionTable hitPolicy="UNIQUE" outputLabel="Grade">
+      <input id="inScore" label="Score">
+        <inputExpression typeRef="number">
+          <text>Score</text>
+        </inputExpression>
+      </input>
+      <output id="outGrade" typeRef="string"/>
+      <rule id="rA">
+        <inputEntry><text>&gt;= 90</text></inputEntry>
+        <outputEntry><text>"A"</text></outputEntry>
+      </rule>
+      <rule id="rB">
+        <inputEntry><text>[70..90)</text></inputEntry>
+        <outputEntry><text>"B"</text></outputEntry>
+      </rule>
+      <rule id="rC">
+        <inputEntry><text>[50..70)</text></inputEntry>
+        <outputEntry><text>"C"</text></outputEntry>
+      </rule>
+      <rule id="rF">
+        <inputEntry><text>&lt; 50</text></inputEntry>
+        <outputEntry><text>"F"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+
+</definitions>

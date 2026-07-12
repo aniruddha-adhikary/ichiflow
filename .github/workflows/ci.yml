@@ -79,6 +79,12 @@ jobs:
       - name: Contract breaking-change diff (oasdiff, chunk 1.4a)
         run: pnpm contract:diff
 
+      - name: Decision layer — DMN-TCK subset on the SPI reference engine
+        run: pnpm decision-tck:jvm
+
+      - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
+        run: pnpm quality:jvm
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

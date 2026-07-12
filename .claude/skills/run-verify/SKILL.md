@@ -26,8 +26,8 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 ## Registered scopes
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
-`contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`. More come online
-phase by phase (doc 14).
+`contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
+`code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -56,3 +56,11 @@ hand-authored reference DMN on Apache KIE / Drools, asserting identical results 
 fidelity spike). To **accept** an intentional breaking change: run `pnpm contract:accept` (copies the
 emitted OpenAPI over the baseline) and commit the updated baseline — that commit is the record of the
 deliberate contract change.
+
+`decision-layer` runs the curated DMN-TCK subset through the Decision Engine SPI reference engine
+(Drools) and asserts `tck_cases_green == total` plus the capability descriptor; run
+`pnpm decision-tck:jvm` before `pnpm verify` to produce `core/build/decision-tck-results.json`.
+
+`code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
+both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce
+`core/build/reports/detekt/detekt.sarif` and `core/build/arch-rules-results.json`.

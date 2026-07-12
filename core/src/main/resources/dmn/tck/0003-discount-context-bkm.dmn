@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DMN-TCK subset (build plan 2.1). Compliance-level-3 construct: a BKM whose encapsulated logic is a
+  FEEL function, invoked from a boxed Context decision that then does arithmetic on the result. Mirrors
+  the hard boxed-expression kinds (BKM + invocation + context) the projection spike relies on, here as
+  an independent conformance model with a decision-table-free multi-step decision.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/"
+             xmlns:feel="https://www.omg.org/spec/DMN/20240513/FEEL/"
+             namespace="https://ichiflow.ai/dmn/tck/discount"
+             id="discount"
+             name="discount">
+
+  <inputData id="idTier" name="Tier">
+    <variable name="Tier" typeRef="string"/>
+  </inputData>
+  <inputData id="idPrice" name="Price">
+    <variable name="Price" typeRef="number"/>
+  </inputData>
+
+  <businessKnowledgeModel id="bkmRate" name="Discount Rate">
+    <variable name="Discount Rate" typeRef="number"/>
+    <encapsulatedLogic>
+      <formalParameter name="tier" typeRef="string"/>
+      <literalExpression>
+        <text>if tier = "GOLD" then 0.2 else if tier = "SILVER" then 0.1 else 0</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+
+  <decision id="decNet" name="Net Price">
+    <variable name="Net Price" typeRef="number"/>
+    <informationRequirement>
+      <requiredInput href="#idTier"/>
+    </informationRequirement>
+    <informationRequirement>
+      <requiredInput href="#idPrice"/>
+    </informationRequirement>
+    <knowledgeRequirement>
+      <requiredKnowledge href="#bkmRate"/>
+    </knowledgeRequirement>
+    <context>
+      <contextEntry>
+        <variable name="rate" typeRef="number"/>
+        <invocation>
+          <literalExpression>
+            <text>Discount Rate</text>
+          </literalExpression>
+          <binding>
+            <parameter name="tier"/>
+            <literalExpression>
+              <text>Tier</text>
+            </literalExpression>
+          </binding>
+        </invocation>
+      </contextEntry>
+      <contextEntry>
+        <literalExpression>
+          <text>Price * (1 - rate)</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+
+</definitions>

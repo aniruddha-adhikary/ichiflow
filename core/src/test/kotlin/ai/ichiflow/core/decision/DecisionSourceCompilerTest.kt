@@ -1,5 +1,6 @@
 package ai.ichiflow.core.decision
 
+import ai.ichiflow.core.decision.spi.DroolsDecisionEngine
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.io.File
@@ -46,13 +47,8 @@ class DecisionSourceCompilerTest {
         path: String,
         inputs: Map<String, Any?>,
     ): Pair<String?, Boolean> {
-        val res = org.kie.internal.io.ResourceFactory.newReaderResource(java.io.StringReader(xml))
-            .apply { setSourcePath(path) }
-        res.resourceType = org.kie.api.io.ResourceType.DMN
-        val runtime = org.kie.dmn.core.internal.utils.DMNRuntimeBuilder.fromDefaults()
-            .buildConfiguration()
-            .fromResources(listOf(res))
-            .getOrElseThrow { e -> RuntimeException("build failed", e) }
-        return DecisionProjectionSpike.evaluate(runtime, inputs, "Fee")
+        val engine = DroolsDecisionEngine()
+        val model = engine.load(xml, path)
+        return DecisionProjectionSpike.evaluate(engine, model, inputs, "Fee")
     }
 }
