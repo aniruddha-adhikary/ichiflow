@@ -476,6 +476,12 @@ governed pattern — a documented `compute` contract (`SeededAllocate`) + a **co
 that `SHA-256(seed)==commitment`, the roster hash is stable, and `allocate` is a pure function of
 `(roster, seed)`. Not a new step type; a **blessed, harness-verified pattern** in the resources manifest.
 
+**Resolved (2026-07 gap-fix round):** blessed as the harness-verified **SeededAllocate** pattern — the
+commit-reveal / public-beacon recipe plus the purity + concurrency harness in
+[13 §2.n](../../architecture/13-agent-harness-loops.md) (asserts `SHA-256(seed)==commitment`, stable roster
+hash, `allocate` pure in `(roster, seed)`), with the standing-Flow pointer in
+[04 §5.12](../../architecture/04-flow-and-case-layer.md). A named pattern, not a new step type — exactly as proposed.
+
 ### G2 — Cross-Case shared mutable state with fairness invariants — **BLOCKING**
 ichiflow has **no first-class primitive** for multi-dimensional, transactionally-consumed shared state
 with a hard non-negativity invariant under concurrency. The permit example's fee pool and any single
@@ -490,6 +496,14 @@ schema'd, Team-owned, effective-dated artifact declaring dimensions + invariants
 red-teams the invariant under simulated parallel bookings. This is the single most important missing
 primitive the case surfaces.
 
+**Resolved (2026-07 gap-fix round):** adopted as the first-class **`QuotaLedger`** primitive
+([ADR-0030](../../adr/0030-quota-ledger.md), [04 §5.9](../../architecture/04-flow-and-case-layer.md)) — a
+governed, Team-owned, effective-dated ledger declaring dimensions + invariants, with atomic
+`reserve`/`commit`/`release` invoked from a canonical **`quota-op`** step on the DecisionRecord/outbox spine,
+memoized exactly-once on replay, and a concurrency harness ([13 §2.l](../../architecture/13-agent-harness-loops.md))
+red-teaming `headroom >= 0` under contention. The interim `QuotaReserve` `compute`-ref modelling (§2.4, §4.2)
+is superseded by `quota-op`.
+
 ### G3 — Eligibility over a household/entity graph — **MINOR**
 FEEL expresses bounded quantifiers but not multi-hop relational reachability legibly (§2.3); the
 nucleus/orphan/joint-singles tests strain into unreadable nested `some`/`every`. The architecture's
@@ -499,6 +513,11 @@ means graph-shaped eligibility is *routinely* a Decision **plus** a compute feat
 decision source should say so explicitly. **Proposal:** a documented **"graph predicate → compute
 feature-function → decision-table key"** pattern in the decision-layer guidance + resources manifest, so
 authors reach for it deliberately instead of drowning a decision table in nested quantifiers.
+
+**Resolved (2026-07 gap-fix round):** documented as the **"graph predicate → compute feature-function →
+decision-table key"** pattern in [03 §2.4](../../architecture/03-decision-layer.md) — the `NucleusResolver`
+seam this section already uses, now a named decision-layer pattern (the multi-hop graph walk lives in a
+schema'd `compute` feature-function returning a typed `nucleusKind` the decision table keys on).
 
 ### G4 — Cohort / set-level decisioning and a cohort-level DecisionRecord — **BLOCKING**
 Two sub-gaps. **(a) Cohort barrier:** the batch trigger ([04 §2.4](../../architecture/04-flow-and-case-layer.md))
@@ -514,6 +533,13 @@ to any one application. Today it must be smeared across N per-Case records or pa
 one set-level `compute`/`decision`, scatter) and (b) a **cohort-scoped DecisionRecord** (keyed by
 `exerciseId`) that per-Case records **reference** for the shared ballot facts — so "prove my queue number"
 resolves to *one* cohort record every applicant's record points at, not 50,000 copies.
+
+**Resolved (2026-07 gap-fix round):** adopted as the **`cohort`** set-level Case shape
+([ADR-0031](../../adr/0031-set-level-cases.md), [04 §5.10](../../architecture/04-flow-and-case-layer.md)) — an
+explicit **gather-barrier** over a case selector with a bounded-fan-in guardrail, running one set-level
+step (the ballot ordering) and scattering results back, plus a **cohort-scoped DecisionRecord** keyed by
+`cohortId`/`exerciseId` that member Cases reference ([08 §1.7](../../architecture/08-audit-and-observability.md)).
+The `QuotaLedger` ranked draw (G2) composes under the same barrier.
 
 ### G5 — EIP "resale-vs-BTO" branding nuance — **MINOR (modelling, not architectural)**
 Formally EIP is branded for resale, yet identical ethnic ratios bind at BTO selection (§1). This is a

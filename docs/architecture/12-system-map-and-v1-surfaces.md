@@ -383,6 +383,84 @@ against their own substrates. No new zone or deployable is introduced by the LLM
 
 ---
 
+## 6. Packaging & placement doctrine
+
+Section §1 classifies human **surfaces** (is a screen the product output, or an internal
+control?). **This section classifies capability placement** — does a capability live in the kernel,
+ship as a first-party optional component, sit behind an SPI with a thin default, or delegate to a
+system the enterprise already runs? The two rules are **complementary**: one decides *who builds the
+UI*, the other decides *where the capability lives*, and both hold the v1 kernel to its minimum. This
+is the **living copy** of the doctrine recorded in
+[`../adr/0033-packaging-and-placement.md`](../adr/0033-packaging-and-placement.md) (the source of
+record); the classification table below is the map the doctrine maintains.
+
+### 6.1 The placement decision tree
+
+For each capability — or, more precisely, each **semantic within a capability** — ask in order:
+
+- **(i) Does the audit spine depend on its semantics?** → **CORE**, hard-shipped. If the
+  DecisionRecord, deterministic replay, `case_id` correlation, number/ledger allocation, or
+  lifecycle/verification integrity depend on it, it cannot leave ichiflow (Document numbering +
+  lifecycle + verification; `QuotaLedger` invariants; the Flow interpreter; the DecisionRecord
+  itself).
+- **(ii) Is it an ichiflow-differentiating capability?** → **FIRST-PARTY OPTIONAL COMPONENT**, shipped
+  by ichiflow but installable/optional, not baked into the kernel. The differentiators ichiflow
+  **builds** ([`BRIEF.md`](BRIEF.md) §17): decision governance, the Copilots, the Design Kit — and the
+  *default* implementations of core SPIs where ichiflow's version is itself the selling point.
+- **(iii) Is it a commodity with mature OSS?** → **SPI + THIN DEFAULT + integration guidance**. Ship a
+  small, licensing-vetted default behind an SPI and document integrating the proven OSS (document
+  rendering → Typst default; search → Postgres FTS; BI → embed Metabase/Superset).
+- **(iv) Does the enterprise already own one?** → **DESIGNED EXTERNAL-DELEGATION PATH** (an Adapter or
+  `external-task` seam). Provide a designed seam so an enterprise's existing platform owns the concern
+  while ichiflow keeps the audit anchor (an enterprise CCM owning issuance; a corporate IdP federated
+  in; an external finance system reached by `external-task`).
+
+**This classifies a *semantic*, not a product area monolithically.** Most real capabilities are
+**hybrid** across the tree — issuance is (i) numbering/lifecycle/verification **core** + (ii)/(iii)
+rendering **component/SPI** + (iv) **delegated** full issuance; the audit-spine core is invariant
+across placements, and only *who does the non-core part* moves. The doctrine's job is to keep the
+**core minimal** (only what the audit spine depends on) and give everything else a **declared seam
+with a delegation path** — the "closed core, declared extension points" rule ([`BRIEF.md`](BRIEF.md)
+§21b) applied to packaging, and the generalization of ADR-0029's three issuance placement profiles.
+
+### 6.2 The classification table
+
+Each row places the capability **per semantic** (the primary quadrant in **bold**), its v1 default,
+its external-delegation path, and — because this doc is the phasing map — its **v1 phasing**. It is the
+capability-placement companion to the **⟨SPI⟩** swap points already marked on the §4.1 component map.
+Placement is a **technical** call, never a paywall: every quadrant ships under Apache-2.0/MIT
+([`../adr/0022-fully-open-source.md`](../adr/0022-fully-open-source.md)); and where a row reads
+"post-v1," that is a **phasing** of the surface/adoption, not a change of placement
+([`../adr/0024-llm-only-internal-surfaces-v1.md`](../adr/0024-llm-only-internal-surfaces-v1.md)).
+
+| Capability | Placement (per semantic) | v1 default | External-delegation path | v1 phasing |
+|---|---|---|---|---|
+| **Document rendering** | render **(iii)** SPI; numbering/lifecycle/verification **(i)** core | Typst behind rendering SPI | delegated rendering / full issuance → enterprise CCM (ADR-0029) | **v1**: issuance core + Typst default; the delegation seam is designed, deep CCM integrations post-v1 |
+| **Notifications** | delivery **(iii)** SPI; issuance-of-record **(i)** core when it *is* a Document | notification adapters (05 §4.2) | enterprise notification / CCM platform via outbound Adapter | **v1** |
+| **BI / reporting** | **(iii)** embed OSS BI over **(i)** governed read models | Metabase/Superset-class over read-model projections (ADR-0021) | enterprise BI tool over the same governed read models | governed read models **v1**; embedded BI **adopted post-v1** (C1) |
+| **Observability backend** | **(iii)/(iv)** OTel-native, BYO backend; no proprietary store | minimal local viewer (Dev); OTLP export (ADR-0011) | any OTLP backend (CloudWatch/GCO/Grafana/Datadog) | **v1** (OTLP export + Dev-tier local viewer) |
+| **Identity broker** | **(iv)** broker per audience; propagation **(i)**-adjacent | Keycloak (ADR-0009) | federate the enterprise/agency corporate IdP upstream | **v1** |
+| **AuthZ engine(s)** | **(i)** one PDP contract; engines **(iii)** behind it | OpenFGA only (ADR-0010) | Cedar/OPA ABAC behind the same PDP | OpenFGA **v1**; Cedar/OPA add-on **post-v1** |
+| **Rule engine** | **(i)** DMN semantics + governance core; engine **(iii)** SPI | Apache KIE/Drools (ADR-0002) | any DMN-TCK-conformant engine via the Decision SPI | Drools **v1**; ZEN second engine **post-v1** |
+| **Workflow substrate** | **(i)** interpreter + DecisionRecord core; execution **(iii)** on a substrate | Temporal (ADR-0003) | substrate is embedded, not delegated; Flows export CNCF-SWF | **v1** |
+| **Entity storage** | **(i)** contracts + query/CRUD; store **(iii)** SPI | PostgreSQL-first (ADR-0018/0012) | OpenSearch-class search binding; DB behind the Repository SPI | **v1** |
+| **Object storage** (Document binaries) | binary **(iii)** SPI; snapshot/hash **(i)** core | PG large-object / local FS (Dev/Team), S3-compatible (Ent) | any S3-compatible object store behind the SPI (02 §11) | **v1** |
+| **Migration tooling** | **(ii)** differentiator (map-first, parity) built | Ring 0/1/2 + parity harness (ADR-0014) | Atlas / pgroll / Debezium integrated beneath the Copilot seam | rings + parity harness **v1**; Copilots **post-v1** (v1 authors mappings as plain declarative data) |
+| **MCP surface** | **(i)** why/case/flow query APIs + tier enforcement core; **(ii)** the server | first-party `ichiflow-mcp`, 3 guardrail tiers (ADR-0015/0024) | MCP tool-extension SPI for org-specific tools | **v1** |
+
+**Cross-refs.** Source of record:
+[`../adr/0033-packaging-and-placement.md`](../adr/0033-packaging-and-placement.md). The doctrine
+generalizes [`../adr/0029-document-issuance.md`](../adr/0029-document-issuance.md)'s three issuance
+placement profiles (core numbering/lifecycle + component rendering + delegated issuance) to every
+capability. Every quadrant is fully open source
+([`../adr/0022-fully-open-source.md`](../adr/0022-fully-open-source.md) — placement is technical, never
+a paywall), and the v1-phasing column reflects surface/adoption phasing
+([`../adr/0024-llm-only-internal-surfaces-v1.md`](../adr/0024-llm-only-internal-surfaces-v1.md)), never
+placement. **Relationship to §1:** that rule classifies human **surfaces**; this one classifies
+**capability placement** — complementary lenses that both keep the v1 kernel minimal.
+
+---
+
 ## Open questions
 
 1. **`ichiflow preview` fidelity is now load-bearing for more personas.** With B5/B6/B7 collapsing to

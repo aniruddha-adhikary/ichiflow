@@ -498,6 +498,10 @@ versions and lifecycle transitions**, each an audited DecisionRecord event (§7,
   holder's decision (portal action or inbound canonical event, correlated by `case_id`), raced by a
   **pausable SLA** (§5.7) whose expiry follows an authored `onTimeout` chain (`offer-lapsed`). This is the
   facet the **grants** Letter-of-Offer needs, and it is why the step is canonical rather than a compute-variant.
+  The acceptance facet also covers **multi-party countersignature** — a small extension where `issued →
+  accepted` requires **N correlated counter-signatures** (co-applicants acceding, e.g. the grants case's
+  co-applicants) before the award activates: each accede is an idempotent, correlated signal on the same
+  await, and activation gates on all N (ADR-0029).
 
 **2.9.3 The binary is derived — determinism, storage, redaction.** The **canonical truth is the data
 snapshot + the pinned template version**, from which the binary **deterministically re-renders**; the PDF
@@ -1243,6 +1247,19 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
   root Flow. The residual question is the stitching model for a Case that spans multiple sibling flows
   *concurrently* (e.g. a submission with parallel per-authority sub-cases under §2.3 composition) — how
   the DecisionRecord and task-inbox grouping present one logical Case over N flows.
+- **QuotaLedger release-back reflow policy (§5.9).** The ledger declares a reflow-policy *hook*, but the
+  full **vocabulary** of reflow targets (`next-in-ranked-order` / `next-round` / `treasury`) and the
+  governance of **cross-round** reflow — returning released money to a *closed* round — is undecided:
+  whether cross-round reflow is even permitted, and under what approval, is a real fairness question the
+  primitive flags rather than fixes (ADR-0030).
+- **Cohort bounded-fan-in cap + chunking (§5.10).** A cohort gather-barrier over tens of thousands of
+  Cases needs a concrete fan-in cap and a chunking policy for the set-level step. This **interacts with
+  the long-history mitigation question** (below): a large set-level step inflates one interpreter's event
+  history, so the cap/chunking and continue-as-new checkpointing must be settled together (ADR-0031).
+- **Case-association cross-invariant-check cadence (§5.11).** Whether cross-Case invariant checks
+  (double-funding, active-award caps) run at **link time**, as a **scheduled Flow** over the association
+  set, or **both** is undecided; a portfolio-wide check is a set-level read whose cadence/cost needs
+  measuring (ADR-0032).
 - **Interpreter granularity.** One universal interpreter workflow vs. a small family (e.g. a
   separate interpreter for high-fan-out vs. long-human-wait shapes) to tune Temporal history size
   and sticky-cache behavior. Undecided pending load testing.
