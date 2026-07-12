@@ -15,6 +15,8 @@ and consumed everywhere. Specifically —
   oasdiff breaking-change gates for APIs, expand/contract at the contract level);
 - how every other pillar — **Decisions, Flows, Adapters, Portals/UI, the why API** — consumes
   this one schema source;
+- the **domain entity store** (§11): schema-defined business entities persisted PostgreSQL-first via
+  generated repositories with a query/pagination/search contract (v1-kernel; ADR-0018);
 - the **monorepo layout** for schemas and generated artifacts;
 - how **AI coding agents** author and consume schemas (LLM-legible IDL; JSON Schema doubling as
   LLM tool schemas).
@@ -522,6 +524,39 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
 
 ---
 
+## 11. The domain entity store (v1-kernel)
+
+The schema also defines ordinary business **entities** — the `LoanApplication` *record itself*, the
+`Policy`, the `Claim` — that must be persisted, listed, edited, and searched. This is a distinct
+concern from the **Case store** (case state + `case_id` registry, [04](04-flow-and-case-layer.md)) and
+from the **DecisionRecord** (audit projection, [08-audit-and-observability.md](08-audit-and-observability.md)):
+those model *process and provenance*; the entity store models the *business record*. It is a **v1-kernel**
+module (ADR-0018), because the generated List/Detail/Form/CRUD screens ([07-ui-and-portals.md](07-ui-and-portals.md)
+§5) and their ReBAC row filters presuppose a queryable entity store and a list/query API.
+
+- **Schema-defined, generated persistence.** Entity tables are **generated from the canonical schema**
+  — the same source that drives types, validators, and forms. No hand-maintained ORM mapping drifts
+  from the contract.
+- **PostgreSQL-first, behind a Repository SPI.** Persistence is PostgreSQL-first
+  ([0012](../adr/0012-postgresql-first-storage-spis.md)) via **generated repositories / CRUD
+  services** exposing a **query / pagination / search contract** emitted alongside the OpenAPI surface
+  and consumed by the generated UI and by Flows. Search default is **Postgres FTS**, with an
+  OpenSearch-class binding behind the search SPI.
+- **CRUD + audit-log + outbox — not event-sourced.** Business entities are ordinary tables with an
+  audit log and a transactional outbox. Event sourcing stays confined to the decision/flow core
+  ([0011](../adr/0011-decisionrecord-and-selective-event-sourcing.md)); entities are *not*
+  event-sourced. Their history is the audit log; the DecisionRecord supplies causal provenance.
+- **Entity ↔ Case relationship.** An entity is referenced by `case_id`; entity lifecycle and Case
+  lifecycle are **distinct** — an entity can precede or outlive any single Case that touches it.
+- **PDP-shaped access.** The same central PDP that guards the API guards entity queries: ReBAC supplies
+  the row-filter set for list/search, the generated UI renders exactly what the API would return.
+
+The **ORM / data-access choice (jOOQ vs Exposed vs plain SQL)** is an explicit **Open question**
+(below): this section fixes the entity store's *presence, generation, and query/pagination/search
+contracts*; the data-access library is deliberately left open and contained behind the Repository SPI.
+
+---
+
 ## Open questions
 
 1. **OpenAPI 3.2 adoption timing.** 3.2 (Sept 2025) improves discriminators (`defaultMapping`,
@@ -544,3 +579,8 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
 6. **Where Zod ends and TypeBox begins on the TS side.** Both are valid; the boundary (generated
    Zod for typed endpoints vs. TypeBox/Ajv for dynamic/raw JSON Schema) is a convention that needs
    codifying in the contracts-ts package guidelines.
+7. **Domain entity-store ORM / data-access layer (§11).** The entity store's presence, generated
+   repositories, and query/pagination/search contracts are decided (ADR-0018), but the Kotlin
+   data-access library — **jOOQ** (typed SQL DSL, generated from the DB), **Exposed** (Kotlin ORM/DSL),
+   or **plain SQL** — is open, trading typed-query ergonomics against codegen fit and licensing. It is
+   contained behind the Repository SPI, so the choice does not change the entity store's contracts.

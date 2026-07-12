@@ -20,7 +20,15 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    simulation, and explainability layer (the true gap vs IBM ODM Decision Center).
 2. **Orchestration**: Temporal is the durable-execution substrate. ichiflow ships a declarative
    flow definition (JSON/YAML, CNCF-Serverless-Workflow-aligned, schema'd) interpreted on
-   Temporal. Human tasks / manual review / case management is a first-party ichiflow module
+   Temporal. Computation that is neither a Decision nor an Adapter runs in a first-class **`compute`
+   step** — a typed Kotlin/TS **code activity** (schema'd boundary, versioned `ref`, unit-testable,
+   trace-emitting), the *same* unified code-activity contract used by decision feature-functions and
+   adapter code-transforms. Flows have three authoring surfaces — a **typed TS/Kotlin flow builder**
+   (steps, guards, and event listeners as pure typed code), **YAML**, and **AI chat** — but the
+   **canonical flow JSON is the single executed/audited/exported artifact**: the typed builder
+   compiles **one-way** to it (mirroring TypeSpec→OpenAPI; simple flows may still be authored as YAML
+   directly, no fake round-trip), and every flow carries `authored-in: code | yaml | ai-chat`
+   provenance. Human tasks / manual review / case management is a first-party ichiflow module
    (await-signal + SLA timers + escalation; assignment routing is itself a decision).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
@@ -40,9 +48,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 7. **Identity**: broker per audience/portal (Keycloak primary; Zitadel noted for B2B2C),
    OIDC/SAML/LDAP/legacy username-password via broker strategies; Better Auth pattern on TS
    edges; OAuth2 Token Exchange (RFC 8693) for identity propagation.
-8. **Authorization**: central PDP; hybrid model — OpenFGA (ReBAC backbone, list-filtering) +
-   Cedar or OPA for ABAC/feature/field-level policies; the SAME PDP drives generated API and
-   generated UI (field/row-level); authz decisions produce decision logs (explainable).
+8. **Authorization**: central PDP driving the SAME entitlements across generated API and generated
+   UI (field/row-level); authz decisions produce decision logs (explainable). **v1 = OpenFGA only**
+   (ReBAC backbone + list-filtering + simple attribute conditions). **Cedar/OPA ABAC** for richer
+   attribute/feature/field-level policy is an **Enterprise-tier / post-v1 add-on behind the same PDP
+   interface** — the PDP contract is unchanged whether one engine or two sit behind it; the hybrid
+   OpenFGA + Cedar/OPA model remains the target end-state.
 9. **Audit/explainability**: per-case DecisionRecord is a first-class typed domain object
    stitching workflow event history + fired-rule traces + DMN results + human review + AI-agent
    actions into one causal chain, queryable via a "why" API. Event-source the decision/flow
@@ -85,6 +96,15 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   fee/rate tables) governed like any other contract; Decisions, Flows, and the UI reference a CodeSet
   by `id@version` rather than inlining its rows. Each row carries per-audience display metadata.
 - **Flow** — declarative long-running process definition interpreted on Temporal.
+- **Compute step / code activity** — the unified typed-code extension primitive: a versioned,
+  schema'd-at-the-boundary, trace-emitting Kotlin/TS unit (`ref: <lang>://<module>/<Name>@<version>`
+  + input/output JSON Schema) used identically as a Flow `compute` step, a Decision feature-function,
+  and an Adapter code-transform. Computation lives here; declarative artifacts stay for control-flow
+  graphs, rule tables, and structural mappings. Because it is schema'd at its boundary and emits a
+  trace, code participates in the audit spine without the DSL becoming a programming language.
+- **authored-in** — provenance on a Flow (and any artifact with multiple authoring surfaces)
+  recording which surface produced the canonical artifact: `code` (typed builder), `yaml`, or
+  `ai-chat`. The canonical JSON/DMN remains the executed/audited/exported artifact regardless.
 - **Case** — a unit of business work flowing through Flows (incl. manual review); carries the
   global `case_id` and its DecisionRecord. Supports post-submission operations (amend, cancel,
   withdraw, appeal, correct).
@@ -96,19 +116,28 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 - **Design Kit** — the first-party UX-designer toolchain (parallel to the AI-native agent kit):
   a DTCG design-token pipeline, a component workbench, a live playground (real screens over
   schema-driven mocks), and a designer-facing safety contract (see doc 07). uischema/viewschema
-  are the canonical artifacts; the playground is the authoring surface.
-- **pageschema / copyset** — *proposed* designer artifacts (ADR pending, see doc 07 §13):
+  are the canonical artifacts; **AI chat authors them and the live playground is the read-only
+  judgment surface** (no visual-builder canvas — Authoring doctrine; ADR-0019).
+- **pageschema / copyset** — first-class **governed designer artifact classes** (see doc 07 §13):
   `pageschema` composes multiple uischema/viewschema regions into a screen; `copyset` is a
   translator-friendly, i18n-keyed microcopy catalog referenced by key (sharing the CodeSet
-  `plainLanguage` i18n substrate). Named here as vocabulary; committing them as governed artifact
-  classes is a founder decision.
+  `plainLanguage` i18n substrate). Versioned and CI-gated like any other contract.
 - **Workspace** — the design-time project (schemas, decisions, flows, uischemas, adapters,
   policies) — a git repo an AI agent can operate on.
 - **DecisionRecord / why API** — the audit/explainability object and its query surface.
 - **Copilots** — Domain Modeling Copilot (greenfield), Migration Copilot (brownfield), Rule
   Authoring assistance for business users; all follow "AI proposes, deterministic tools +
   humans dispose," with provenance. (A design-facing UI/Design Copilot on the same contract is
-  documented in docs 07/10.)
+  documented in docs 07/10.) **All Copilots are post-v1**; in v1 their artifacts (Ring-0 mappings,
+  DMN, uischema/pageschema) are authored as plain declarative data by a human or agent without the
+  Copilot. The AI-chat authoring doctrine (below) is the v1 assistance surface.
+- **Authoring doctrine** — every persona (business user, designer, developer) authors by **AI chat
+  + live preview**, not drag-and-drop or visual-builder canvases. The AI authors the artifact from
+  conversation; the human steers in chat and judges via **read-only live previews** — flow diagrams,
+  decision-table views, rendered screens, simulation results — rendered *from* the canonical
+  artifacts, never a second editable representation. The approval surface is the **diff (AI-explained
+  in plain language) + preview / simulation** pair. Direct artifact editing remains available to
+  developers. (See doc 00 "Chat to author, preview to judge"; ADR-0019.)
 - **Tiers** — Dev (single binary, SQLite/embedded), Team (docker compose/small K8s, Postgres),
   Enterprise (HA, zones, SSO, compliance packs). Same app code across tiers; config only.
 

@@ -1,9 +1,10 @@
 # 0010 — Hybrid authorization: OpenFGA ReBAC backbone + Cedar/OPA ABAC, one PDP
 
-- Status: accepted
+- Status: accepted (amended 2026-07-12)
 - Date: 2026-07-12
 - Deciders: ichiflow architecture
 - Research: [../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md)
+- Amendment basis: design review 2026-07 (scope critique)
 
 ## Context
 
@@ -36,6 +37,25 @@ both the generated API and the generated UI (research 04 §B.2.2, §B.2.3):
   *reason/rule*) — feeding both compliance audit and the UI explanation surface, and joining the
   DecisionRecord ([0011](0011-decisionrecord-and-selective-event-sourcing.md)).
 - Entitlements are **policy-as-code, versioned, AI-generatable** (research 04 §B.3).
+
+## Amendment (2026-07-12) — v1 phasing: OpenFGA only
+
+The hybrid above is the **target end-state**, but running and reconciling two engines (OpenFGA graph +
+Cedar/OPA) plus write-through/CDC tuple-sync is disproportionate v1 scope and cannot live in the
+single-binary dev tier (OpenFGA is a server; a stale tuple is a wrong decision). Phasing decision:
+
+- **v1 = OpenFGA only.** The ReBAC backbone (relationships, multi-tenancy, reverse-index
+  list-filtering) plus **simple attribute conditions** (OpenFGA conditional relationships) cover v1's
+  RBAC + row-level + coarse attribute needs.
+- **Cedar/OPA ABAC = Enterprise-tier / post-v1 add-on**, for richer attribute/feature/field-level
+  policy and formal analysis, introduced **behind the same PDP interface**.
+- **The PDP contract is unchanged** whether one engine or two sit behind it: the API and UI PEPs still
+  call `(principal, action, resource, context)` → `allow | deny + reason`, and decision logs are
+  emitted identically. Adding Cedar/OPA later is a `PolicyEngine` SPI binding, not a re-architecture.
+
+Consequence for the dev tier: this resolves the flagged authz exception in
+[09](../architecture/09-deployment-and-topology.md) §3.1 — v1 authz is OpenFGA-shaped everywhere, with
+ABAC-rich field-masking a Team+/Enterprise capability, not a day-one dual-engine composition.
 
 ## Alternatives considered
 

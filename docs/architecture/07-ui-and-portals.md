@@ -22,8 +22,8 @@ covers —
 - **app-level i18n** alongside per-audience code rendering;
 - the **Design Kit** — the first-party designer toolchain (DTCG token pipeline, component
   workbench, live playground) and the **designer safety contract**;
-- proposed designer artifacts beyond uischema (**pageschema**, **copyset**) and the **mock-first**
-  (schema-driven MSW) design-time workflow;
+- first-class **governed designer artifacts** beyond uischema (**pageschema**, **copyset**) and the
+  **mock-first** (schema-driven MSW) design-time workflow;
 - where **fully custom frontends** plug in (headless APIs, BFF contract) so the UI layer stays
   optional.
 
@@ -323,7 +323,7 @@ Portal:
   tokenExchange: { sts: keycloak, downstreamAudiences: [loan-svc, billing-svc] }  # RFC 8693
   entitlements: { model: rebac+abac, relationships: openfga://ichiflow/1, policies: cedar://ichiflow/1 }
   tokens: brand-customer             # design-token set (look)
-  copyset: voice-customer            # per-audience microcopy / voice (proposed artifact — see §13)
+  copyset: voice-customer            # per-audience microcopy / voice (governed artifact — see §13)
   screens: [loan-application-form, my-cases-list, case-detail]
 ```
 
@@ -336,9 +336,9 @@ Portal:
   one-way async relay bridges zones (BRIEF §11). The Portal declaration carries its `zone`.
 - **Own entitlements.** Each Portal binds its own OpenFGA relationships + Cedar policies, so the
   same schema-generated screen renders differently per audience because the PDP answers differently.
-- **Brand = look + voice + composition.** A Portal binds its **design-token set** (look), and — as
-  the designer surface generalizes (§13) — a **`copyset`** (per-audience voice/microcopy) and
-  optionally a **`pageschema`** set (screen composition), so the audience-selecting-the-layer pattern
+- **Brand = look + voice + composition.** A Portal binds its **design-token set** (look), a
+  **`copyset`** (per-audience voice/microcopy), and optionally a **`pageschema`** set (screen
+  composition) — all first-class governed artifacts (§13) — so the audience-selecting-the-layer pattern
   (§4.1) extends from CodeSet display to the whole designer surface, not just theming.
 
 ---
@@ -431,19 +431,25 @@ surprises — they are **states a designer must be able to see and design**, so 
 mandated workbench stories for `PDP-hidden` (with the "why" affordance) and `PDP-read-only` alongside
 its ordinary states.
 
-### 11.3 Live playground (the authoring surface)
+### 11.3 Live playground (chat to author, preview to judge)
 
 The Design Kit ships a **live playground** (in the dev server) that loads a chosen Schema + its
-baseline uischema + a **mocked BFF** (§14) seeded with sample Case data and renders the real screen,
-with a **token/theme switch** and an **audience toggle** (customer / back-office / partner) so
-per-audience code rendering (§4.1) and PDP-shaped visibility are visible live.
+baseline uischema + a **mocked BFF** (§14) seeded with sample Case data and renders the **real
+screen**, with a **token/theme switch** and an **audience toggle** (customer / back-office / partner)
+so per-audience code rendering (§4.1) and PDP-shaped visibility are visible live.
 
-The design principle this settles: **the uischema JSON is a compile target, not an authoring
-surface.** Just as TypeSpec is the authoring surface and JSON Schema is the canonical artifact (doc 02
-§1), the **visual playground is the designer's authoring surface and uischema/viewschema is the
-canonical artifact** it emits. v1 delivers a read-only live preview (real screens, token/theme
-switching, audience toggle); a visual inspector that round-trips edits back to `contracts/ui/` is a
-later, larger capability (Open questions §6).
+The interaction model is the framework-wide doctrine (ADR-0019; doc 00 "Chat to author, preview to
+judge"): the designer **describes intent in chat**, the AI (UI/Design Copilot, §13 / doc 10 §7 —
+post-v1) **authors the uischema / pageschema / tokens**, and the **rendered screen is the read-only
+live preview the designer judges**, approving the **diff + preview** pair. There is **no drag-and-drop
+visual inspector**: an editable visual canvas would be a *second representation* of an artifact whose
+canonical form is the JSON, and is an explicit **non-goal** (doc 00 non-goals; ADR-0019).
+
+The design principle this settles: **the uischema JSON is a compile target — neither a hand-edited
+surface for designers nor a visual canvas.** Just as TypeSpec is the authoring surface and JSON Schema
+is the canonical artifact (doc 02 §1), here **AI chat is the designer's authoring surface and
+uischema/viewschema is the canonical artifact**, rendered as a live screen the designer judges. Direct
+uischema editing remains available to developers (it is text under version control).
 
 ---
 
@@ -480,15 +486,14 @@ playground before a PR is opened. **The designer's safety net is the same CI tha
 
 ---
 
-## 13. Where designers need more than uischema (proposed extensions)
+## 13. Beyond uischema — the designer's governed artifact classes
 
-uischema is a **form-layout** language; a lot of what a designer owns is not a form. Today the answer
-for the following is "register a higher-priority renderer" — i.e. a developer writes code, which is
-exactly the dependency the persona should escape. The extensions below all reuse the existing
-register / reference / version DNA, so they extend the architecture rather than fight it. **Each new
-*governed artifact class* below is a proposal pending an ADR** (surface-area cost: schema, CI gates,
-registry entry, generator, docs, agent skill); they are named here as vocabulary so the designer
-surface has a target shape.
+uischema is a **form-layout** language; a lot of what a designer owns is not a form. The fallback of
+"register a higher-priority renderer" — a developer writes code — is exactly the dependency the persona
+should escape. The artifact classes below reuse the existing register / reference / version DNA and are
+**adopted as first-class governed artifact classes** (BRIEF vocabulary; design review 2026-07), each
+versioned and CI-gated like any other contract (schema, CI gates, registry entry, generator, agent
+skill):
 
 - **`pageschema` (screen composition).** A case-detail or dashboard screen is *N* regions (summary
   header, timeline, obligation checklist, task actions, related cases) — a composition, not a single
@@ -499,9 +504,9 @@ surface has a target shape.
   copy, and button text are currently scattered inline in uischema. A **`copyset`** is an i18n-keyed
   message catalog (one key per string, per locale) that uischema/pageschema reference *by key* —
   exactly the CodeSet pattern (doc 02 §9). It yields a translator-friendly surface, governed
-  validation-error copy, and consistency with CodeSet `plainLanguage`; indeed **`copyset` and CodeSet
-  `plainLanguage` should share one i18n substrate** (§4.2). Whether `copyset` is a new class or an
-  extension of the CodeSet mechanism is part of the ADR.
+  validation-error copy, and consistency with CodeSet `plainLanguage`; **`copyset` is a distinct
+  governed artifact class that shares the CodeSet `plainLanguage` i18n substrate and tooling** (§4.2),
+  rather than a separate parallel i18n stack.
 - **Presentation mode.** Single-page / wizard / stepper / accordion is a top designer control and must
   not require code. Make **presentation mode a declared uischema-level option** the playground can flip.
 - **Declared empty / loading / error / partial states.** Make these **declared** per screen/region
@@ -538,11 +543,11 @@ and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
 
 ## Open questions
 
-1. **viewschema + pageschema vocabulary.** JSON Forms has no table/detail schema; ichiflow defines
-   viewschema on TanStack Table, and screen composition needs a **pageschema** (§13). Their exact
-   vocabularies (column sets, cell-renderer testers, region composition) must be **pinned down
-   together**, sharing tester semantics with uischema. Committing `pageschema` (and `copyset`) as new
-   governed artifact classes is an ADR-level decision (§13).
+1. **viewschema + pageschema vocabulary.** `pageschema` and `copyset` are **committed** as governed
+   artifact classes (§13; design review 2026-07); the residual work is pinning their *exact*
+   vocabularies — viewschema column sets / cell-renderer testers and pageschema region composition —
+   **together**, sharing tester semantics with uischema. A vocabulary work item, not an adoption
+   question.
 2. **uischema auto-migration coverage.** How much of a `@renamedFrom`-driven scope migration can
    be applied automatically vs. must be flagged for the designer (§3) is unvalidated — reshapes
    (a field splitting into two) have no clean automatic answer.
@@ -556,12 +561,12 @@ and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
 5. **"Why hidden" disclosure limits.** Surfacing the denial *reason* to end users can itself leak
    policy structure. Which reasons are user-facing vs. audit-only (and per-audience) is a policy
    question the PDP + Portal config must jointly answer.
-6. **Designer authoring surface — resolved in principle.** Designers do **not** hand-edit uischema
-   JSON: the **visual playground is the authoring surface and uischema/viewschema is the compile
-   target** (§11.3), with an AI-assisted UI/Design Copilot (doc 10 §7) proposing edits under the same
-   propose/approve guardrails. The residual product decision is *how far the playground round-trips in
-   v1* — read-only live preview (v1) vs a full visual inspector that writes edits back to
-   `contracts/ui/` (later, highest-effort item).
+6. **Designer authoring surface — resolved (ADR-0019).** Designers do **not** hand-edit uischema JSON,
+   and there is **no visual inspector / drag-and-drop canvas** — an editable canvas is a non-goal. The
+   authoring surface is **AI chat**; uischema/viewschema is the compile target; the playground renders
+   a **read-only live preview** the designer judges (diff + preview). The UI/Design Copilot (doc 10 §7,
+   post-v1) drives the chat under the propose/approve guardrails; direct uischema editing remains a
+   developer path.
 7. **Scoped designer approval authority.** §12 defines a low-risk `contracts/ui` + `tokens` change
    class the framework can prove cannot break the contract. Whether a design lead may approve that
    class **without** engineering sign-off is an org/governance (trust/liability) decision for the
