@@ -139,6 +139,15 @@ member Outcomes roll up — is itself a governed artifact (a small DMN or a type
 | `any-blocks` | no member denies; a single deny blocks the whole |
 | `quorum(k)` | at least *k* members approve |
 | `weighted` | the weighted tally of member Outcomes clears a threshold |
+| `custom` | a **governed DMN over the `members[]` array** emits the `rolledUp` OutcomeType — for composition rules the four closed policies cannot express (e.g. "approve if all fiscal authorities approve AND ≥1 of three environmental authorities approves, unless pre-cleared") |
+
+The escape hatch for composition that the four closed policies cannot express is **`policy: custom`,
+which resolves to a governed DMN over the `members[]` array — never to arbitrary code.** Composition
+is business logic that must be governed, simulated, parity-tested, and explained like any other
+Decision; routing it to opaque code would break exactly that. (Contrast the feature-prep and
+inter-step-computation cases (§2.4), where the escape hatch *is* typed code — because there the work
+is computation, not governed business logic. That distinction is the doctrine: **governed business
+logic → a Decision; computation → schema'd typed code.**)
 
 The result is a canonical **`CompositeOutcome`** (doc 02 §9.3): `{ policy, members[], rolledUp }`, each
 member Outcome and its codes staying attributed to their authority all the way into the DecisionRecord
@@ -157,10 +166,37 @@ fee reads its rates from a versioned, effective-dated table. The **rate-table ve
 in the DecisionRecord alongside the computed amount (§7; [08-audit-and-observability.md](./08-audit-and-observability.md) §1.5), so a fee is
 reconstructable as of the rates in force at decision time.
 
-**FEEL as the expression primitive everywhere.** Where ichiflow needs an inline predicate outside a
-full DecisionModel (a Flow guard condition, a Task assignment expression), it uses FEEL as the single
-expression language so business authors learn one syntax. CEL is reserved for internal
-platform-guard use (research 01 §3.7), not business logic.
+**FEEL is the expression primitive for predicates, guards, and table logic — not for computation.**
+Where ichiflow needs an inline predicate outside a full DecisionModel (a Flow guard condition, a
+Task assignment expression), it uses FEEL as the single expression language so business authors
+learn one syntax. FEEL is a real functional language and is the right tool for **predicates, guards,
+and decision-table cell logic**. It becomes **write-only** when pushed into **derived-data / feature
+preparation** *before* the table — multi-step arithmetic, date math across many fields, list
+filter/reduce to compute an aggregate exposure, `monthsSinceLastX`. Deeply nested FEEL contexts
+computing derived features are the decision-layer equivalent of inline data-plumbing in a Flow.
+
+**Boundary rule for decisions.** The decision **table** (the business-rule matrix) always stays DMN
+— it is the auditable artifact. **Non-trivial derived-input computation is a schema'd, ideally pure,
+typed feature function** that runs *before* eval and populates the decision's input schema (§2.2);
+its output — the derived features — is **snapshotted into the DecisionTrace** (§7, which already
+snapshots inputs), so the auditor sees exactly what the table saw. FEEL stays for predicates;
+computation moves to typed code. A feature function is non-portable in the same sense as the DRL
+escape hatch (§4.3), so it inherits the same discipline — a declared, schema'd input/output contract
+plus golden datasets, so its behaviour is *specified* even though the code does not port, and it
+counts against the workspace portability score (G6). CEL is reserved for internal platform-guard use
+(research 01 §3.7), not business logic.
+
+### 2.5 Feature gating is a Decision
+
+Turning a business behaviour on or off for a segment, region, tenant, or time window is **not a code
+flag** — it is a **Decision over context**, the same stance as "routing is a Decision" (§2.3,
+[04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.3). A gate evaluates a small DMN (or a
+CodeSet-eligibility lookup, doc 02 §9.1) over `{ segment, region, tenant, effectiveDate, ... }` and
+returns an enable/disable Outcome, so the gate is versioned, effective-dated, simulated, and
+explained like any other Decision — and *why* a feature was on for one Case and off for another is
+answerable via the why API. Effective-dating (§2.2) and CodeSet eligibility already cover
+time/region gating; framing gating as a Decision unifies them under one governed, auditable surface
+rather than scattering boolean flags through code.
 
 ---
 
@@ -375,6 +411,44 @@ coding agents author Decisions by editing those artifacts in the Workspace and r
 scenarios via the CLI/MCP surfaces (BRIEF §12) — the same gates a human review goes through. The
 governance layer does not distinguish "human wrote it" from "agent wrote it"; both are subject to
 approval workflows and parity tests, and both are provenance-stamped.
+
+### 5.6 Governance level — a per-Workspace/tier dial
+
+Full governance ceremony (approval Flows with assigned reviewers/SLA/escalation, immutable released
+baselines, coverage-threshold CI gates, effective-dating, formal analysis) is right for a regulated
+enterprise and crushing for a three-person team. The ceremony is therefore a **governance level**
+configured per Workspace (and defaulting by tier), not a fixed constant:
+
+| Level | Fits | Governance surface |
+|---|---|---|
+| **light** | Dev / solo | git *is* the governance: states collapse to `draft`/`released`; approval = PR merge (no approval-Flow); coverage advisory, not gating |
+| **standard** | Team | governance states + PR-based approval; coverage gates optional |
+| **full** | Enterprise / regulated | approval-Flows (§5.2), immutable released baselines (§5.1), coverage thresholds (§6.2), effective-dating, formal analysis |
+
+Approval-as-a-Flow (§5.2), released baselines, and coverage gating are the **default (full)** posture
+and are unchanged by this dial; the lighter levels are an explicit opt-in for teams that do not need
+them. Which level is the *default per tier* — e.g. whether the Dev tier ships `light` out of the box
+— is deferred (Open questions §7).
+
+### 5.7 Shadow / canary promotion for any rule change
+
+The shadow → canary → authoritative promotion ladder is **not migration-only**. Migration defines it
+for legacy-vs-migrated rules ([11-migration-in-and-out.md](./11-migration-in-and-out.md) §4.2), but
+the **same primitive generalizes to any rule change** — a routine edit to a released DecisionModel,
+not just a legacy import:
+
+- **Shadow.** A candidate version evaluates *beside* the authoritative version on live inputs; its
+  outputs are logged and diffed but not acted on (the golden-dataset/shadow engine of §5.4, §6.3).
+- **Canary.** The candidate becomes authoritative for a bounded slice (a tenant, a region, a
+  percentage) while the rest stay on the incumbent; divergence is monitored.
+- **Authoritative.** On a clean shadow/canary record the candidate is promoted for all new Cases;
+  in-flight Cases stay pinned to the version + effective date they started on (§2.2, §5.1).
+
+The pieces already exist — effective-dating, immutable released baselines, version pinning, the
+golden-dataset diff — and this subsection assembles them into one promotion story that applies to
+every released rule, not only migrated ones. (How released artifacts are *deployed/promoted across
+environments* — a runtime rule registry, dev→staging→prod promotion, hot-deploy independent of code
+— is a separate, larger question not settled here.)
 
 ---
 
