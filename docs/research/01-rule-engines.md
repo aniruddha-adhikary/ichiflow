@@ -1,0 +1,286 @@
+# Business Rule Engines for ichiflow — Market & Feature Assessment
+
+**Status:** Research draft for architecture decision
+**Date:** 2026-07-12
+**Author:** Research agent
+**Scope:** Rule/decision engines for ichiflow, an AI-native enterprise workflow development framework. Primary decision drivers: **migration in AND out (no lock-in)**, expressiveness for enterprise logic, explainability/audit, AI-friendliness (can an LLM reliably read/write the rule format), and JVM/Kotlin + TypeScript runtime fit.
+
+> **The founder leans Drools/Kogito. This document stress-tests that lean.** Short version: the lean is defensible for the *engine*, but it is the wrong default for *authoring/governance UX* and a poor default for the *TypeScript edge*. The recommendation is a two-engine, one-canonical-format architecture rather than "adopt Drools and be done."
+
+---
+
+## 1. Executive Summary & Recommendation
+
+### 1.1 The landscape in mid-2026 (what actually changed)
+
+- **"Kogito" as a standalone brand is effectively gone.** The former `kiegroup` projects (Drools, jBPM, OptaPlanner, Kogito) have been consolidated under the **Apache Software Foundation as "Apache KIE" (still in incubation)**, with repos moved to the `apache/incubator-kie-*` org. The latest release is **Apache KIE 10.2.0 (April 29, 2026)**. Kogito's cloud-native runtime pieces were folded into the platform; the serverless-workflow part was renamed **SonataFlow** (artifacts moving from `org.kie.kogito:*` to `org.sonataflow:*`). So when someone says "we're betting on Kogito," in 2026 that concretely means: **Drools (rule/DMN/CEP engine) + the KIE Quarkus extensions + SonataFlow + KIE Sandbox editors, under Apache incubation.** [KIE blog, KIE docs, Google Groups, mail-archive]
+- **The commercial downstream is IBM BAMOE** (Business Automation Manager Open Editions), which *replaced* Red Hat Decision Manager / Process Automation Manager. BAMOE is at **9.3.1 (updated ~March 2026)** and has **removed the Kogito-branded container images (as of 8.0.6)**, standardizing on the KIE/Canvas/Console tooling. This matters: the paid safety net for "Drools-in-production" is now IBM BAMOE, not Red Hat. [IBM support pages, IBM/bamoe GitHub, Red Hat catalog]
+- **DMN is real and advancing.** Apache KIE 10.2.0's editor and engine support **DMN 1.6**; Drools has been a **DMN TCK conformance level-3 (100% of the standard, including full FEEL)** implementation for years. Trisotech is the reference implementation and also L3. Camunda's engine is L3. **But DMN interchange between vendors remains partial in practice** (details in §7).
+- **A credible lightweight, non-JVM tier has matured:** **GoRules ZEN engine** (Rust core, **MIT license**, JSON Decision Model / JDM, native bindings for Node/Python/Go/Java/**Kotlin-JVM**/C#/Swift) is the standout for embeddability and TS/edge fit. Around it sit **json-rules-engine** (JS, JSON rules), **CEL** (Google, inline expressions), and **OPA/Rego** (policy, not business rules — a comparison point, not a competitor).
+
+### 1.2 Recommendation
+
+**Do not make Drools/Kogito the single engine. Adopt a "canonical format + pluggable engines" architecture:**
+
+1. **Canonical rule representation = DMN 1.5/1.6 (DRD + FEEL) as the interchange/source-of-truth format, with a thin ichiflow envelope.** DMN is the only vendor-neutral, OMG-standardized, text/XML-serializable decision format with multiple independent conformant engines. It is the best available answer to "migrate in and out without lock-in." FEEL is also comparatively LLM-friendly (readable, functional, well-specified). Accept DMN's known interchange caveats (§7) and pin to TCK-conformant engines.
+2. **Primary JVM execution engine = Apache KIE / Drools DMN + rule engine.** It is the most expressive open engine (RETE inference, rule units, CEP, PMML, executable model, DMN L3), Apache-licensed, Kotlin-callable, and Quarkus-native. This validates the founder's lean *for the engine tier*.
+3. **Second execution engine for the TS/edge/serverless tier = GoRules ZEN.** MIT-licensed Rust with first-class Node/TS + Kotlin bindings and a JSON format an LLM can trivially author. Covers the "embed a rule eval in a TS function / edge worker / Python service without a JVM" case that Drools cannot serve well.
+4. **Business-user authoring/governance is where Drools is genuinely weak** (see §6). ichiflow should build (or integrate) its own decision-table/DMN authoring + versioning + simulation UX rather than rely on KIE Sandbox, which is a developer tool, not a Decision-Center-class business governance product. This is the biggest gap versus IBM ODM and must be owned, not borrowed.
+5. **Provide first-class importers** for: DMN XML (any TCK-conformant source), Drools DRL, GoRules JDM, decision-table spreadsheets (OpenRules/Excel style), and a **best-effort IBM ODM/BAL and FICO Blaze rule-mining path** (semi-automated, consulting-assisted; fully automated import from ODM/Blaze is not realistic — see §8).
+
+**Net:** the Drools bet is right for the engine, wrong as a monoculture. The migration-in/out mandate is best served by making **DMN the lingua franca** and treating every engine (Drools, ZEN, Camunda, even ODM) as an importer/exporter target rather than the center of gravity.
+
+---
+
+## 2. Evaluation criteria (what the matrix scores)
+
+1. **Expressiveness** — rule chaining, inference (RETE) vs sequential, decision tables, decision graphs/DRD, CEP/temporal reasoning.
+2. **Business-user authoring UX** — can a non-developer safely author and change rules.
+3. **Versioning & governance** — branching, approvals, release management, who-can-change-what.
+4. **Testing / simulation** — unit tests on rules, scenario/what-if simulation, coverage.
+5. **Explainability / introspection** — audit trail of which rules fired and why; decision traces.
+6. **Performance & scalability.**
+7. **Embeddability** — library vs server; footprint.
+8. **Language/runtime fit** — JVM/Kotlin, TypeScript/Node, others.
+9. **Licensing & commercial risk.**
+10. **Cloud-native / K8s story.**
+11. **AI-friendliness** — can an LLM read/write the format reliably (text vs binary/proprietary).
+12. **Migration in/out** — published formats, import/export tooling.
+
+---
+
+## 3. Detailed per-engine profiles
+
+### 3.1 Apache KIE — Drools / (former) Kogito / SonataFlow  ★ primary engine candidate
+
+**What it is today.** Drools is a Java **rule engine, DMN engine, and CEP engine**. It is now developed under **Apache KIE (incubating)**; releases are unified across Drools/jBPM/OptaPlanner/Kogito. Latest: **KIE 10.2.0 (Apr 2026)** — Quarkus 3.27, Spring Boot 3.5, **Java 21**, **DMN 1.6** in editor+engine, new PatternFly-v5 BPMN editor (legacy GWT editors removed), KIE Sandbox gained GitLab support. Drools 10.x requires **JDK 17+**. [KIE 10.2 blog; Drools release notes]
+
+**Capabilities (breadth is its main selling point):**
+- **DRL** (Drools Rule Language): text-based, `when/then`, the most expressive open rule language. Experimental **DRL-on-YAML** and **executable model** (compile rules to Java, no runtime DRL parsing) exist.
+- **RETE-based inference** (ReteOO/PHREAK) — true forward-chaining, rule chaining, agenda/conflict resolution. This is the differentiator vs sequential engines (ZEN, Camunda DMN, json-rules-engine) and matches the algorithm class IBM ODM uses. [Wikipedia RETE list includes Drools + IBM ODM]
+- **DMN L3** with full FEEL; **decision tables** (DRL tables, spreadsheet, and DMN boxed); **rule units** (typed, modular rule groupings — the modern structuring primitive); **CEP/Drools Fusion** (sliding windows, temporal operators, interval vs point events); **PMML** (import predictive models and execute alongside rules).
+- **Reliability** (experimental): stateful `KieSession` persistence.
+
+**Explainability.** Via the **event/agenda listener API** (`AgendaEventListener`, `RuleRuntimeEventListener`) you can capture every activation, match, and firing — a complete "which rules fired, in what order, on what facts" trace. DMN evaluation returns a **result event structure** with per-decision results. This is powerful but **developer-facing**: you build the audit UI yourself. It is *not* the turnkey, business-readable decision-trace product that ODM ships.
+
+**Authoring/governance.** This is the weak flank. The open stack gives you **KIE Sandbox** (browser IDE for DMN/BPMN/DRL/test-scenarios, Git-backed) and VS Code extensions — good for developers. There is **no open equivalent of ODM Decision Center** (business-user rule repository with governance workflows, permissions, released baselines, business-friendly BAL editing, and built-in simulation for non-developers). Business governance at that level requires **IBM BAMOE** (paid) or a custom build.
+
+**Licensing/commercial risk.** Apache-2.0. Risk vector: **still in Apache incubation** (not yet a Top-Level Project as of mid-2026), and the *paid* support path narrowed from "Red Hat + community" to **IBM BAMOE**. Community health is real (active repos, frequent releases, unified 10.x line) but the governance transition is not fully settled. Mitigations in §9.
+
+**Runtime fit.** Excellent JVM/**Kotlin** (call KIE APIs directly from Kotlin), Quarkus-native (GraalVM native image via executable model). **No TypeScript story** — this is the gap ZEN fills. There is a `kie-dmn` path but no production-grade JS runtime for the full engine; the DMN *editor* (dmn-js lineage) is JS but the *engine* is JVM.
+
+**AI-friendliness.** Good-to-mixed. DRL and FEEL are text and LLM-writable, but DRL has enough syntactic surface and gotchas (accumulate, `from`, salience, no-loop) that LLM-generated DRL needs validation/round-tripping. DMN+FEEL is more constrained and thus more reliably generated. Binary/executable-model artifacts are not LLM-authorable (compile targets only).
+
+### 3.2 IBM ODM (Operational Decision Manager) & IBM ADS (Automation Decision Services)  ★ the governance benchmark
+
+**ODM.** The mature enterprise standard. **RETE-based** engine. Two authoring surfaces: **BAL (Business Action Language)** — controlled-natural-language rules meant for business users — and **decision tables**; orchestration via **ruleflows** (bottom-up) and **DMN-like decision models** (top-down). Its crown jewel is **Decision Center**: a business-user rule repository with **versioning, permissions, governance workflows, released baselines, testing and simulation runnable by business analysts, and reporting**. This is the capability Drools does not match out of the box. [IBM product docs; DecisionRules/Nected comparisons; Gartner Peer Insights]
+
+**ADS.** IBM's **cloud-native peer to ODM** (not a replacement). **Git-native persistence**, container-first, DevOps/CI-CD friendly, **DMN-style decision models + BAL**, and built-in ML integration. Positioned as the modern successor architecture while ODM continues for existing estates.
+
+**Explainability.** Best-in-class turnkey **decision traces / execution traces** — business-readable "why did this applicant get declined" audit, out of the box. This is a real advantage over Drools' build-it-yourself listeners.
+
+**Migration/export.** ODM rules are stored in Decision Center (DB-backed) and as project artifacts; export is via IBM's own formats (rule projects, XOM/BOM, `.dsar` decision archives) and BAL/decision-table representations. There is **no clean, standard, lossless export to DMN or to any neutral format** — BAL and the BOM/XOM object model are IBM-specific. **This is the lock-in.** Getting rules *out* of ODM in practice = rule mining + re-expression (see §8).
+
+**Licensing/commercial risk.** Proprietary IBM licensing (per-core/VPC, historically expensive); this cost is the main driver pushing enterprises to evaluate alternatives. Very low *abandonment* risk (IBM commitment is strong), very high *lock-in and cost* risk.
+
+**Relevance to ichiflow.** ODM is (a) the **feature benchmark for governance/explainability** ichiflow must approach, and (b) a **top migration-IN source** — enterprises will arrive carrying ODM estates and expect ichiflow to ingest them.
+
+### 3.3 Camunda (8 / Zeebe DMN engine)
+
+**What.** Camunda 8 (Zeebe) is a workflow+decision platform; its **DMN decision engine is DMN-conformant and can run standalone**. The legacy **`camunda-engine-dmn`** is a well-regarded **lightweight embeddable Java DMN engine**, and **`dmn-js`** is the widely reused embeddable DMN *editor* (the de-facto open DMN modeling web component). **Camunda 7 CE is End-of-Life**; the platform's center of gravity is Camunda 8 (largely SaaS/self-managed commercial). FEEL is the expression language. [Camunda docs, GitHub, Wikipedia]
+
+**Assessment.** Strong DMN + FEEL + good decision tables and business-readable modeling; weaker on RETE-style inference/chaining (it is decision-table/DRD-oriented, not a forward-chaining production system) and no CEP-grade temporal engine in the DMN layer. Licensing shifted toward commercial for the full platform, but **dmn-js (editor) and the DMN model format are the most valuable reusable pieces** for ichiflow — a natural source of an embeddable DMN authoring UI, Apache/MIT-friendly.
+
+### 3.4 GoRules ZEN engine  ★ secondary engine candidate (TS/edge tier)
+
+**What.** Open-source (**MIT**) **Rust** business-rules engine executing the **JSON Decision Model (JDM)** — a decision *graph* of nodes (decision tables, switch/branch, functions, expressions) using the **ZEN Expression Language**. **Native bindings: Node/TS, Python, Go, Java, C#, Kotlin-JVM, Kotlin-Android, Swift.** Latest ~0.54.x. Commercial GoRules BRMS (hosted editor/governance) sits on top, but the engine + format are fully open. [gorules/zen GitHub, docs, crates.io/npm]
+
+**Assessment.**
+- **Embeddability & runtime fit: best in class for ichiflow's non-JVM needs.** One engine, real TS and Kotlin bindings, tiny footprint, no server required, edge/serverless-friendly.
+- **AI-friendliness: best in class.** JDM is plain JSON — an LLM can author/modify decision graphs and tables reliably, and the format is diff-able and reviewable.
+- **Explainability:** the engine returns a **trace** of node execution/performance — decent introspection, JSON-native.
+- **Expressiveness: sequential decision-graph, not inference.** No RETE, no forward-chaining, no CEP/temporal windows. For "chained inference over a working memory of facts" (classic Drools/ODM territory) it is weaker. For 90% of enterprise decision-table/decision-flow logic it is more than adequate.
+- **Governance/versioning:** engine is just-a-library (governance is your job or GoRules' paid product) — same gap as Drools but lighter.
+- **Migration:** JDM is a clean, published JSON schema — trivial to import/export/transform. Excellent migration-OUT properties.
+
+### 3.5 FICO Blaze Advisor
+
+Mature, high-end proprietary BRMS (currently ~v6.6+), subscription/annual-license, strong in banking/insurance/credit. Rich authoring (SRL/structured rule language, decision tables, decision trees/graphs, ruleflows) and simulation. **Same lock-in profile as ODM**: proprietary format, no neutral export, high cost. Relevant to ichiflow chiefly as a **migration-IN source** (rule mining) and as a governance/feature benchmark. [FICO product sheets, Gartner/PeerSpot]
+
+### 3.6 Sparkling Logic SMARTS, InRule, OpenRules, DecisionRules, Nected
+
+- **SMARTS (Sparkling Logic):** data-powered decision platform, strong low/no-code authoring, simulation, and analytics; proprietary. A governance/UX benchmark.
+- **InRule:** 20+ yr decisioning platform for regulated industries; polished business-analyst authoring ("remove developers from the loop"), ML explainability. Proprietary. Governance/UX benchmark.
+- **OpenRules:** **open-source (Apache-2)**, **Excel/Google-Sheets-driven** rule authoring — genuinely business-user-friendly and *auditable/no-lock-in* by design; JVM-based; offers migration services from ODM. A strong reference for "spreadsheet decision tables as a first-class, portable authoring format" — ichiflow should support this import path.
+- **DecisionRules / Nected:** modern SaaS low-code rule engines (JSON/table rules, REST-first, usage-based pricing; Nected from ~$239/mo, claims no lock-in / cancel-anytime). Represent the "fast, business-friendly, cloud" tier ichiflow competes with on UX. Both are proprietary-hosted — weaker on true portability than DMN/JDM/OpenRules.
+
+### 3.7 Policy engines as comparison points (not business-rule competitors)
+
+- **OPA / Rego:** Datalog-inspired **policy** engine for authz/infra/config decisions over JSON. Excellent for guardrails/policy, **wrong tool for business decision logic** (Rego is not business-user-authorable, not decision-table-oriented). Include as an *adjacent* capability (e.g., ichiflow platform authorization), not the business-rule engine.
+- **CEL (Common Expression Language, Google):** fast, safe, embeddable **inline expression** evaluator — great for lightweight guard conditions/predicates inside ichiflow itself. Not a decision-model/graph engine; complements ZEN/DMN as an expression primitive.
+- **json-rules-engine (JS):** simple JSON condition/event rules for Node; fine for lightweight in-app rules, no inference/DMN/governance. A low-end option, not an enterprise engine.
+
+---
+
+## 4. Feature-difference matrix
+
+Legend: ●●● strong / built-in · ●● partial / adequate · ● weak / DIY · ○ absent · Lic: A=Apache/MIT open, P=proprietary, H=open-core.
+
+| Capability | Drools / Apache KIE | IBM ODM | IBM ADS | Camunda 8 DMN | FICO Blaze | GoRules ZEN | OpenRules | json-rules-eng | CEL | OPA/Rego |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Inference / RETE / chaining | ●●● (RETE/PHREAK) | ●●● (RETE) | ●● | ● (seq) | ●●● | ● (seq graph) | ●● | ● | ○ | ●● (Datalog) |
+| Decision tables | ●●● | ●●● | ●●● | ●●● | ●●● | ●●● | ●●● (Excel) | ● | ○ | ● |
+| Decision graph / DRD | ●●● (DMN) | ●● (DMN-like) | ●●● (DMN-like) | ●●● (DMN) | ●●● | ●●● (JDM) | ●● | ○ | ○ | ○ |
+| CEP / temporal reasoning | ●●● (Fusion) | ●● | ● | ○ | ●● | ○ | ○ | ○ | ○ | ○ |
+| DMN conformance | ●●● (L3, DMN 1.6) | ●● (DMN-derived) | ●● | ●●● (L3) | ●● | ○ (JDM, not DMN) | ● | ○ | ○ | ○ |
+| Business-user authoring UX | ● (dev tools) | ●●● (BAL/Decision Ctr) | ●●● | ●● | ●●● | ●● (paid UI) | ●●● (Excel) | ● | ○ | ○ |
+| Versioning & governance | ● (Git/Sandbox) | ●●● (Decision Center) | ●●● (Git-native) | ●● | ●●● | ●● (paid) | ●● | ○ | ○ | ●● |
+| Testing / simulation | ●● (test-scenario) | ●●● (biz simulation) | ●●● | ●● | ●●● | ●● | ●● | ● | ● | ●● |
+| Explainability / decision trace | ●● (listeners, DIY UI) | ●●● (turnkey traces) | ●●● | ●● | ●●● | ●● (JSON trace) | ●● | ● | ● | ●● |
+| Performance / scale | ●●● | ●●● | ●●● | ●●● | ●●● | ●●● (Rust) | ●● | ●● | ●●● | ●●● |
+| Embeddability (library) | ●● (JVM lib/server) | ● (server) | ● (server/container) | ●● (Java lib) | ● | ●●● (multi-lang lib) | ●● (JVM) | ●●● (npm) | ●●● | ●● |
+| JVM / Kotlin fit | ●●● | ●● (API) | ●● | ●●● | ●● | ●●● (binding) | ●●● | ○ | ●● | ●● |
+| TypeScript / Node fit | ○ | ○ | ● (REST) | ● (dmn-js editor) | ○ | ●●● | ○ | ●●● | ●● | ●● |
+| Cloud-native / K8s | ●●● (Quarkus/SonataFlow) | ●● (containers) | ●●● (container-first) | ●●● | ●● | ●●● | ● | ●● | ●●● | ●●● |
+| AI-friendliness (LLM read/write) | ●● (DRL/FEEL text) | ● (BAL semi, BOM opaque) | ●● (BAL/DMN) | ●● (FEEL/XML) | ● (proprietary) | ●●● (JSON JDM) | ●● (Excel/CSV) | ●●● (JSON) | ●●● | ●● (Rego) |
+| Migration OUT (neutral export) | ●● (DMN, DRL text) | ● (IBM-only formats) | ●● (DMN-ish, Git) | ●●● (DMN XML) | ● (proprietary) | ●●● (JSON JDM) | ●●● (Excel) | ●●● | ●●● | ●●● |
+| Licensing | A (incubating) | P | P | H | P | A (MIT) | A | A | A | A |
+| Commercial/abandonment risk | Med (incubation, IBM-only paid) | Low abandon / High cost+lockin | Low/High cost | Med (open-core drift) | Low/High cost | Low-Med (small vendor) | Low | Low | Low | Low |
+
+**Reading the matrix:** Drools wins on engine breadth (inference + CEP + DMN L3) and open licensing but loses badly on business-user governance UX and has *no* TS story. ODM/Blaze win governance+explainability but are proprietary lock-in. ZEN wins embeddability + AI-friendliness + multi-runtime, at the cost of inference/CEP depth. **No single engine is strong across all rows — which is exactly why ichiflow should standardize the format (DMN) and multiplex engines.**
+
+---
+
+## 5. Standards analysis: DMN, FEEL, PMML
+
+- **DMN 1.x + FEEL.** OMG standard; current implementations track **DMN 1.5/1.6** (Apache KIE 10.2 ships DMN 1.6). **Conformance levels:** L1 (DRD + documented logic), L2 (DRD + simplified FEEL/S-FEEL, decision tables), **L3 (full FEEL + all boxed expressions + fully executable)**. **TCK conformance-L3 implementations include Drools, Trisotech (reference impl), Camunda**, and others (Oracle, Red Hat lineage). DMN is the **only credible neutral interchange format** for decisions.
+- **PMML.** OMG/DMG standard for predictive models (scorecards, trees, regressions). Drools/KIE can **import and execute PMML alongside DMN/DRL** — valuable for the "rules + ML score" enterprise pattern. ichiflow should support PMML import as a model-scoring node.
+- **DRL, BAL, SRL, Rego, JDM, ZEN-expr** are all **vendor/engine-specific** — useful as source formats to import, not as interchange standards.
+
+---
+
+## 6. Where Drools/Kogito is honestly weaker than ODM
+
+Being blunt, because the founder is leaning Drools:
+
+1. **Business-user governance.** ODM **Decision Center** = versioned rule repository, permissions, governance/approval workflows, released baselines, and business-analyst-run **simulation** — all turnkey. Drools' open stack has **no equivalent**; KIE Sandbox + Git is a developer workflow. **ichiflow must build this layer.** (IBM BAMOE would provide it but reintroduces paid lock-in — defeating the purpose.)
+2. **Business-readable rule language.** ODM **BAL** (controlled natural language) is materially more approachable for non-developers than **DRL**. ichiflow should author in **DMN decision tables + FEEL** (business-friendlier than DRL) or a BAL-like DSL that compiles down.
+3. **Turnkey explainability.** ODM ships business-readable decision traces; Drools requires you to build the audit UI on top of the listener API.
+4. **Simulation/what-if for analysts.** ODM/Blaze/SMARTS/InRule all ship analyst-facing simulation; Drools' test-scenario tooling is developer-oriented.
+5. **Product maturity of the paid safety net.** The commercial backstop moved from Red Hat to **IBM BAMOE**, and the project is **still in Apache incubation** — less settled than ODM's decades of enterprise support.
+
+**Conversely, Drools beats ODM on:** open licensing/cost, DMN L3 conformance & interchange, cloud-native (Quarkus/native-image/SonataFlow), PMML+CEP breadth, embeddability, and AI-friendliness (text DRL/FEEL vs opaque BOM/XOM).
+
+---
+
+## 7. DMN as a migration/interchange format — how real is it?
+
+**Real, but not turnkey-lossless. Plan for it accordingly.**
+
+- **What works:** DMN **XML (semantic) interchange** of DRDs, decision tables, and FEEL logic between **TCK-L3 engines** (Drools ↔ Camunda ↔ Trisotech) is genuinely usable — this is the strongest portability story in the decision-engine world.
+- **Known pain points (documented):**
+  1. **FEEL ambiguities** — the spec has under-specified behaviors (e.g., certain list/`sort` built-ins) that different conformant engines resolve differently, so identical FEEL can yield different results across vendors. The **DMN TCK exists precisely to pin these down**, and not all vendors pass all TCK cases.
+  2. **"DMN-washing"** — many tools claim DMN conformance while implementing only a tiny, often incompatible subset (OMG lets anyone drawing a DRD claim conformance). Verify against **TCK results**, not marketing.
+  3. **Diagram Interchange (DMN DI)** — pre-1.2 had no standard DI, so layout traveled via vendor extensions; even post-1.2 the graphical round-trip is weaker than the semantic round-trip. For ichiflow, **prioritize semantic fidelity over pixel-perfect diagram fidelity**.
+  4. **Vendor extensions** — engines add non-standard functions/annotations that don't port.
+- **Practical rule for ichiflow:** treat DMN as the **canonical semantic format**, **pin to TCK-conformant engines**, run an **import-validation + differential-test harness** (execute imported models on ichiflow's engine and compare against golden outputs from the source engine), and store a **provenance/extension map** for anything non-standard.
+
+---
+
+## 8. Migration IN / OUT analysis
+
+### 8.1 Migrating INTO ichiflow
+
+| Source | Realistic import path | Fidelity |
+|---|---|---|
+| DMN XML (Camunda, Trisotech, Drools, ADS) | Direct parse → ichiflow canonical DMN; differential-test | High (semantic), medium (diagram) |
+| Drools DRL / decision tables | Parse DRL (text) → map to DMN where table-shaped; keep DRL for inference-heavy rules on the Drools engine | High for tables, engine-bound for RETE logic |
+| GoRules JDM | Direct JSON transform (JDM ↔ ichiflow graph) | High |
+| Excel/OpenRules decision tables | Spreadsheet importer → DMN decision tables | High |
+| **IBM ODM (BAL/BOM/XOM, `.dsar`)** | **Rule mining, not clean export** — parse BAL where feasible, but BOM/XOM object model and ruleflows need semi-automated re-expression + SME validation | **Low-medium; consulting-assisted** |
+| **FICO Blaze (SRL, decision trees/graphs)** | **Rule mining** — proprietary; extract logic, re-express as DMN | **Low-medium; consulting-assisted** |
+| PMML models | Import as scoring node | High |
+
+**Reality of ODM/Blaze migration (from consulting patterns):** there is **no lossless automated export**. Enterprises migrate off ODM/Blaze via **rule mining** (extract rule intent from BAL/SRL + Decision Center metadata), **re-expression** into DMN/target format, and **differential testing** against production decision logs to prove equivalence. Vendors like OpenRules and GoRules advertise ODM migration *services* precisely because it is a semi-manual, SME-heavy exercise. **ichiflow's honest promise: "accelerated, tool-assisted migration," not "one-click import."** LLM assistance (parse BAL → draft DMN) is a genuine differentiator here and plays to ichiflow's AI-native positioning.
+
+### 8.2 Migrating OUT of ichiflow (the anti-lock-in promise)
+
+Because ichiflow's canonical format is **DMN (+ optional JDM/DRL projections)**:
+- **Export DMN 1.5/1.6 XML** → runs on any TCK-L3 engine (Drools, Camunda, Trisotech). This is the core no-lock-in guarantee.
+- **Export JDM** → runs on GoRules ZEN anywhere (TS/Rust/JVM).
+- **Export decision tables to Excel/CSV** → OpenRules-style portability.
+- **Publish the canonical schema + a differential-test suite** so a leaving customer can prove behavioral equivalence on the target engine.
+
+This is a materially stronger exit story than ODM/Blaze/SMARTS/InRule/Nected can offer, and it should be marketed as such.
+
+### 8.3 Recommended canonical rule representation for ichiflow
+
+**DMN 1.6 (DRD + FEEL) as the semantic core, wrapped in a small ichiflow envelope** that adds: metadata (owner, version, effective dates), governance state (draft/reviewed/released), test cases, provenance (source system + extension map), and optional projections (DRL for inference-heavy models, JDM for edge deployment). Rationale: DMN is the *only* format that is (a) an open standard, (b) executable on multiple independent engines, (c) text/XML-serializable and reasonably LLM-authorable via FEEL, and (d) already the interchange target every serious vendor exports toward. Everything else (DRL, JDM, BAL) becomes an *import source* or a *deployment projection*, never the source of truth.
+
+---
+
+## 9. Risks of the Drools/Kogito bet — and mitigations
+
+| Risk | Severity | Mitigation |
+|---|---|---|
+| Apache KIE **still incubating**; governance/branding not fully settled | Med | Pin to stable 10.x releases; the code is battle-tested (ex-Red Hat); keep the engine behind an ichiflow abstraction so it is swappable |
+| Paid support path narrowed to **IBM BAMOE** (single vendor) | Med | ichiflow provides its own support/governance layer; don't depend on BAMOE; keep DMN portability so customers can move to Camunda/Trisotech |
+| **No TypeScript/edge runtime** for Drools | High (for ichiflow's TS surface) | Adopt **GoRules ZEN** as the second engine for TS/edge/serverless; DMN/JDM interchange between tiers |
+| **Weak business-user governance vs ODM** | High | Build ichiflow's own authoring + versioning + simulation + decision-trace UX (biggest product investment); optionally embed **dmn-js** for the editor |
+| **DRL is developer-facing / LLM-imperfect** | Med | Author in DMN decision tables + FEEL (business-friendlier, more LLM-reliable); reserve DRL for genuine inference/CEP cases |
+| **DMN interchange caveats** (FEEL ambiguity, DMN-washing) | Med | Pin TCK-L3 engines; ship differential-test harness; store extension/provenance maps |
+| **Kogito/SonataFlow churn** (renames, artifact moves) | Low-Med | Depend on Drools (rule/DMN/CEP) which is stable; treat SonataFlow (workflow) as optional, not core to the rule story |
+| Single-engine monoculture lock-in to Drools | Med | The two-engine + canonical-DMN architecture *is* the mitigation — Drools becomes replaceable |
+
+---
+
+## 10. Bottom line
+
+- **Format over engine.** Make **DMN 1.6 the canonical, source-of-truth decision format**; treat every engine as an importer/exporter. This is the strongest possible answer to the migration-in/out mandate and the anti-lock-in mission.
+- **Two engines, deliberately:** **Apache KIE / Drools** for JVM/Kotlin, inference, CEP, PMML, DMN-L3 (validates the founder's lean *as an engine choice*); **GoRules ZEN** for TS/edge/serverless and best-in-class AI-authorability.
+- **Own the governance/authoring/explainability layer** — this is where Drools loses to ODM and where ichiflow must invest, not borrow.
+- **Be honest in marketing:** "one-click import" from ODM/Blaze is not real; "AI-accelerated, tool-assisted migration + a genuinely clean exit via DMN/JDM" is real and differentiating.
+
+---
+
+## 11. Sources
+
+- Apache KIE 10.2.0 Release Announcement (Apr 29, 2026) — https://kie.apache.org/blog/kie_10_2_0_release/
+- Apache KIE docs (Kogito, Drools, DMN, SonataFlow) — https://kie.apache.org/docs/ ; https://kie.apache.org/docs/components/drools/drools_dmn/
+- Drools DMN documentation (conformance L3, DMN versions) — https://docs.drools.org/latest/drools-docs/drools/DMN/index.html
+- Drools release notes 10.0.x — https://kie.apache.org/docs/10.0.x/drools/drools/release-notes/index.html
+- apache/incubator-kie-drools (rule/DMN/CEP engine) — https://github.com/apache/incubator-kie-drools
+- Kogito repos moving kiegroup → apache — https://groups.google.com/g/kogito-development/c/NXPLBMH-_-U
+- SonataFlow rename proposal (org.kie.kogito → org.sonataflow) — https://www.mail-archive.com/dev@kie.apache.org/msg00269.html
+- apache/incubator-kie-kogito-serverless-operator — https://github.com/apache/incubator-kie-kogito-serverless-operator
+- IBM BAMOE (Business Automation Manager Open Editions) — https://github.com/IBM/bamoe ; https://www.ibm.com/docs/en/ibamoe/9.0.x?topic=introduction-what-is-bamoe
+- BAMOE 9.3.1 download info (Mar 2026) — https://www.ibm.com/support/pages/more-information-about-ibm-business-automation-manager-open-editions-931-download
+- BAMOE Kogito image removal (8.0.6) / Red Hat catalog — https://catalog.redhat.com/software/containers/ibm-bamoe/bamoe-kogito-rhel8-operator/62d668813273d8696f48a10e
+- IBM Operational Decision Manager — https://www.ibm.com/products/operational-decision-manager
+- IBM ODM vs ADS (BAL, Decision Center, ruleflows, DMN-like models, Git-native ADS) — https://www.linkedin.com/pulse/future-ibm-decision-automation-technology-combines-art-friedlander
+- IBM ODM (Wikipedia; RETE lineage) — https://en.wikipedia.org/wiki/IBM_Operational_Decision_Management
+- IBM ODM Gartner Peer Insights — https://www.gartner.com/reviews/product/ibm-operational-decision-manager-odm
+- DecisionRules vs IBM ODM (BAL, licensing) — https://www.decisionrules.io/en/compare/ibm-odm-alternative/
+- Camunda 8 DMN engine / FEEL / standalone — https://camunda.com/platform/decision-engine/ ; https://camunda.com/dmn/
+- camunda-engine-dmn (lightweight Java DMN) — https://github.com/camunda/camunda-engine-dmn
+- camunda-dmn-js (embeddable editor) — https://github.com/camunda/camunda-dmn-js
+- Camunda 7 CE End-of-Life notice — https://github.com/camunda/camunda-bpm-platform
+- FICO Blaze Advisor product / v6.6 — https://www.fico.com/en/products/fico-blaze-advisor ; https://www.fico.com/en/latest-thinking/solution-sheet/what-s-new-fico-blaze-advisor-decision-rules-management-system
+- FICO Blaze Advisor Gartner reviews — https://www.gartner.com/reviews/product/fico-blaze-advisor
+- GoRules ZEN engine (MIT, Rust, JDM, multi-language bindings) — https://github.com/gorules/zen ; https://gorules.io/open-source
+- GoRules JDM docs — https://docs.gorules.io/
+- zen-engine npm — https://www.npmjs.com/package/@gorules/zen-engine
+- GoRules "How to choose a BRE / BRMS Buyer's Guide 2026" — https://gorules.io/resources/how-to-choose-business-rules-engine
+- Nected reviews/pricing/lock-in — https://www.nected.ai/ ; https://www.g2.com/products/nected/reviews ; https://nerdisa.com/nected-ai/
+- IBM ODM alternatives / migration context (Nected) — https://www.nected.ai/us/blog-us/ibm-odm-alternatives
+- OpenRules (Excel-based, Apache, migration services) — https://openrules.com/ ; https://openrules.com/migrationAnnouncement.htm
+- Sparkling Logic SMARTS — https://www.sparklinglogic.com/business-rules/business-rules-engine/
+- InRule / SMARTS / OpenRules comparison — https://www.decisionrules.io/en/articles/top-10-business-rule-engines/
+- Open Policy Agent / Rego — https://www.openpolicyagent.org/docs/policy-language
+- CEL vs OPA (inline policy expressions) — https://medium.com/@2nick2patel2/fastapi-policy-engines-opa-cel-llm-function-calls-with-guarded-execution-a5632d8405c7
+- DMN TCK (conformance kit; ambiguity resolution) — https://dmn-tck.github.io/tck/ ; https://github.com/dmn-tck/tck
+- DMN conformance "DMN-washing" & TCK momentum — https://methodandstyle.com/blog/tck-shows-momentum-behind-real-dmn/ ; https://methodandstyle.com/blog/aiding-recognizing-full-dmn-conformance/
+- DMN Interchange in Action (Feldman) — https://www.linkedin.com/pulse/dmn-interchange-action-jacob-feldman
+- Trisotech DMN (reference implementation, L3) — https://www.trisotech.com/dmn/
+- Drools CEP explained — https://blog.kie.org/2021/10/event-driven-drools-cep-complex-event-processing-explained.html
+- BRE market size ($1.67B 2025) — https://www.decisionrules.io/en/articles/top-10-business-rule-engines/

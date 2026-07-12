@@ -1,0 +1,401 @@
+# 05 — Operability Pillars: Audit/Explainability, Observability, Deployability, Multi-Database, Zone Separation
+
+> Research brief for **ichiflow**, an AI-native enterprise workflow framework.
+> Scope: the "operability" pillars — deep auditability/explainability, observability, independent
+> deployability, multi-database support, and environment/zone separation.
+> Motivating use case: regulated enterprise workflows (e.g. loan approvals) where **auditors, support
+> staff, and AI agents** must all answer *"why was this application approved/denied?"* with full,
+> reconstructable decision lineage.
+>
+> **Author:** research agent · **Date:** 2026-07-12 · **Status:** draft for architecture review
+
+---
+
+## 0. TL;DR / Cross-cutting recommendations
+
+1. **PostgreSQL-first, pluggable-later.** Ship ichiflow so a new adopter runs on a single PostgreSQL
+   instance (case data + audit + read models + queue), and expose a **persistence SPI** so large
+   customers can move audit to an append-only ledger, search to OpenSearch, analytics to a warehouse,
+   without forking. This mirrors where Camunda and Keycloak landed by 2025–26. See §4.
+2. **Decision provenance is a first-class domain object, not a log side-effect.** Model a per-business-
+   transaction **DecisionRecord / decision trace** that stitches together workflow event history +
+   rule-engine fired-rules trace + DMN evaluation results + AI-agent reasoning steps into **one causal
+   chain keyed by `case_id`**. Persist it append-only. This is the artifact that satisfies FCRA/ECOA
+   adverse-action, GDPR Art. 22, and feeds the "why" API for humans and agents. See §1.
+3. **Append-only audit log + bitemporal snapshots beats full event-sourcing-everywhere.** Reserve
+   event sourcing for the workflow/decision core where replay and intent genuinely matter; use a
+   transactional-outbox / audit-log table pattern for everything else. Add bitemporal ("as-of")
+   queries so you can answer *"what did we know when the decision was made."* See §1.
+4. **OpenTelemetry is now the safe default for all three signals.** OTel graduated in the CNCF in May
+   2026; traces, metrics, and logs are stable across JVM/Kotlin and Node/TS. Correlate technical
+   `trace_id` with business `case_id` via span attributes + baggage, and emit **one wide "decision
+   event" per case** (canonical log line). See §2.
+5. **Modular monolith as the default shape, with async-first module boundaries so adopters can split
+   later.** Spring Modulith 2.0 (Nov 2025) makes enforced module boundaries + event-driven internal
+   comms a mainstream pattern; combine with a single-binary dev mode (Temporal-style) for DX and
+   Helm/Operator + air-gap bundle for enterprise on-prem. See §3.
+6. **Design for DMZ/intranet split from day one.** Assume the customer-facing portal runs in a DMZ and
+   the rules/case core runs in the intranet, connected by one-way async replication / message relay
+   (and, at the extreme, hardware data diodes). Keep secrets in Vault/ESO; treat AI-agent credentials
+   as non-human identities. See §5.
+
+---
+
+## 1. Audit & Explainability
+
+### 1.1 Executive summary
+For a loan-decision workflow the audit requirement is not "log the changes" — it is **reconstruct the
+decision**: which inputs were known, at what version of which policy, which rules fired, what the DMN
+tables returned, what an AI agent reasoned, who (human) reviewed, and the final outcome — as a single
+causal chain, queryable *as of the decision time*. Three storage strategies compete (event sourcing,
+audit-log tables, CDC-based audit); they are not mutually exclusive and the right answer for ichiflow
+is a **hybrid**: event-sourced decision core + append-only audit ledger + bitemporal snapshots.
+
+### 1.2 Storage strategies — tradeoffs
+
+| Strategy | What it captures | Strengths | Weaknesses | Fit for ichiflow |
+|---|---|---|---|---|
+| **Event sourcing** | Business *intent* as an immutable event stream; current state is a fold | Complete, replayable history; natural fit for "why"; temporal queries | High complexity + "explanation tax"; hard to ad-hoc query; long streams need snapshots; eventual-consistency vs interactive UI | **Yes, but scoped** to the workflow/decision aggregate only |
+| **Audit-log tables** (app-level) | Rows written by the app alongside business writes | Simple, queryable (SQL), well understood; captures intent if app writes it | Can drift from truth if a write path forgets to log; ordering/atomicity needs the outbox pattern | **Yes** — default for non-core domains |
+| **CDC-based audit** (Debezium tailing WAL) | *What changed* at the row level from the DB log | Cannot be bypassed; low app coupling; sub-second latency; great for projections | Captures change, **not intent/why**; needs Kafka/connector infra | **Optional** — for projections & tamper-evident change feed, not primary "why" |
+| **Append-only ledger** (immudb / QLDB-style) | Cryptographically verifiable, tamper-evident record | Provable immutability for regulators ("physically cannot be altered") | Extra store to operate; not a general query engine | **Optional SPI** for high-assurance customers |
+
+Consensus in the 2025–26 literature: **event sourcing "earns its keep" only in greenfield bounded
+contexts where replay, temporal queries and complete audit trails are genuine requirements** — exactly
+the decision core — while **"CDC + Outbox is usually a better alternative to full event sourcing"** for
+the rest. "A well-done CRUD is much better than a poorly done Event Sourcing." Use the **transactional
+outbox** to make the DB write and the emitted audit event atomic.
+
+### 1.3 Decision-provenance pattern (the core recommendation)
+Introduce a **DecisionRecord** (a.k.a. decision trace) as a domain artifact per business transaction:
+
+- **Keyed by `case_id`** (the loan application), spanning all steps and services.
+- Stitches: workflow event history → business-rule engine **fired-rules trace** (which rules evaluated,
+  which conditions were met, actual variable values, which rule won) → **DMN evaluation results**
+  (input entries, matched rows, outputs) → any **AI-agent reasoning trace** (context retrieved, tools
+  called, model outputs, confidence) → **human-review record** (reviewer identity, decision) → outcome.
+- Stored **append-only** with a **content schema** rich enough for post-hoc reconstruction — arXiv work
+  on "Decision Trace Schema for Governance Evidence" and "Explainability-by-Design" describes the
+  minimum evidence record: provenance chain from input features → inference → final decision.
+- This single record is what the **"why" API** (for support staff, auditors, and AI agents) reads, and
+  what generates the **adverse-action reason codes** for a denial letter.
+
+DMN is the right tool for the rule layer precisely because **"DMN is a policy engine that records rule
+evaluation paths"** and models are "traceable and explainable… suitable for compliance-sensitive
+environments." Camunda's decision engine supports `RecordSnapshots`-style per-evaluation audit.
+
+### 1.4 Temporal / bitemporal data ("what did we know when")
+Regulated decisions must be reconstructable **as of the decision instant**, not as-of-now. Model
+**bitemporal** data: *valid time* (when a fact was true in the world) + *transaction/system time* (when
+we recorded it). Options:
+- **PostgreSQL**: PG 18 adds SQL:2011 *application-time* (valid-time) temporal constraints, but **does
+  not auto-track system time**; full bitemporality needs the `temporal_tables`/`periods` extension or
+  trigger-based history tables. Note: managed PG (RDS/Azure/Cloud SQL) often does not allow these
+  extensions — plan for trigger-based history there.
+- **XTDB 2.x**: bitemporal-native immutable SQL DB (JUXT), explicitly positioned for "data compliance"
+  and time-travel reporting. v2.1 GA (Dec 2025) is in production at client sites; v2.2 beta adds OTel
+  tracing + Prometheus metrics. Strong fit **as an optional audit/as-of store**, less so as the primary
+  transactional DB (maturity, operational familiarity).
+
+### 1.5 Named technologies & current status (2026)
+
+| Tech | Category | Status (mid-2026) | Notes for ichiflow |
+|---|---|---|---|
+| **KurrentDB** (formerly EventStoreDB) | Event store | Rebranded Dec 2024 (Event Store → Kurrent); first KurrentDB release Mar 2025; license moved ESLv2 → **Kurrent License v1 (KLv1)**; `-ce/-ee` suffixes dropped. EventStoreDB 24.10 supported until Oct 2026. | **License is source-available, not OSI open-source** — do a legal review before embedding in a distributed framework. |
+| **Axon Framework / Axon Server** | ES + CQRS toolkit (JVM) | 70M+ downloads; v5.x RC in 2025, v6 roadmap adds distributed sagas; **Axon Server 2025.0 opened to any language** (Go/.NET/JS/Python/Rust) not just Java. | Mature JVM option; server is a separate operational component. |
+| **Marten** | ES + DocumentDB on **PostgreSQL** (.NET) | Actively developed; strong projection support; leans on PG JSONB. **Polecat** is an emerging JVM/port with dynamic consistency boundaries. | Attractive because it's **"just Postgres"** — aligns with §4 PG-first. .NET-centric though. |
+| **XTDB 2.x** | Bitemporal immutable SQL | v2.1 GA Dec 2025, in production; v2.2 beta. | Best-in-class for **as-of/bitemporal audit** queries. |
+| **immudb** (Codenotary) | Append-only, cryptographically verifiable | v2.0 (SQL/JSON, document API removed); v1.11 added immutable audit logging + PostgreSQL-wire verification functions; immudb Vault managed offering. | Good **high-assurance tamper-evident ledger SPI**. |
+| **Amazon QLDB** | Managed ledger | **Deprecated — end of support July 31, 2025.** AWS steers users to Aurora PostgreSQL (which lacks cryptographic verifiability). | **Do not build on QLDB.** Alternatives: immudb, Azure SQL Ledger, ScalarDL, Dolt. |
+
+### 1.6 Regulatory drivers (2026 status)
+- **FCRA / ECOA (Reg B) adverse-action** — US: creditors must give **specific, accurate reasons** for
+  denial; **≤4 reasons** is the practical guidance. CFPB Circular 2022-03 and 2024 guidance: **you may
+  not use models so complex you cannot produce specific reasons** — explainability is legally mandatory.
+  July 2025 Fed webinars reaffirmed. Direct driver for the DecisionRecord → reason-code path.
+- **GDPR Art. 22 (+ "right to explanation")** — EU: no solely-automated decisions with legal/
+  significant effect without safeguards; data subject can get **human intervention, express a view,
+  contest**, and receive **"meaningful information about the logic involved."** Requires per-decision
+  audit incl. human-reviewer identity, policy state, decision substance.
+- **EU AI Act** — Credit scoring is **Annex III high-risk** (Art. 6, point 5(b)). Entered into force
+  Aug 2024; originally binding for high-risk **Aug 2, 2026**. The **"Digital Omnibus"** (political
+  agreement **7 May 2026**, adoption pending Official Journal as of late May 2026) **postpones stand-
+  alone Annex III systems — including credit scoring — to 2 December 2027** (Annex I embedded to Aug 2,
+  2028). **Caveat:** the delay is only binding once published in the OJ; Art. 50 transparency
+  obligations still hit Aug 2, 2026. Requirements to design for: risk management (Art. 9), data
+  governance (Art. 10), technical documentation (Art. 11), transparency (Art. 13), human oversight
+  (Art. 14), accuracy/robustness (Art. 15), EU DB registration (Art. 49). **Plan to the earlier date.**
+- **SOX** — immutable, tamper-evident audit trails over financial-reporting-relevant controls (append-
+  only + verifiability supports this).
+- **BCBS 239** — banks must maintain **end-to-end data lineage** for risk data aggregation & reporting;
+  lineage remains the hardest principle for banks (legacy/distributed estates). Reinforces OpenLineage
+  in §2 and global-ID correlation in §4.
+
+---
+
+## 2. Observability
+
+### 2.1 Executive summary
+**OpenTelemetry is now the unambiguous default.** CNCF **graduated OTel on 21 May 2026** (same tier as
+Kubernetes/Prometheus); **all three signals — traces, metrics, logs — are stable across every major SDK
+including JVM/Kotlin and Node/TS.** The framework-specific work is not "adopt OTel" (settled) but
+**correlating business-level decision traces with technical traces** and exposing a **queryable "why"
+surface** that both support staff and AI agents can use.
+
+### 2.2 Correlating business ↔ technical (`trace_id` ↔ `case_id`)
+- Set a **business correlation ID** (`case_id`) at the entry point, propagate via **OTel baggage**, and
+  attach it as a **span attribute** (e.g. `ichiflow.case_id`, `loan.application_id`) on every span, plus
+  inject `trace_id`/`span_id` into every structured log (MDC on JVM). This makes technical traces
+  queryable by business key and vice-versa.
+- Adopt the **wide-event / canonical-log-line pattern** (Stripe-style, a.k.a. "Observability 2.0"):
+  **emit one structured, high-cardinality event per unit of work.** For ichiflow, emit **one "decision
+  event" per case** carrying identity fields, policy/rule versions, decision inputs, outcome, reviewer,
+  timing, model/agent metadata. This is the observability twin of the §1 DecisionRecord and the
+  substrate for querying *"every case where confidence < 0.8"* or *"every denial under policy v37."*
+
+### 2.3 Data lineage
+- **OpenLineage** (LF AI & Data **graduated** project) + **Marquez** (reference implementation) is the
+  open standard for dataset/job lineage; now shipped as an Airflow provider, integrates Spark/dbt/Kafka.
+  Use it to satisfy the **BCBS 239 lineage** requirement at the data/pipeline layer, complementing the
+  per-case causal chain at the decision layer.
+
+### 2.4 LLM / AI-agent-friendly debugging
+- 2026 agent-observability practice: capture **every agent step** — tool selection, args, model
+  responses, memory reads/writes, state transitions, decision branches — as a **structured, queryable
+  trace** ("context graph": the persistent record of *why* the agent decided). Tooling maturing:
+  Braintrust, Arize (Phoenix), Datadog LLM Observability (execution flow-chart of the decision path),
+  plus OTel's emerging GenAI semantic conventions.
+- **Design implication for ichiflow:** the "why" API should be **structured and machine-queryable**, not
+  prose. An AI support/audit agent should be able to query the DecisionRecord + wide decision-event by
+  `case_id` and get a typed object (inputs, fired rules, DMN outputs, agent steps, outcome, reason
+  codes) — the same object a human UI renders. Treat structured logs as the anomaly-query surface.
+
+### 2.5 Named technologies & status
+
+| Tech | Status (2026) | Notes |
+|---|---|---|
+| **OpenTelemetry** | **CNCF Graduated (May 2026)**; traces/metrics/logs stable in JVM/Kotlin & Node/TS; JS API ~1.36B downloads/mo | Default for all three signals; Java agent auto-instruments + injects context into MDC |
+| **OpenLineage / Marquez** | LF AI & Data **graduated** / incubating ref impl; Airflow provider | Data-pipeline lineage for BCBS 239 |
+| **Wide events / canonical logs** | Mainstream pattern ("Observability 2.0"); backends: Honeycomb, GreptimeDB, ClickHouse-based | One decision event per case |
+| **Agent observability** | Fast-moving 2026 category: Braintrust, Arize Phoenix, Datadog LLM Obs, LangSmith | Structured, queryable agent traces |
+
+---
+
+## 3. Independent Deployability & Scaling
+
+### 3.1 Executive summary
+For a **framework product**, the winning shape in 2026 is a **modular monolith that adopters can split
+later** — not microservices-by-default. Industry sentiment shifted hard: 2026 is called "the
+renaissance of the monolith," with **~42% of orgs that adopted microservices consolidating** back into
+larger deployable units. The framework's job is to make **module boundaries explicit and async-first**
+so a single deployable can be carved into services when (and only when) scale demands it.
+
+### 3.2 Modular monolith vs microservices vs SCS
+
+| Model | Deployables | Internal comms | When | Framework role |
+|---|---|---|---|---|
+| **Modular monolith** | 1 | In-process events across enforced module boundaries | Default; simplest CI/CD & ops; one availability picture | **ichiflow's default** |
+| **Self-contained systems (SCS)** | ~5–25 | UI-level integration; each owns UI+logic+DB | Intermediate step; break monolith into SCS *before* microservices | Natural "split" target |
+| **Microservices** | 100s | Network/async | Only at genuine scale/team-autonomy need | Escape hatch, not starting point |
+
+Guidance is consistent: **"break a monolith into SCS first, then evolve the pieces that need it into
+microservices"** — going straight to microservices is the anti-pattern.
+
+### 3.3 How a framework enables "start as one, split later"
+- **Enforced module boundaries.** Spring Modulith 2.0 (**GA 21 Nov 2025**, on Spring Boot 4 / Framework
+  7) + ArchUnit fitness functions + jMolecules: modules can't reach into each other's internals; boundary
+  violations fail the build. Modulith 2.0 adds a revamped **Event Publication Registry** (full lifecycle
+  + staleness monitor), **module-specific Flyway migrations**, and IDE tooling.
+- **Async-first internal communication.** Modules communicate via **domain events**, not direct calls —
+  so the seam is already a message boundary. When you split a module out, the in-process event becomes a
+  network message with minimal code change (the Modulith externalization story).
+- **Per-module schema ownership** (module-specific migrations) so a module carries its tables when it
+  leaves. Combine with the §4 persistence SPI.
+- The equivalent JVM/Kotlin + Node/TS story: keep the framework's public contracts as events/commands so
+  a TS front-of-house module and a Kotlin rules-core module can be co-deployed or split.
+
+### 3.4 Developer experience: single-binary / dev-mode
+Match the DX bar set by **Temporal dev server** (single self-contained binary, no external deps, starts
+full service + Web UI) and **Supabase CLI**. ichiflow should ship a **`dev` mode single binary/process**
+that boots the engine + embedded PostgreSQL (or bundled PG) + UI, zero Docker required — this is the
+single biggest adoption lever for a framework.
+
+### 3.5 Enterprise on-prem delivery
+- **Helm + Kubernetes Operator.** Ship a Helm chart for stateless/app deploy and an **Operator** for
+  stateful/shared services (DB, messaging) lifecycle — the Red Hat OpenShift-endorsed combination.
+- **Air-gapped support is table stakes for banks.** Everything (operator images, Helm charts, container
+  images, dependencies) must be resolvable inside the boundary. Support **private registry mirroring**
+  (Harbor is the de-facto choice), configurable image registry/repo/tags, and consider **Zarf**-style
+  single-tarball packaging (widely used in DoD/air-gapped). Provide a connected staging → sign → transfer
+  → load pipeline with scan gates. (See Replicated's enterprise-Helm guidance for ISV distribution.)
+- Camunda 8.8 (2025) is a useful reference: it **removed the mandatory Keycloak + external PostgreSQL**
+  dependency, added built-in identity + OIDC-to-any-IdP, and shipped official vendor-supported K8s
+  deployment — a template for reducing the framework's mandatory operational surface.
+
+---
+
+## 4. Multi-Database Support
+
+### 4.1 Executive summary
+Different data domains have genuinely different access patterns — **case data (transactional), audit
+(append-only/immutable), analytics (columnar), search (inverted index)**. Polyglot persistence serves
+each best but multiplies operational cost and consistency risk. The pragmatic 2026 stance for a
+framework: **PostgreSQL-first for everything by default, with a pluggable persistence SPI** so adopters
+opt into specialized stores only when they hit real limits.
+
+### 4.2 The pragmatic default: "Just use Postgres"
+The strongly-argued 2026 consensus ("It's 2026, Just Use Postgres"): PG can serve as relational store,
+JSONB document store, **queue**, **search** (FTS + `pg_trgm`/`pgvector`), time-series (Timescale), and
+analytics — "different rooms in one house." Operational math is compelling: one store at 99.9% beats
+three chained at 99.9% each (= 99.7%); a new engineer learns the whole data model in a day. The maxim is
+**"add specialized tools when you actually hit Postgres limits — not when you think you will."**
+
+### 4.3 When you do go polyglot — correlation across stores
+- **Global/correlation IDs** (the `case_id`) stamped on every record in every store, so a decision can be
+  reassembled across case DB + audit ledger + search + warehouse. This is also the BCBS 239 lineage key.
+- **Sagas** for cross-store consistency of multi-step operations; **transactional outbox** to atomically
+  emit the change event that updates secondary stores.
+- **CQRS read-model projections:** the same events that update the write store are consumed to build
+  read models in the store best suited to each query (search index, analytics table). Projections are
+  rebuildable from the event/audit log — a big operational win (drop & rebuild a corrupted read model).
+- **CDC (Debezium tailing PG WAL) → Kafka → consumers** is the "gold standard" for near-real-time sync
+  to Elasticsearch/OpenSearch/warehouse when you don't want app-level dual writes.
+- **Tradeoff to flag:** replication lag forces a read-your-writes decision (read from leader, wait for
+  projection, or tolerate staleness) — surface this explicitly in the framework's query APIs.
+
+### 4.4 Pluggable persistence SPI (recommended architecture)
+Follow the **Keycloak / Camunda storage-SPI** precedent. Define ichiflow SPIs for: **case store, audit/
+ledger store, read-model/projection store, search store.** Default implementations all target
+PostgreSQL; enterprise adopters can bind audit → immudb/XTDB, search → OpenSearch, analytics →
+Snowflake/BigQuery, without forking the framework. Note the 2025 direction of travel: Camunda 8.8
+*reduced* mandatory external stores (Identity moved onto Zeebe's own storage) — a reminder that "fewer
+mandatory stores, more optional SPIs" is the ergonomic sweet spot.
+
+### 4.5 Patterns catalog
+
+| Pattern | Use | Tradeoff |
+|---|---|---|
+| Single PG (default) | Case + audit + queue + search + read models | Simplest; may hit ceilings at very high scale/specialized query needs |
+| Polyglot per-domain | Right tool per access pattern | Consistency + ops burden; needs correlation IDs + sagas |
+| CQRS + projections | Fast, purpose-built read models | Eventual consistency; projection rebuild logic |
+| CDC + outbox | Reliable cross-store sync | Kafka/connector infra; captures change not intent |
+| Storage SPI | Let adopters swap stores | API surface to maintain; test matrix grows |
+
+---
+
+## 5. Zone Separation (DMZ / Intranet)
+
+### 5.1 Executive summary
+Banks and insurers segment networks into **internet → DMZ → intranet (→ core)** zones. The canonical
+deployment for ichiflow: **customer-facing portal in the DMZ, rules/case core in the intranet**, with
+**one-way, asynchronous** data movement between them and no direct DMZ→core path. Design for this
+topology from day one; it directly shapes module boundaries (§3) and the persistence split (§4).
+
+### 5.2 Reference architecture & sync patterns
+- **DMZ web tier holds no sensitive data and does no core computation** — it only renders data "suitable
+  for display," so a DMZ breach exposes minimal PII. All DMZ→intranet connections are proxied/filtered
+  through a dispatcher; no direct external↔internal connection. Sub-zone the DMZ (drop-all between
+  sub-zones).
+- **Cross-zone data movement patterns**, from lightest to strongest isolation:
+  1. **One-way async replication / message relay** — DMZ portal drops requests onto a queue/relay; the
+     intranet core pulls, processes, and publishes results back through a controlled channel. Async-first
+     module boundaries (§3.3) make this natural.
+  2. **File-drop / store-and-forward** — portal writes a validated payload to a drop location scanned
+     and ingested by the intranet side (classic bank integration pattern).
+  3. **Data diode / cross-domain solution (CDS)** — **hardware-enforced unidirectional transfer**; the
+     device is *physically* incapable of reverse flow. Regulators ask "can you prove data cannot flow
+     back — not configured-not-to, but physically impossible." Products: Owl, Everfox, BAE (Common
+     Criteria EAL7+), ST Engineering; often paired with content validation (OPSWAT MetaDefender) and
+     digital signatures/mTLS. Relevant for the most sensitive core-settlement zones.
+- **Design guidance for ichiflow:** make the **portal module** and **case/rules core module** deployable
+  to different zones with only **async event/message contracts** between them (no synchronous RPC that
+  assumes a return path). This is the same seam that later enables a microservice split — zone
+  separation and independent deployability reinforce each other.
+
+### 5.3 Secrets & zero-trust (2026 status)
+- **Zero-trust is the mainstream default** for secrets in 2026 (perimeter-security is out). **HashiCorp
+  Vault** is the reference; **Vault 2.0** (first major since 2018, post-IBM acquisition) enables cloud
+  auth via **OIDC tokens without long-lived static credentials**. **External Secrets Operator (ESO)**
+  syncs Vault→Kubernetes with rotation, decoupling app teams from the backend.
+- **Non-human identity (NHI) is the defining 2026 secrets problem** — CI/CD bots, Terraform runners, and
+  **AI agents** create identities faster than manual processes track; AI-service credential leaks grew
+  **81% YoY in 2025**. **Directly relevant to ichiflow:** its AI agents are NHIs — give each agent a
+  scoped, short-lived, auditable identity (workload identity / OIDC), never a static shared key, and log
+  agent credential use into the same audit stream.
+
+---
+
+## 6. Consolidated technology status table (mid-2026)
+
+| Technology | Area | Status | Recommendation for ichiflow |
+|---|---|---|---|
+| PostgreSQL (18) | Multi-DB / audit | Adds app-time temporal; no auto system-time | **Primary default store** |
+| KurrentDB (ex-EventStoreDB) | Audit/ES | Rebranded 2024; **KLv1 source-available** license | Consider; **legal review before embedding** |
+| Axon Framework/Server | Audit/ES (JVM) | Mature; Server 2025.0 multi-language | Option for ES core on JVM |
+| Marten / Polecat | Audit/ES on PG | Active; PG-native | Aligns with PG-first (Marten=.NET) |
+| XTDB 2.x | Bitemporal audit | v2.1 GA Dec 2025, in prod | **Optional as-of/bitemporal audit store** |
+| immudb 2.0 | Ledger | Active; PG-wire verification | **Optional tamper-evident ledger SPI** |
+| Amazon QLDB | Ledger | **EOL July 31 2025** | **Avoid** |
+| OpenTelemetry | Observability | **CNCF Graduated May 2026**; 3 signals stable | **Default all signals** |
+| OpenLineage/Marquez | Lineage | Graduated / ref impl | **Data-lineage for BCBS 239** |
+| Spring Modulith 2.0 | Deployability | GA Nov 2025 (Boot 4) | **Default modular-monolith toolkit** |
+| Temporal dev server | DX | Single-binary local dev | **DX model to emulate** |
+| Camunda 8.8 | Reference | Removed mandatory Keycloak/PG; OIDC | Architecture reference |
+| HashiCorp Vault 2.0 + ESO | Secrets | Vault 2.0 (IBM); OIDC, no static creds | **Secrets baseline** |
+| Data diodes (Owl/Everfox/BAE) | Zone sep | Mature; CC EAL7+ | For high-assurance zone boundaries |
+
+---
+
+## 7. Open questions / follow-ups for architecture review
+1. **Event sourcing scope** — confirm the exact aggregate boundary where ES is worth the complexity vs.
+   audit-log + outbox everywhere else.
+2. **KurrentDB license** — get legal sign-off on KLv1 before any decision to embed/distribute; otherwise
+   default to Marten-on-PG or a PG-native audit log.
+3. **Bitemporal on managed PG** — validate whether target customers run managed PG (no temporal
+   extensions) and therefore need trigger-based history or XTDB.
+4. **"Why" API contract** — nail the typed schema of the DecisionRecord so it serves humans, adverse-
+   action letters, and AI agents from one source.
+5. **AI-Act timing** — track OJ publication of the Digital Omnibus; **build to Aug 2, 2026** to be safe
+   even though credit-scoring compliance may formally shift to Dec 2, 2027.
+
+---
+
+## 8. Sources
+
+**Audit / event stores / ledgers**
+- KurrentDB / Event Store rebrand & license: https://github.com/kurrent-io/KurrentDB · https://www.kurrent.io/releases/kurrentdb/25-0/ · https://www.kurrent.io/blog/introducing-event-store-license-v2-eslv2 · https://www.kurrent.io/blog/kurrent-re-brand-faq · https://www.bigdatawire.com/2024/12/18/event-store-changes-name-to-kurrent-raises-12m-to-unify-streams-and-databases/
+- QLDB deprecation: https://www.infoq.com/news/2024/07/aws-kill-qldb/ · https://www.dolthub.com/blog/2024-08-12-qldb-deprecated-alternatives/ · https://techcommunity.microsoft.com/blog/azuresqlblog/moving-from-amazon-quantum-ledger-database-qldb-to-ledger-in-azure-sql/4246237
+- XTDB: https://www.xtdb.com/ · https://github.com/xtdb/xtdb · https://github.com/xtdb/xtdb/releases/tag/v2.2.0-beta1
+- immudb: https://github.com/codenotary/immudb · https://www.opensourceforu.com/2026/05/immudb-upgrade-brings-immutable-audit-trails-to-postgresql-workloads/ · https://codenotary.com/blog/welcome-immudb-vault-the-fully-managed-immutable-cloud-database
+- Marten / Axon / event sourcing: https://martendb.io/events/ · https://www.axoniq.io/axon-framework · https://www.axoniq.io/blog/axon-server-2025-0-for-the-curious-developer · https://dasroot.net/posts/2026/04/event-sourcing-cqrs-databases-eventstoredb-axon-polecat/
+- ES vs CDC / audit tradeoffs: https://debezium.io/blog/2020/02/10/event-sourcing-vs-cdc/ · https://www.javacodegeeks.com/2026/06/event-sourcing-vs-change-data-capture-cdc-choosing-the-right-pattern.html · https://event-driven.io/en/when_not_to_use_event_sourcing/ · https://chriskiehl.com/article/event-sourcing-is-hard
+- Bitemporal / temporal Postgres: https://wiki.postgresql.org/wiki/SQL2011Temporal · https://www.postgresql.org/docs/19/ddl-temporal-tables.html · https://pgxn.org/dist/temporal_tables/ · https://hash.dev/blog/multi-temporal-versioning
+- Decision provenance / DMN: https://arxiv.org/pdf/2604.09296 · https://arxiv.org/pdf/2206.06251 · https://camunda.com/blog/2024/01/decision-engines-what-they-are-what-they-do/ · https://www.trisotech.com/dmn/
+
+**Regulatory**
+- EU AI Act: https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai · https://www.gibsondunn.com/eu-ai-act-omnibus-agreement-postponed-high-risk-deadlines-and-other-key-changes/ · https://www.patechlabs.com/news/eu-ai-act-august-2-2026-deadline-banks-high-risk-ai · https://www.fluxforce.ai/regulations/eu-ai-act-article-6-high-risk
+- FCRA/ECOA adverse action: https://www.consumerfinance.gov/compliance/circulars/circular-2022-03-adverse-action-notification-requirements-in-connection-with-credit-decisions-based-on-complex-algorithms/ · https://www.consumerfinancemonitor.com/2025/08/06/regulatory-requirements-related-to-adverse-action-notifications/ · https://www.americanbar.org/groups/business_law/resources/business-law-today/2023-november/adverse-action-notice-compliance-considerations-for-creditors-that-use-ai/
+- GDPR Art. 22: https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/rights-related-to-automated-decision-making-including-profiling/ · https://www.deepinspect.ai/blog/gdpr-ai-article-22-automated-decision
+- BCBS 239: https://www.bis.org/publ/bcbs_nl36.htm · https://en.wikipedia.org/wiki/BCBS_239 · https://www.bankingsupervision.europa.eu/ecb/pub/pdf/ssm.supervisory_guides240503_riskreporting.en.pdf
+
+**Observability**
+- OpenTelemetry: https://opentelemetry.io/ · https://opentelemetry.io/docs/specs/otel/logs/ · https://blog.jetbrains.com/kotlin/2026/04/next-level-observability-with-opentelemetry/ · https://zeonedge.com/blog/opentelemetry-2026-complete-guide-unified-observability
+- Correlation / wide events: https://oneuptime.com/blog/post/2026-02-06-otel-request-scoped-correlation-ids/view · https://blog.alcazarsec.com/tech/posts/wide-logging · https://jeremymorrell.dev/blog/a-practitioners-guide-to-wide-events/ · https://charity.wtf/tag/observability-2-0/
+- OpenLineage/Marquez: https://openlineage.io/getting-started/ · https://marquezproject.ai/
+- Agent observability: https://www.braintrust.dev/articles/agent-observability-complete-guide-2026 · https://arize.com/blog/best-ai-observability-tools-for-autonomous-agents-in-2026/ · https://atlan.com/know/ai-agent-observability/
+
+**Deployability / architecture**
+- Spring Modulith / modular monolith: https://www.javacodegeeks.com/2026/07/spring-modulith-2-0-enforcing-module-boundaries-before-microservices.html · https://blog.jetbrains.com/kotlin/2026/02/building-modular-monoliths-with-kotlin-and-spring/ · https://dev.to/x4nent/the-modular-monolith-2026-complete-guide-spring-modulith-archunit-fitness-functions-and-lessons-878
+- Self-contained systems: https://scs-architecture.org/vs-ms.html · https://www.jmix.io/blog/modern-enterprise-architecture-self-contained-systems/
+- Temporal dev server: https://docs.temporal.io/self-hosted-guide · https://temporal.io/blog/temporalite-the-foundation-of-the-new-temporal-cli-experience
+- On-prem / air-gapped K8s: https://www.replicated.com/enterprise-helm · https://rutagon.com/insights/air-gapped-kubernetes-deployment/ · https://www.spectrocloud.com/blog/kubernetes-in-air-gapped-environments
+- Camunda 8.8 reference: https://camunda.com/blog/2025/03/streamlined-deployment-with-camunda-8-8/ · https://camunda.com/blog/2025/03/introducing-enhanced-identity-management-in-camunda-88/
+
+**Multi-database**
+- Polyglot / CQRS: https://medium.com/@v4sooraj/cqrs-event-sourcing-with-polyglot-persistence-end-to-end-flow-with-mermaid-diagrams-e897a8ae94a4 · http://cqrs.wikidot.com/doc:projection · https://metapatterns.io/fragmented-metapatterns/polyglot-persistence/
+- Postgres-first: https://www.tigerdata.com/blog/its-2026-just-use-postgres · https://www.amazingcto.com/postgres-for-everything/ · https://github.com/Olshansk/postgres_for_everything
+
+**Zone separation / secrets**
+- DMZ / zones: https://fiveable.me/network-security-and-forensics/unit-2/network-security-zones/study-guide/r0BqnKEAHFeoglsU
+- Data diodes / CDS: https://www.opswat.com/blog/data-diodes-in-transfer-cds-securing-high-assurance-cross-domain-solutions · https://owlcyberdefense.com/learn-about-data-diodes/ · https://www.baesystems.com/en-us/product/data-diode-solution
+- Zero-trust / secrets: https://www.infoq.com/news/2026/04/vault-2-0-ibm-identity/ · https://blog.gitguardian.com/top-secrets-management-tools/ · https://ayedo.de/en/posts/vault-eso-secrets-management/
