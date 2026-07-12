@@ -306,6 +306,10 @@ checklist; **v1 is accepted only when *both* of these pass on the actual kernel*
    demonstrate they are consumable outside ichiflow. Anti-lock-in is a core promise, so **migration in
    and out are both on the acceptance bar.**
 
+Both exercises run in CI as the **outermost harness** — the top-level loop that composes every
+per-subsystem deterministic harness, decomposed into milestone checkpoints an agent passes
+incrementally ([`13-agent-harness-loops.md`](13-agent-harness-loops.md) §2.j, §4; ADR-0026).
+
 ## 6. Non-goals (explicit)
 
 - **Not a general-purpose PaaS or app builder.** ichiflow is opinionated about the enterprise-

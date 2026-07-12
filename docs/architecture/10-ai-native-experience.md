@@ -253,6 +253,10 @@ is vibes (research 07 §6.2, the real differentiator). ichiflow provides, **by c
    inputs, not prose guesses.
 5. **`ichiflow verify` gate + repro-before-fix hook** — the agent must reproduce the failure and show
    the fix passing against the captured case before a human approves (enforced by a §2.2 hook).
+   `ichiflow verify` is the single entry point to the per-subsystem **deterministic harness loops** —
+   machine-readable pass/fail verdicts and enumerable "how much is done" — specified in
+   [`13-agent-harness-loops.md`](13-agent-harness-loops.md) (scoped verify on write via hooks, full
+   verify in CI; `get_verify_status` is the Tier-0 read tool over the progress ledger).
 
 The determinism discipline has a cost worth stating loudly (research 07 §8.8): replay only works if
 the decision core stays deterministic (scoped event sourcing, doc 08) and **non-deterministic
