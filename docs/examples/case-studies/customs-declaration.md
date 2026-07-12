@@ -637,6 +637,11 @@ Singapore-Customs template," move or retitle it. **A governance guardrail, not a
    (line, category, base, dutyRatePin, duty, gst, fee) would make the amount a **contract**, not an
    audit-time reconstruction. Recommend an `Outcome.feeBreakdown?` extension shared with the points-based
    `scoreBreakdown?` proposal.
+
+   **Resolved (2026-07 gap-fix round):** typed **`Outcome.feeBreakdown[]`** (`FeeLine = { component, base,
+   rateRef, amount }`) is now first-class in [02 §9.3](../../architecture/02-schema-foundation.md), alongside
+   `scoreBreakdown[]` and surviving `CompositeOutcome` composition — so the CCP's payable amount is a typed
+   contract, not a trace reconstruction.
 3. **Post-approval-obligation *monitoring* is out of scope of the Flow shown.** The CCP prints A5 (retain
    5 years) and Z18 (present for inspection) as `post-approval-obligation` conditions, but obligations are
    **deadline-bearing and tracked after the Case closes** ([BRIEF Condition](../../architecture/BRIEF.md),
@@ -644,6 +649,12 @@ Singapore-Customs template," move or retitle it. **A governance guardrail, not a
    with no active Flow in this study. The primitive exists (obligation state `pending→fulfilled/breached`);
    what is unmodelled here is the **long-horizon obligation-tracking Flow** that would fire on breach. Worth
    an explicit note that issuance and obligation-monitoring are two Flows, not one.
+
+   **Resolved (2026-07 gap-fix round):** documented as the standing **obligation-monitoring Flow** pattern in
+   [04 §5.12](../../architecture/04-flow-and-case-layer.md) — a scheduled/timer Flow (timers over years) that
+   re-verifies post-approval obligations (A5 retain-5-years, Z18 present-for-inspection), fires on
+   `condition.breached`, and opens a remediation Case; issuance and obligation-monitoring are confirmed as
+   **two Flows, not one**.
 4. **Multi-control lines (two CAs on one HS code) are supported but under-exercised.** `hs-controlled-goods`
    rows allow `controlledBy: [HSA, NEA]` (e.g. a controlled-drug precursor that is also a hazardous
    substance), and `all-must-approve` handles it — but each trace shows a single controlling CA. The
