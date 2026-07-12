@@ -19,10 +19,14 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    planned second engine (TS/edge/embedded). ichiflow builds its own governance, authoring,
    simulation, and explainability layer (the true gap vs IBM ODM Decision Center). DMN 1.6 XML stays
    the **executed/exported/interchange** artifact, but — because DMN XML is LLM-hostile to author
-   directly — an LLM-friendly canonical **decision-table source** (a markdown/JSON decision-table
-   form) **compiles deterministically one-way** to it, mirroring TypeSpec→OpenAPI and the flow
-   builder→FlowJSON; `authored-in` provenance extends to DecisionModels (`dmn-xml | table-source |
-   ai-chat`), and direct DMN XML authoring stays available (ADR-0027).
+   directly — an LLM-friendly canonical **decision source** projection (a structured markdown/YAML/JSON
+   form covering the **full DMN 1.6 feature set**: DRDs, all boxed-expression kinds, item definitions —
+   not decision tables only) **compiles deterministically one-way** to it, mirroring TypeSpec→OpenAPI
+   and the flow builder→FlowJSON; **100% AI coverage of the DMN surface is a verified metric via a
+   projection-coverage harness** (doc 13). `authored-in` provenance extends to DecisionModels
+   (`decision-source | dmn-xml | drl | ai-chat`), direct DMN XML authoring stays available, and the
+   engine-native escape hatches (DRL / rule units / CEP) are **first-class AI-authorable + testable
+   governed paths** — quarantine marks *portability*, never authorability (ADR-0027).
 2. **Orchestration**: Temporal is the durable-execution substrate. ichiflow ships a declarative
    flow definition (JSON/YAML, CNCF-Serverless-Workflow-aligned, schema'd) interpreted on
    Temporal. Computation that is neither a Decision nor an Adapter runs in a first-class **`compute`
@@ -207,11 +211,16 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   feature-prep), and it is the substrate for **extension Flow step types**.
 - **authored-in** — provenance on any artifact with multiple authoring surfaces, recording which
   surface produced the canonical artifact. A **Flow**: `code` (typed builder) | `yaml` | `ai-chat`. A
-  **DecisionModel**: `dmn-xml` (direct DMN) | `table-source` (the decision-table source projection) |
-  `ai-chat`. The canonical JSON/DMN-XML remains the executed/audited/exported artifact regardless.
-- **decision-table source** — the LLM-friendly canonical **authoring projection** for a DecisionModel:
-  a markdown/JSON decision-table form (FEEL cells + hit-policy + DRD wiring as data) that **compiles
-  deterministically one-way to DMN 1.6 XML**, the executed/exported artifact. The Decision-layer mirror
+  **DecisionModel**: `decision-source` (the decision source projection) | `dmn-xml` (direct DMN) | `drl`
+  (engine-native escape hatch) | `ai-chat`. The canonical DMN-XML (or, for an engine-native model, its
+  engine-native text) remains the executed/audited/exported artifact regardless.
+- **decision source** — the LLM-friendly canonical **authoring projection** for a DecisionModel: a
+  structured markdown/YAML/JSON form (FEEL throughout) that expresses the **full DMN 1.6 feature set** —
+  DRDs (decision / input-data / BKM / knowledge-source nodes + dependencies), **all** boxed-expression
+  kinds (decision tables, literal FEEL, contexts, invocations, functions/BKMs, lists, relations), and
+  item definitions — and **compiles deterministically one-way to DMN 1.6 XML**, the executed/exported
+  artifact. Decision tables are the common shape, not the only one; **nothing in DMN is authorable only
+  by hand-writing XML** (verified by a projection-coverage harness, doc 13). The Decision-layer mirror
   of TypeSpec→OpenAPI and the flow builder→FlowJSON; no round-trip is promised, and direct DMN XML
   authoring stays available (ADR-0027).
 - **Extension step type** — a **custom Flow step type** declared in the Workspace under an extension

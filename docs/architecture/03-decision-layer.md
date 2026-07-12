@@ -65,10 +65,11 @@ input data, business knowledge models, and knowledge sources, with logic express
 - **executable/exportable as the interchange artifact** — DMN 1.6 XML runs on any TCK-L3 engine, the
   anti-lock-in keystone. It is, however, **LLM-hostile to author *directly*** (verbose, positional,
   deep boxed-expression nesting — the same trait that disqualified BPMN XML as a Flow surface), so
-  ichiflow puts an LLM-friendly **decision-table source** projection in front of it that compiles
-  one-way to DMN XML (§2.6). FEEL itself stays comparatively LLM-friendly (functional, well-specified,
-  far more constrained and reliable to generate than DRL — research 01 §3.1, §6); the projection is
-  what makes *whole-model* authoring legible, not just the cell expressions.
+  ichiflow puts an LLM-friendly **decision source** projection in front of it — covering the **full DMN
+  1.6 feature set**, not decision tables only — that compiles one-way to DMN XML (§2.6). FEEL itself
+  stays comparatively LLM-friendly (functional, well-specified, far more constrained and reliable to
+  generate than DRL — research 01 §3.1, §6); the projection is what makes *whole-model* authoring
+  legible across DRDs, boxed expressions, and item definitions, not just the cell expressions.
 
 We accept DMN's known interchange caveats (FEEL under-specification, "DMN-washing," weak diagram
 round-trip) and manage them by pinning to **TCK-L3 engines** and running a differential-test harness
@@ -91,10 +92,10 @@ metadata:
   version: 3.2.0                 # semver; governed release (see §5.1)
   governanceState: released     # draft | in-review | released | deprecated
   effective: { from: 2026-08-01, to: null }   # bitemporal effectivity
-  authoredIn: table-source      # dmn-xml | table-source | ai-chat  (§2.6; provenance only)
+  authoredIn: decision-source   # decision-source | dmn-xml | drl | ai-chat  (§2.6; provenance only)
 model:
   dmn: ./loan-eligibility.dmn    # DMN 1.6 XML — the executed/exported source of truth (DRD + FEEL)
-  source: ./loan-eligibility.decision-table.md   # decision-table source; compiles one-way → dmn (§2.6)
+  source: ./loan-eligibility.decision-source   # full-DMN decision source; compiles one-way → dmn (§2.6)
   entryPoint: LoanEligibility    # named decision to evaluate
 contracts:
   input:  { schema: schemas/LoanApplication.json }   # JSON Schema (BRIEF §5)
