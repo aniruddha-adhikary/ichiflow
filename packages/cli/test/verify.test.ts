@@ -10,6 +10,7 @@ import { selfCheckScope } from "../src/verify/scopes/self-check.js";
 import { schemaFidelitySpikeScope } from "../src/verify/scopes/schema-fidelity-spike.js";
 import { schemaPipelineScope } from "../src/verify/scopes/schema-pipeline.js";
 import { codegenScope } from "../src/verify/scopes/codegen.js";
+import { contractVectorsScope } from "../src/verify/scopes/contract-vectors.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -77,6 +78,15 @@ describe("schema-pipeline", () => {
     const failures = checks.filter((c) => c.status !== "pass");
     expect(failures).toEqual([]);
     expect(checks.some((c) => c.id === "schema-pipeline.openapi.version-3.1")).toBe(true);
+  });
+});
+
+describe("contract-vectors (Ajv side)", () => {
+  it("matches every expected accept/reject verdict on the real contract via Ajv", async () => {
+    const checks = await contractVectorsScope.run({ repoRoot, seed: deriveSeed("contract") });
+    const tsChecks = checks.filter((c) => c.id.startsWith("contract.ts."));
+    expect(tsChecks.length).toBeGreaterThanOrEqual(15);
+    expect(tsChecks.filter((c) => c.status !== "pass")).toEqual([]);
   });
 });
 
