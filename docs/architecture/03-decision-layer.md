@@ -1,0 +1,555 @@
+# 03 — The Decision Layer
+
+> **What this covers.** How ichiflow represents, evaluates, governs, tests, and explains
+> **Decisions** — the rule-evaluated determinations at the heart of every enterprise workflow.
+> Covers the canonical decision format (DMN 1.6), the Decision Engine SPI and its engines
+> (Apache KIE/Drools default, GoRules ZEN planned second), the escape-hatch/quarantine rules,
+> the governance + authoring + simulation layer ichiflow builds itself, the explainability
+> contract (typed traces into the DecisionRecord), testing as a first-class artifact, the
+> CEP/temporal story, and an honest capability-parity assessment against IBM ODM and raw Drools.
+>
+> **Position in the system.** The Decision layer is ichiflow's heart. **Flows** (interpreted on
+> Temporal — see research [`../research/02-workflow-orchestration.md`](../research/02-workflow-orchestration.md))
+> call Decisions at branch points, routing points, and validation points; **Adapters** feed them
+> canonical inputs; every evaluation emits a typed trace that the **DecisionRecord / why API**
+> (see research [`../research/05-audit-observability-deployment.md`](../research/05-audit-observability-deployment.md))
+> stitches into the per-Case causal chain. This document is grounded in research
+> [`../research/01-rule-engines.md`](../research/01-rule-engines.md); the migration of decisions in
+> and out of ichiflow is covered in [`11-migration-in-and-out.md`](./11-migration-in-and-out.md).
+>
+> These are design docs for a system that does not exist yet: present tense describes the target;
+> phasing is marked **v1** (first shippable) vs **later**.
+
+---
+
+## 1. Position and design stance
+
+The single most-litigated question in research 01 was "adopt Drools and be done?" The locked answer
+(BRIEF §1) is **no**: ichiflow standardizes the *format*, not the *engine*. Two consequences shape
+everything below.
+
+1. **Format over engine.** The canonical, source-of-truth representation of a Decision is **DMN 1.6
+   (DRD + FEEL)**, wrapped in a thin ichiflow envelope. Every engine — Drools, ZEN, and any future
+   engine — is an importer/exporter/executor *behind an SPI*, never the center of gravity. This is
+   the strongest available answer to the migration-in/out mandate (research 01 §8, §10).
+2. **Own the governance layer.** The genuine gap versus IBM ODM is not the engine — Drools matches
+   ODM on inference and beats it on openness — it is the **business-user governance, authoring,
+   simulation, and turnkey explainability** layer (research 01 §6). ichiflow *builds* this layer on
+   top of the canonical format. It is the largest single product investment in this document and is
+   what makes ichiflow a Decision-Center-class product rather than "Drools with a UI."
+
+The Decision layer therefore has four strata, top to bottom:
+
+| Stratum | What it is | Who owns it |
+|---|---|---|
+| **Governance & Authoring** | Versioning, approval workflows, business-user authoring UX, simulation, coverage | **ichiflow builds** (§5) |
+| **Canonical format** | DMN 1.6 DRD + FEEL + ichiflow envelope (the DecisionModel) | **ichiflow defines** (§2) |
+| **Decision Engine SPI** | `evaluate` / `trace` / `validate` / capability descriptors | **ichiflow defines** (§3) |
+| **Engines** | Drools (default), ZEN (planned), others | pluggable, behind SPI (§4) |
+
+---
+
+## 2. Canonical representation: the DecisionModel
+
+### 2.1 DMN 1.6 as the semantic core
+
+A **Decision** is authored as **DMN 1.6** — a Decision Requirements Diagram (DRD) of decision nodes,
+input data, business knowledge models, and knowledge sources, with logic expressed as **FEEL**
+(boxed expressions, decision tables, contexts, function definitions). DMN is chosen because it is the
+*only* decision format that is simultaneously (research 01 §5, §8.3):
+
+- an **open OMG standard**, not a vendor dialect;
+- **executable on multiple independent conformant engines** (Drools, Camunda, Trisotech are all DMN
+  TCK conformance level-3);
+- **text/XML-serializable**, diffable, and reviewable in git;
+- **reasonably LLM-authorable** via FEEL (functional, well-specified, far more constrained and
+  reliable to generate than DRL — research 01 §3.1, §6).
+
+We accept DMN's known interchange caveats (FEEL under-specification, "DMN-washing," weak diagram
+round-trip) and manage them by pinning to **TCK-L3 engines** and running a differential-test harness
+(§6.4, and [`11-migration-in-and-out.md`](./11-migration-in-and-out.md) §OUT).
+
+### 2.2 The ichiflow envelope
+
+A **DecisionModel** is the versioned, governed unit ichiflow tracks. It is the DMN document plus a
+thin envelope of metadata that DMN itself does not standardize. The envelope is declarative data an
+AI agent can propose and a human can diff (BRIEF doc conventions).
+
+```yaml
+# decisionmodel: loan-eligibility  (illustrative ichiflow envelope over a DMN 1.6 model)
+apiVersion: ichiflow.dev/v1
+kind: DecisionModel
+metadata:
+  id: loan-eligibility
+  title: Loan Eligibility
+  owner: credit-risk-team
+  version: 3.2.0                 # semver; governed release (see §5.1)
+  governanceState: released     # draft | in-review | released | deprecated
+  effective: { from: 2026-08-01, to: null }   # bitemporal effectivity
+model:
+  dmn: ./loan-eligibility.dmn    # DMN 1.6 XML — the source of truth (DRD + FEEL)
+  entryPoint: LoanEligibility    # named decision to evaluate
+contracts:
+  input:  { schema: schemas/LoanApplication.json }   # JSON Schema (BRIEF §5)
+  output: { schema: schemas/EligibilityResult.json }
+engine:
+  preferred: drools              # capability-negotiated at deploy (§3.3)
+  requires: [decisionTables, feel-full]
+projections:                     # optional deployment projections, NOT the source of truth
+  - { format: jdm, engine: zen, path: dist/loan-eligibility.jdm.json }   # §4.2
+tests:
+  scenarios: ./scenarios/        # first-class scenario specs (§6)
+  goldenDatasets: [prod-2025-declines, edge-cases-v2]   # (§6.3)
+provenance:                      # for migrated models (§11)
+  source: none                   # none | dmn-import | drl-import | odm-mining | ...
+  extensionMap: null
+```
+
+The envelope binds a Decision to its **Schema** contracts (input/output JSON Schema, BRIEF §5), its
+**governance state**, its **tests**, its **provenance**, and any **projections**. Input and output
+are validated against their JSON Schema at the SPI boundary using the same runtime validators as
+every other adapter (networknt/OptimumCode on Kotlin; BRIEF §5) — a Decision is a schema'd port like
+any other.
+
+**FEEL as the expression primitive everywhere.** Where ichiflow needs an inline predicate outside a
+full DecisionModel (a Flow guard condition, a Task assignment expression), it uses FEEL as the single
+expression language so business authors learn one syntax. CEL is reserved for internal
+platform-guard use (research 01 §3.7), not business logic.
+
+---
+
+## 3. The Decision Engine SPI
+
+The SPI is the contract every engine implements. Flows and Adapters call the SPI, never an engine
+directly, so an engine is swappable and a DecisionModel is portable across the engine tier.
+
+### 3.1 The four operations
+
+| Operation | Signature (conceptual) | Purpose |
+|---|---|---|
+| `evaluate` | `(DecisionModelRef, input, evalContext) → DecisionResult` | Run the decision; return typed outputs validated against the output Schema. |
+| `trace` | emitted *with* every `evaluate` | A **typed evaluation trace**: fired rules/decisions, input snapshot, intermediate values, timings (§7). Not optional and not a separate call — evaluation is trace-producing by construction. |
+| `validate` | `(DecisionModel) → ValidationReport` | Static validation: DMN well-formedness, FEEL type-checks, schema-contract conformance, coverage gaps, unreachable rules, table completeness/overlap (hit-policy) checks. Runs in CI and in the authoring UI. |
+| `capabilities` | `() → CapabilityDescriptor` | What the engine can do (§3.3), so ichiflow can route a model to a compatible engine and refuse an incompatible one at deploy time, not runtime. |
+
+`evaluate` is pure with respect to the working memory it is given: inputs in, `DecisionResult` + trace
+out, no hidden side effects. Statefulness (CEP working memory) is modelled explicitly (§8).
+
+### 3.2 The typed trace is part of the contract
+
+Every `evaluate` returns a `DecisionResult` **and** a `DecisionTrace`. The trace is a typed ichiflow
+object (not an engine-specific log format) so the DecisionRecord can consume it uniformly regardless
+of which engine produced it. Engines map their native introspection into the ichiflow trace shape:
+
+- **Drools** maps its `AgendaEventListener` / `RuleRuntimeEventListener` activations and DMN
+  per-decision result events into the trace (research 01 §3.1).
+- **ZEN** maps its JSON node-execution trace into the same shape (research 01 §3.4).
+
+This mapping is what turns Drools' "powerful but developer-facing" introspection (research 01 §3.1,
+§6.3) into a business-readable, uniform artifact — the work ichiflow does that Drools does not.
+
+### 3.3 Capability descriptors and negotiation
+
+Engines differ in capability (research 01 §4 matrix): Drools has RETE inference and CEP; ZEN is a
+sequential decision graph with neither. A `CapabilityDescriptor` lets ichiflow negotiate rather than
+fail at runtime.
+
+```yaml
+# capabilities: drools-engine (illustrative)
+engine: drools
+dmnConformance: L3
+feel: full
+supports:
+  inference: true          # RETE/PHREAK forward chaining
+  cep: true                # temporal windows, interval events
+  decisionTables: true
+  drd: true
+  pmml: true               # ML scoring node (research 01 §5)
+  drlEscapeHatch: true     # §4.3
+runtime: [jvm]
+---
+# capabilities: zen-engine (illustrative)
+engine: zen
+dmnConformance: none       # executes JDM, not DMN — via projection (§4.2)
+feel: subset
+supports:
+  inference: false
+  cep: false
+  decisionTables: true
+  drd: true                # decision graph (JDM), not DMN DRD
+  pmml: false
+  drlEscapeHatch: false
+runtime: [ts, edge, jvm, wasm]
+```
+
+A DecisionModel declares `engine.requires: [...]`. At deploy, ichiflow matches `requires` against
+each candidate engine's descriptor and **refuses to deploy** a model that requires `inference` to an
+engine that lacks it — surfacing the incompatibility to the author, not to production traffic.
+
+---
+
+## 4. Engines
+
+### 4.1 Apache KIE / Drools — default / reference engine (v1)
+
+Drools is the default engine and validates the founder's lean *for the engine tier* (research 01
+§3.1, §10). It provides:
+
+- **DMN L3** with full FEEL — the reference execution of the canonical format.
+- **RETE/PHREAK inference** — true forward chaining, rule chaining, agenda/conflict resolution: the
+  differentiator versus sequential engines, matching the algorithm class of IBM ODM.
+- **CEP (Drools Fusion)** — sliding windows, temporal operators, interval vs point events (§8).
+- **PMML** — execute predictive models alongside rules as a scoring node.
+- **Kotlin-native** call path, Quarkus-native, GraalVM native image via executable model — fits the
+  Kotlin core (BRIEF §4).
+
+Phasing note: ichiflow pins to stable Apache KIE 10.x releases and keeps Drools strictly behind the
+SPI, because the project is still in Apache incubation and the paid support path has narrowed to IBM
+BAMOE (research 01 §3.1, §9). The abstraction *is* the mitigation.
+
+### 4.2 GoRules ZEN — planned second engine (later)
+
+ZEN is the planned second engine for the **TypeScript / edge / serverless / embedded** tier that
+Drools cannot serve (research 01 §3.4, §9 — "no TypeScript story" for Drools is the highest-severity
+gap). ZEN is MIT-licensed Rust with first-class Node/TS and Kotlin bindings, tiny footprint, no
+server, and best-in-class AI-authorability (JSON JDM).
+
+ZEN executes **JDM (JSON Decision Model)**, not DMN. Because DMN is canonical, ZEN is fed via a
+**projection**: ichiflow compiles the table/graph-shaped subset of a DecisionModel to JDM at build
+time (`projections:` in §2.2). This works for the ~90% of enterprise logic that is
+decision-table/decision-flow shaped; it does **not** work for inference-heavy or CEP models, which
+`capabilities` negotiation (§3.3) keeps on Drools. The DMN↔JDM projection is lossy in the
+inference/CEP direction by design, and the projection compiler records what it dropped.
+
+### 4.3 Escape hatches: DRL and engine-native logic
+
+Some genuine enterprise logic — deep forward-chaining inference over a working memory, complex CEP —
+is more naturally expressed in **DRL** (Drools Rule Language) than in DMN. ichiflow permits DRL (and,
+in principle, other engine-native artifacts) as an **escape hatch**, under strict quarantine so it
+never silently erodes the portability promise.
+
+Rules for the escape hatch:
+
+1. **Allowed only when DMN cannot express it well** — inference/CEP-heaviness, not convenience.
+   Table-shaped and DRD-shaped logic must be authored as DMN.
+2. **Marked non-portable.** An escape-hatch artifact carries `portability: engine-bound` in its
+   envelope and is visibly flagged in the authoring UI, in `validate` reports, and in the exported
+   bundle. It counts against a workspace's portability score.
+3. **Exportable adapter required.** No escape-hatch artifact is admitted without a declared
+   input/output Schema contract and a documented behavior — so a leaving customer can re-implement it
+   on another engine against the same contract and the same golden datasets, even though the artifact
+   itself does not port. The escape hatch degrades portability from "runs elsewhere unchanged" to
+   "specified well enough to re-build elsewhere"; it never degrades to "opaque."
+4. **Quarantined blast radius.** Escape-hatch logic lives in clearly delimited DecisionModels; a
+   model is either portable DMN or quarantined engine-bound, never a silent mix.
+
+```yaml
+# an escape-hatch DecisionModel is explicitly, visibly non-portable
+kind: DecisionModel
+metadata: { id: fraud-inference, version: 1.4.0, governanceState: released }
+model: { drl: ./fraud-inference.drl, entryPoint: FraudSession }
+portability: engine-bound          # <-- quarantine marker; flagged everywhere
+engine: { preferred: drools, requires: [inference] }
+contracts:                         # <-- mandatory exportable adapter contract
+  input:  { schema: schemas/TxnWindow.json }
+  output: { schema: schemas/FraudSignal.json }
+tests: { scenarios: ./scenarios/, goldenDatasets: [fraud-labeled-2025] }
+```
+
+---
+
+## 5. Governance & Authoring — the layer ichiflow builds
+
+This is the ODM Decision Center–class product ichiflow owns rather than borrows (research 01 §6, §9).
+KIE Sandbox is a developer tool, not a business-governance product; ichiflow builds the governance,
+authoring, simulation, and coverage surfaces on top of the canonical DecisionModel.
+
+### 5.1 Versioning & release management
+
+- DecisionModels are **semver-versioned** and live in the **Workspace** (a git repo — BRIEF vocab).
+  Git is the substrate; ichiflow layers governance semantics on top.
+- **Governance states** (`draft → in-review → released → deprecated`) are first-class and enforced:
+  only `released` models are deployable to production; `effective` windows (§2.2) allow a released
+  version to become authoritative on a future date (bitemporal, aligned with research 05 as-of
+  support).
+- **Released baselines** are immutable snapshots — the ODM concept ichiflow reproduces — so an
+  auditor can reconstruct exactly which model version decided a given Case (feeds the DecisionRecord).
+- Breaking changes to a Decision's **Schema contract** are gated by the same oasdiff/CI breaking-change
+  machinery as any other contract (BRIEF §5).
+
+### 5.2 Approval workflows
+
+Approval is itself modelled as an ichiflow **Flow** with **human Tasks** — dogfooding the framework.
+A change to a DecisionModel opens a review Case: assigned reviewers (routing is itself a Decision),
+required approvals, SLA timers, and escalation. Approvals, reviewers, diffs, and simulation results
+are recorded to the append-only DecisionRecord so "who approved this rule change, when, on what
+evidence" is answerable via the why API.
+
+### 5.3 Business-user authoring UX (v1 spans three modes)
+
+Because BAL-style controlled natural language is materially more approachable than DRL (research 01
+§6.2), ichiflow gives business authors DMN-native surfaces plus AI assistance — never raw DRL.
+
+1. **Decision tables** — the primary surface. Boxed DMN decision tables with hit-policy support,
+   completeness/overlap checking (via `validate`), and inline FEEL cells. Spreadsheet
+   (Excel/OpenRules-style) import/export is supported (research 01 §3.6, §8) so analysts can work in
+   the tool they know.
+2. **Guided rules** — a structured, form-driven "when/then" builder that emits DMN + FEEL, giving a
+   BAL-like controlled-natural-language feel without a proprietary language. Business-readable,
+   deterministically compiled to the canonical format.
+3. **Natural-language-assisted authoring (AI, Rule Authoring Copilot)** — an author describes intent
+   in plain language ("decline if debt-to-income exceeds 43% unless the co-signer FICO is above
+   740"); the Copilot proposes a decision table / FEEL expression. This follows the framework-wide
+   contract **"AI proposes, deterministic tools + humans dispose"** (BRIEF vocab, research 06 §A.5):
+   the proposal is type-checked by `validate`, shown as a diff, must be human-approved, and — for any
+   released rule — must pass scenario + parity tests before it is authoritative. FEEL's constrained
+   surface makes LLM generation comparatively reliable (research 01 §3.1).
+
+The editor component may embed **dmn-js** (Camunda's Apache/MIT-friendly, de-facto DMN editor) rather
+than building a DMN canvas from scratch (research 01 §3.3, §9).
+
+### 5.4 Simulation & scenario testing (analyst-facing)
+
+The analyst-facing simulation ODM/Blaze/SMARTS ship and Drools lacks (research 01 §6.4) is a
+first-party ichiflow surface:
+
+- **What-if simulation** — run a draft model over ad-hoc or sampled inputs and see outputs +
+  human-readable trace, before release.
+- **Scenario testing** — run the model against the DecisionModel's **scenario specs** (§6).
+- **Golden-dataset replay** — run a candidate version against a **golden dataset** and diff outcomes
+  against the released version or against recorded legacy outcomes (the same engine that powers
+  migration parity testing, §6.3 and doc 11).
+- **Coverage** — report which rules/table rows fired across a scenario suite or golden dataset, so
+  authors see untested branches and dead rules.
+
+### 5.5 Authoring for the AI coding agent
+
+Every authoring surface has a declarative artifact underneath (DMN + envelope + scenario specs). AI
+coding agents author Decisions by editing those artifacts in the Workspace and running `validate` +
+scenarios via the CLI/MCP surfaces (BRIEF §12) — the same gates a human review goes through. The
+governance layer does not distinguish "human wrote it" from "agent wrote it"; both are subject to
+approval workflows and parity tests, and both are provenance-stamped.
+
+---
+
+## 6. Testing as a first-class artifact
+
+Decision tests are not an afterthought or a code file — they are **governed artifacts inside the
+DecisionModel**, readable and writable by business users, and required for release.
+
+### 6.1 Scenario specs
+
+A **scenario** is a business-readable given/expect spec: named inputs → expected outputs (and,
+optionally, expected fired rules / reason codes). They are stored with the DecisionModel, versioned
+with it, and authored in the same UI. They double as documentation of intent.
+
+```yaml
+# scenarios/high-dti-decline.yaml  (business-readable scenario spec)
+scenario: High DTI is declined unless strong co-signer
+decisionModel: loan-eligibility@3.2.0
+cases:
+  - name: DTI 45% no co-signer -> DECLINE
+    given: { dti: 0.45, coSigner: null, ficoPrimary: 690 }
+    expect:
+      outcome: DECLINE
+      reasonCodes: [DTI_OVER_LIMIT]
+  - name: DTI 45% strong co-signer -> APPROVE
+    given: { dti: 0.45, coSigner: { fico: 760 } }
+    expect: { outcome: APPROVE }
+```
+
+### 6.2 Coverage
+
+`validate` + the scenario runner compute **rule/row coverage** across the scenario suite and golden
+datasets, surfaced in the authoring UI and gated in CI (a released model must meet a coverage
+threshold). Coverage is what turns "we have some tests" into a governance signal.
+
+### 6.3 Golden datasets
+
+A **golden dataset** is a named, versioned corpus of real or synthetic cases with known-correct
+outcomes — historical production decisions, curated edge cases, or legacy-system outputs. Golden
+datasets power:
+
+- release-gating regression (a candidate version must not regress outcomes on the golden dataset),
+- analyst simulation (§5.4),
+- **decision parity testing** for migration (legacy vs migrated outcomes — doc 11 §Parity), the
+  shared engine that makes "migrate your rules to ichiflow" defensible (research 06 §A.6.3).
+
+### 6.4 Differential testing (interchange fidelity)
+
+Because DMN interchange is not lossless (research 01 §7), any imported or cross-engine model runs
+through a **differential-test harness**: execute the model on the target engine and compare outputs
+against golden outputs from the source engine; store a provenance/extension map for anything
+non-standard. This is how ichiflow keeps DMN's portability promise honest (see doc 11 §OUT).
+
+---
+
+## 7. Explainability: the typed evaluation trace
+
+Every `evaluate` emits a **typed `DecisionTrace`** — not a log line, a typed domain object — carrying:
+
+- **fired rules / decisions**: which DMN decisions evaluated, which table rows matched under which
+  hit policy, which DRL rules activated and in what agenda order (for the inference escape hatch);
+- **input snapshot**: the exact inputs the decision saw, as-of evaluation time;
+- **intermediate values**: the outputs of upstream DRD decisions and named FEEL sub-expressions;
+- **outputs + reason codes**: the result and the business-facing reasons (adverse-action / ECOA /
+  GDPR Art. 22 grade — research 05);
+- **model identity**: DecisionModel id + version + effective window + engine + capability set.
+
+The trace flows into the per-Case **DecisionRecord**, which stitches Flow event history + fired-rule
+traces + DMN results + human review + AI-agent actions into one causal chain keyed by `case_id`,
+queryable via the **why API** (BRIEF §9; research 05 §1). This is the layer that converts Drools'
+developer-facing listener output into ODM-class, business-readable, turnkey explainability — the
+capability research 01 §6.3 says ichiflow must build, built once at the SPI so it works uniformly
+across engines.
+
+---
+
+## 8. CEP / temporal rules
+
+Complex event processing — reasoning over streams of events with temporal operators and sliding
+windows (fraud velocity, "3 failed logins in 5 minutes," interval-vs-point events) — is a real
+enterprise need and a Drools strength (Drools Fusion; research 01 §3.1, §4 matrix) that ZEN and
+sequential DMN engines lack entirely.
+
+ichiflow's CEP story:
+
+- **v1: CEP runs on Drools only.** A CEP DecisionModel declares `requires: [cep]`; capability
+  negotiation (§3.3) pins it to Drools. Standard DMN cannot express temporal windows, so CEP models
+  are typically authored via the **DRL escape hatch** (§4.3) and carry `portability: engine-bound` —
+  visibly quarantined, with a mandatory Schema contract and golden datasets so the behavior is
+  specified even though the artifact does not port.
+- **Stateful working memory is explicit.** Unlike stateless `evaluate`, a CEP model owns a
+  `KieSession`-style working memory into which events are inserted over time; ichiflow models this as
+  a long-lived decision session bound to a Flow/Case, with the same typed-trace and DecisionRecord
+  wiring (each activation is traced).
+- **Event feed via Adapters.** CEP inputs arrive through ichiflow Adapters (Kafka/AMQP/MQ — BRIEF
+  vocab) as canonical events; the CEP session's emitted signals become canonical events or Decisions
+  that a Flow reacts to.
+- **later:** evaluate whether a portable subset of temporal patterns can be lifted into the DMN
+  envelope (so common windows are authorable without the escape hatch); today they are not, and we
+  say so.
+
+---
+
+## 9. Capability parity with IBM ODM and Drools (the feature-difference assessment)
+
+This is the assessment the founder explicitly requested (research 01 §6): an honest mapping of what
+IBM ODM Decision Center/Server and raw Drools provide, to where ichiflow provides the equivalent —
+in the **engine**, in an **ichiflow-built layer**, or on the **roadmap**. Grounded in research 01
+§§3.1–3.2, 4, 6.
+
+Legend: **Engine** = provided by Drools/ZEN under the SPI · **ichiflow** = built by ichiflow on top ·
+**Roadmap** = planned, phase noted · ●●● strong / ●● partial / ● weak.
+
+| Capability (ODM / Drools term) | IBM ODM | Raw Drools | Where ichiflow provides it | ichiflow strength |
+|---|---|---|---|---|
+| **Rule/decision execution** | ●●● RETE | ●●● RETE/PHREAK | **Engine** (Drools default) | ●●● |
+| **Inference / forward chaining** | ●●● | ●●● | **Engine** (Drools); pinned via `requires:[inference]` | ●●● |
+| **CEP / temporal (Fusion)** | ●● | ●●● | **Engine** (Drools) + ichiflow session/trace wiring (§8) | ●●● (Drools-only) |
+| **DMN L3 + full FEEL** | ●● (DMN-derived) | ●●● | **Engine** (Drools) as canonical exec | ●●● |
+| **PMML / ML scoring node** | ●● | ●●● | **Engine** (Drools) | ●●● |
+| **BAL authoring (controlled NL)** | ●●● | ○ | **ichiflow**: guided rules + NL-assisted authoring → DMN/FEEL (§5.3); *not* a proprietary BAL clone | ●● v1 → ●●● |
+| **Decision tables (business surface)** | ●●● | ● (dev tables) | **ichiflow** authoring UI over DMN boxed tables + spreadsheet import (§5.3) | ●●● |
+| **Ruleflows / decision orchestration** | ●●● | ●● (DRD) | **ichiflow Flows** on Temporal call Decisions (research 02); DRD within a model = **Engine** | ●●● |
+| **Decision Center: versioned rule repository** | ●●● | ● (Git/Sandbox) | **ichiflow** governance layer over git Workspace (§5.1) | ●● v1 → ●●● |
+| **Governance: permissions / approval workflows / baselines** | ●●● | ○ | **ichiflow** approval Flows + released baselines + states (§5.1–5.2) | ●● v1 → ●●● |
+| **Analyst simulation / what-if** | ●●● | ● (dev test-scenario) | **ichiflow** simulation + golden-dataset replay + coverage (§5.4) | ●● v1 → ●●● |
+| **Testing / scenario specs** | ●●● | ●● (test-scenario) | **ichiflow** first-class business-readable scenarios (§6) | ●●● |
+| **Coverage analysis** | ●● | ● | **ichiflow** rule/row coverage gating (§6.2) | ●● |
+| **Turnkey decision traces (business-readable "why")** | ●●● | ●● (listeners, DIY UI) | **ichiflow** typed trace → DecisionRecord → why API (§7; research 05) | ●● v1 → ●●● |
+| **Explainability for compliance (adverse-action/Art. 22)** | ●●● | ● | **ichiflow** reason codes in trace + DecisionRecord (§7) | ●●● |
+| **TypeScript / edge / embedded execution** | ○ | ○ | **Engine** (ZEN, planned) via JDM projection (§4.2) | ○ → ●●● (later) |
+| **Open licensing / no lock-in** | ○ (proprietary) | ●● | **ichiflow**: DMN-canonical, everything exportable (doc 11 §OUT) | ●●● |
+| **Neutral migration OUT** | ● (IBM-only formats) | ●● (DMN/DRL) | **ichiflow** DMN/JDM/table export + differential harness (doc 11) | ●●● |
+| **AI-assisted authoring** | ● | ● | **ichiflow** Rule Authoring Copilot (§5.3) | ●●● |
+
+**Honest reading.** Where ODM leads today is **exactly** the governance/authoring/simulation/turnkey-
+trace band, and every one of those cells is an **ichiflow-built** item marked "●● v1 → ●●●", i.e. real
+work that lands adequate in v1 and matures after. Where Drools already wins (execution, inference,
+CEP, DMN L3, PMML, openness) ichiflow inherits the win through the SPI. Where *both* lose — TS/edge
+execution and clean migration-out — ichiflow's two-engine + DMN-canonical architecture is the
+differentiator. ichiflow does **not** claim day-one parity with two decades of Decision Center; it
+claims a credible, honestly-phased path to it on an open, no-lock-in substrate, with AI-assisted
+authoring and a genuinely clean exit that ODM cannot offer.
+
+---
+
+## 10. The SPI and evaluation path (diagram)
+
+```mermaid
+flowchart TB
+  subgraph Authoring["Governance & Authoring (ichiflow builds — §5)"]
+    UX["Authoring UX<br/>tables · guided rules · NL-assisted (AI)"]
+    GOV["Versioning · approval Flows · released baselines"]
+    SIM["Simulation · golden datasets · coverage"]
+  end
+
+  subgraph Canonical["Canonical format (§2)"]
+    DM["DecisionModel<br/>DMN 1.6 (DRD + FEEL) + envelope"]
+    SC["Scenario specs + golden datasets (§6)"]
+  end
+
+  UX --> DM
+  GOV --> DM
+  DM --> VAL
+
+  subgraph SPI["Decision Engine SPI (§3)"]
+    VAL["validate()"]
+    CAP["capabilities()"]
+    EVAL["evaluate() + trace()"]
+  end
+
+  CAP -->|negotiate: requires vs supports| ROUTER{Route to engine}
+  DM --> ROUTER
+  ROUTER -->|DMN / inference / CEP / PMML| DROOLS["Drools engine<br/>(default, JVM) — §4.1"]
+  ROUTER -->|JDM projection: TS / edge| ZEN["ZEN engine<br/>(planned) — §4.2"]
+  ROUTER -->|engine-bound escape hatch| DRL["DRL / CEP session<br/>quarantined — §4.3 / §8"]
+
+  CALLER["Flow on Temporal / Adapter<br/>(research 02, 04)"] --> EVAL
+  EVAL --> DROOLS
+  EVAL --> ZEN
+  EVAL --> DRL
+
+  DROOLS --> RES["DecisionResult<br/>(validated vs output Schema)"]
+  ZEN --> RES
+  DRL --> RES
+  DROOLS --> TR["Typed DecisionTrace<br/>fired rules · input snapshot · intermediates"]
+  ZEN --> TR
+  DRL --> TR
+
+  RES --> CALLER
+  TR --> DR["DecisionRecord / why API<br/>(§7; research 05)"]
+  SIM -.replay.-> EVAL
+  SC -.gate release.-> VAL
+```
+
+---
+
+## 11. Migration of decisions (pointer)
+
+Getting decisions **in** (DMN import, DRL import, JDM import, spreadsheet import, and rule-mining from
+IBM ODM / FICO Blaze / legacy code with LLM-assisted BAL→DMN under human gates) and **out** (DMN 1.6
+XML to any TCK-L3 engine, JDM to ZEN, tables to spreadsheets, plus the differential/parity harness
+that proves equivalence) is covered in [`11-migration-in-and-out.md`](./11-migration-in-and-out.md).
+The honest promise (research 01 §8, research 06 §A.6): **AI-accelerated, tool-assisted migration and
+a genuinely clean exit — not "one-click import."**
+
+---
+
+## 12. Open questions
+
+1. **BAL-like guided-rule fidelity.** How close can guided rules + NL-assisted authoring get to the
+   approachability of ODM BAL without a proprietary language? Needs user testing with business
+   analysts (§5.3).
+2. **Portable temporal subset.** Can a useful subset of CEP/temporal patterns be lifted into the DMN
+   envelope so common windows avoid the engine-bound escape hatch (§8)? Undecided.
+3. **ZEN projection boundary.** Exactly which DMN/FEEL constructs project cleanly to JDM, and how we
+   surface "this model can't run on the edge tier" early to authors (§4.2). Needs a conformance map.
+4. **FEEL ambiguity pinning.** Which specific FEEL under-specifications (research 01 §7) do we pin,
+   and do we publish ichiflow's chosen semantics as part of the canonical spec? Leaning yes.
+5. **Coverage thresholds as policy.** Should the release-gating coverage threshold be global, per
+   regulated vertical (compliance pack), or per DecisionModel? (§6.2)
+6. **Approval-workflow dogfooding depth.** Approval-as-a-Flow is elegant but risks a bootstrap
+   dependency (the Decision layer depends on Flows which call Decisions). Confirm the layering is
+   acyclic in practice (§5.2).
