@@ -1,2 +1,2 @@
-# ichiflow
+# 🍓 ichiflow
 AI-native enterprise workflows
