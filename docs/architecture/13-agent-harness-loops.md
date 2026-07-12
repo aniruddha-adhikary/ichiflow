@@ -444,6 +444,105 @@ The step's flow-control vectors (submit-shaped issuance in a graph) ride the flo
 its render checks ride the UI harness (§2.e), and its audit events feed the DecisionRecord completeness
 harness (§2.g) — §2.k is the issuance-specific composition of all three (ADR-0029).
 
+### 2.l QuotaLedger — concurrency, invariants, and reflow under contention
+
+The `QuotaLedger` ([04](04-flow-and-case-layer.md) §5.9; ADR-0030) enforces its fairness invariants **at
+the ledger, atomically**, and its `reserve` / `commit` / `release` operations are side-effecting and
+replay-sensitive — so the harness **red-teams the invariant under contention** rather than trusting a
+hand-written guard. The load-bearing property is that the declared invariant holds under **parallel**
+movement.
+
+- **Contention vectors (the invariant under parallel movement).** Simulated **parallel**
+  `reserve`/`commit`/`release` against a dimension assert the declared invariant never breaks —
+  `headroom >= 0` and `committed <= capacity` hold under **every interleaving**, and an over-reservation
+  past capacity is **refused**, not silently driven negative. This is the race the ledger exists to win.
+  Fixtures: seeded interleaving schedules + declared invariants. Verdict: `invariant_holds: pass|fail`
+  per schedule.
+- **TTL'd-reservation expiry / release.** A held reservation that passes its TTL (under time-skip, §3.6)
+  auto-expires and returns headroom; an explicit `release` (decline / clawback) does the same; a
+  `commit` before expiry converts the reservation to consumption. Fixtures: reserve→expire and
+  reserve→release→re-reserve sequences.
+- **Monetary variable-size fit.** For a `kind: monetary` dimension the fit test is
+  `capacity − committed − reserved ≥ amount` (not `headroom ≥ 1`): variable-size reservations pack until
+  the pool cannot fit the next amount, and the pinned rate version is recorded per commit. Fixtures:
+  variable-amount reservation streams against a budget pool.
+- **Ranked-draw + reserve-list cutoff.** A set-level **ranked draw** draws the pool down in rank order
+  until exhausted; candidates below the line fall onto the **reserve list** (a coded end state, not a
+  quality failure), and the cutoff is exact and reproducible. Fixtures: ranked candidate sets +
+  capacities. (Composes with the cohort gather-barrier, §2.m.)
+- **Release-back reflow.** Returned capacity (clawback / under-claim / expiry) reflows per the ledger's
+  **declared reflow policy** (`next-in-ranked-order` / `next-round` / `treasury`) — the vector asserts
+  the released amount lands where the policy declares, not wherever code happens to send it.
+- **Exactly-once-memoized replay.** Re-executing a `quota-op` on interpreter replay / continue-as-new
+  **does not double-consume** — the mutation is memoized keyed by `(case_id, step.id)` exactly like
+  `issue-document` number allocation (§2.k, [04](04-flow-and-case-layer.md) §2.9). Fixtures: movement
+  sequences + replayed histories. Verdict: `replay_no_double_consume: pass|fail`.
+
+Every movement is an audited DecisionRecord event, so these verdicts also feed the completeness harness
+(§2.g). **Progress metric:** `contention_vectors_green / total` across the contention, TTL, monetary,
+ranked-draw, reflow, and replay families — done-ness of a ledger is *every declared invariant proven
+under parallel movement*, not a compile.
+
+### 2.m Set-level Cases — cohort gather-barrier and bundle roll-up
+
+The two set-level Case shapes ([04](04-flow-and-case-layer.md) §5.10; ADR-0031) key **above** `case_id`,
+so their harness proves the **barrier** and the **roll-up** behave — a cohort fans **in** to one
+decision, a bundle fans **out** to N.
+
+- **Cohort gather-barrier (bounded fan-in).** A cohort Flow gathers **all** member Cases in cohort *C*
+  before the set-level step runs — the vector asserts the barrier does **not** release early on a partial
+  gather, and that the **bounded fan-in guardrail** trips at the declared cap rather than silently
+  loading 50,000 Cases into one step. Fixtures: cohort selectors + member sets straddling the cap.
+- **Cohort-record fan-in.** After the set-level step, member Cases **reference one cohort-scoped
+  DecisionRecord** keyed by `cohortId` (`exerciseId` / `roundId`) — the vector asserts "prove my queue
+  number / my rank" resolves to **one** cohort record every member points at, not N copies
+  ([08](08-audit-and-observability.md) §1.7). Fixtures: a cohort + its member Cases + the expected shared
+  record.
+- **Bundle heterogeneous fan-out.** A bundle parent spawns **one sub-Case per computed element, each of a
+  different `caseType`** resolved through the CaseType catalog ([02](02-schema-foundation.md) §10) — the
+  vector asserts each child is a **full independent Case** (own Flow, own SLA, own lifecycle), not a
+  homogeneous copy. Fixtures: a computed selection → expected heterogeneous child set.
+- **Partial-tolerant roll-up.** When some children approve and some reject, the parent rolls up to
+  **`partial`** — a first-class, **non-gated** end state — **not** a blocked or failed bundle (this is
+  precisely what a `CompositeOutcome` is *not*). Fixtures: mixed child-outcome sets → expected `partial`.
+- **Parent references children.** The bundle parent DecisionRecord **references** (never merges) its
+  child records ([08](08-audit-and-observability.md) §1.7) — the vector asserts no child Outcome is
+  folded into a parent determination.
+
+**Progress metric:** `set_level_vectors_green / total` across the cohort-barrier, cohort-record,
+heterogeneous-fan-out, partial-roll-up, and parent-reference families.
+
+### 2.n Auditable-randomness recipe (SeededAllocate)
+
+The auditable-randomness pattern (public-housing-ballot G1;
+[04](04-flow-and-case-layer.md) §5.12; §3 of the
+[public-housing-ballot](../examples/case-studies/public-housing-ballot.md) case study) is a **blessed,
+harness-verified pattern — not a new step type**: an app-builder assembles it from existing primitives,
+and this harness is what makes the assembly *provably fair* rather than fragile choreography. The recipe:
+**commit** a seed hash (`H = SHA-256(masterSeed)`) to the audit ledger before the application window
+closes (or source the seed from a **public randomness beacon** via `external-task`,
+[04](04-flow-and-case-layer.md) §2.8); **freeze + hash** the roster
+(`R = SHA-256(canonical(roster))`) at window close; run a **pure** `allocate(roster, seed)` `compute`
+step; **publish** `(seed, roster-hash)` into the cohort DecisionRecord for auditor reproduction.
+
+- **Commitment integrity.** On golden cohorts, the revealed seed matches its pre-close commitment —
+  `SHA-256(masterSeed) == H` — so the authority cannot have ground seeds after seeing the roster.
+  Fixtures: golden `(masterSeed, commitment)` pairs, including a deliberately-mismatched negative vector.
+- **Roster-hash stability.** `SHA-256(canonical(roster))` is **stable** — canonicalization is
+  order-independent and reproducible, and any post-freeze edit changes `R` (an audit finding). Fixtures:
+  a roster + permuted / edited variants → expected stable-vs-changed hash.
+- **`allocate` purity / byte-reproduction.** `allocate(roster, seed)` is a **pure function of
+  `(roster, seed)`** — the same inputs produce the **byte-identical** ordering on replay, drawing no live
+  entropy inside the replayable boundary (the same seeded-determinism discipline as §3.6). Fixtures:
+  golden `(roster, seed) → ordering` cohorts, re-run and replayed. Verdict: `allocate_reproducible:
+  pass|fail`.
+
+The recipe is registered in the **resources manifest** as a named pattern (`SeededAllocate`), so an
+author reaches for the blessed, harness-covered recipe rather than re-assembling the fragile
+commit→freeze→reveal→derive ordering by hand (getting that ordering wrong breaks fairness *without*
+breaking replay — the exact failure this harness catches). **Progress metric:**
+`fairness_vectors_green / total` across the commitment, roster-hash, and reproduction families.
+
 ---
 
 ## 3. The loop mechanics

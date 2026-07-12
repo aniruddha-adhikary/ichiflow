@@ -544,6 +544,14 @@ by a Team, governed and discoverable via `ichiflow-mcp`, adding **no new runtime
 existing refs). This generalizes the reference product's *implicit* "a product = schema+decisions+flow+
 uischema" into an *explicit, enumerable* object, and is the substrate S3 quantifies over.
 
+**Resolved (2026-07 gap-fix round):** adopted as the **CaseType catalog** artifact class in
+[02 §10](../../architecture/02-schema-foundation.md) — a thin, **additive, optional** governed manifest binding
+a case-type's artifact bundle + applicability metadata (e.g. SSIC), owned by a Team, versioned as a unit and
+discoverable/pinnable via `ichiflow-mcp`, adding **no new runtime mechanism** (it resolves to existing refs).
+Single-product Workspaces need none (kept an optional aggregation layer, BRIEF §21b). Related:
+[ADR-0031](../../adr/0031-set-level-cases.md) (the bundle fan-out resolves `caseType` through it) /
+[ADR-0033](../../adr/0033-packaging-and-placement.md) (packaging & placement doctrine).
+
 ### G2 — a **bundle-Case** shape: computed heterogeneous sub-Cases + partial-tolerant status aggregation — **MINOR-TO-MODERATE (adopt)**
 The dynamic composite (§2.4) is **not** a `CompositeOutcome` (that composes N Outcomes into **one gated
 decision on one Case**; a licence bundle is **N independent Cases** whose outcomes are **displayed together
