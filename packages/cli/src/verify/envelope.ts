@@ -22,7 +22,7 @@ const addFormats = require("ajv-formats") as (ajv: Ajv2020) => void;
  * `@ichiflow/schemas` from the TypeSpec source. This is the contract of record the CLI validates
  * its own output against — the meta-harness's self-reference.
  */
-function schemaDir(): string {
+export function generatedSchemaDir(): string {
   const entry = require.resolve("@ichiflow/schemas/verdict-envelope");
   return dirname(entry);
 }
@@ -32,7 +32,7 @@ let cachedValidator: ValidateFunction | undefined;
 /** Compile (once) the Ajv validator for the verdict envelope from the generated schemas. */
 export function envelopeValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
-  const dir = schemaDir();
+  const dir = generatedSchemaDir();
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   addFormats(ajv);
   for (const file of readdirSync(dir)) {

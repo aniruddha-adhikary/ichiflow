@@ -24,6 +24,13 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      # The full verify loop includes the cross-language fidelity spike, whose JVM (networknt)
+      # verdicts are produced here and cross-checked against Ajv.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
       - run: pnpm install --frozen-lockfile
 
       - name: License allowlist gate (ADR-0016)
@@ -46,6 +53,9 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+      - name: Fidelity spike — JVM (networknt) verdicts
+        run: pnpm spike:jvm
 
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json

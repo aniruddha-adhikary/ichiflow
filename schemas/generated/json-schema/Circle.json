@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Circle.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "type": "string",
+            "const": "circle"
+        },
+        "radius": {
+            "type": "number",
+            "minimum": 0
+        }
+    },
+    "required": [
+        "kind",
+        "radius"
+    ],
+    "allOf": [
+        {
+            "$ref": "Shape.json"
+        }
+    ]
+}

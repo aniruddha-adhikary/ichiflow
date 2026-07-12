@@ -1,0 +1,195 @@
+{
+  "description": "Cross-language fidelity probe corpus (build plan 1.0). Each vector names an emitted schema (by generated filename), a JSON instance, and the expected verdict. Two independent validators — Ajv (TS) and networknt (JVM) — must BOTH match `expect` AND agree with each other on every vector. Constructs are chosen to be the ones validators most often diverge on: optional-vs-nullable, format assertion, numeric bounds/exclusivity, int32 range inside a union, and cross-file $ref resolution.",
+  "vectors": [
+    {
+      "id": "nullability.optional-absent",
+      "schema": "NullabilityProbe.json",
+      "expect": "accept",
+      "instance": { "required": "a", "nullable": "b" }
+    },
+    {
+      "id": "nullability.explicit-null-ok",
+      "schema": "NullabilityProbe.json",
+      "expect": "accept",
+      "instance": { "required": "a", "optional": "o", "nullable": null }
+    },
+    {
+      "id": "nullability.missing-required",
+      "schema": "NullabilityProbe.json",
+      "expect": "reject",
+      "instance": { "nullable": "b" }
+    },
+    {
+      "id": "nullability.missing-nullable-key",
+      "schema": "NullabilityProbe.json",
+      "expect": "reject",
+      "instance": { "required": "a" }
+    },
+    {
+      "id": "nullability.optional-is-not-nullable",
+      "schema": "NullabilityProbe.json",
+      "expect": "reject",
+      "instance": { "required": "a", "optional": null, "nullable": "b" }
+    },
+    {
+      "id": "nullability.required-wrong-type",
+      "schema": "NullabilityProbe.json",
+      "expect": "reject",
+      "instance": { "required": 5, "nullable": "b" }
+    },
+    {
+      "id": "scalar.all-valid",
+      "schema": "ScalarProbe.json",
+      "expect": "accept",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 3,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "scalar.ratio-boundary-open",
+      "schema": "ScalarProbe.json",
+      "expect": "accept",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 1,
+        "ratio": 0.0001
+      }
+    },
+    {
+      "id": "scalar.rating-above-max",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 6,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "scalar.rating-below-min",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 0,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "scalar.rating-not-integer",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 3.5,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "scalar.ratio-exclusive-min",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 3,
+        "ratio": 0
+      }
+    },
+    {
+      "id": "scalar.bad-email-format",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "not-an-email",
+        "when": "2026-07-12T00:00:00Z",
+        "rating": 3,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "scalar.bad-datetime-format",
+      "schema": "ScalarProbe.json",
+      "expect": "reject",
+      "instance": {
+        "email": "user@example.com",
+        "when": "2026-07-12",
+        "rating": 3,
+        "ratio": 0.5
+      }
+    },
+    {
+      "id": "email.valid",
+      "schema": "Email.json",
+      "expect": "accept",
+      "instance": "user@example.com"
+    },
+    {
+      "id": "email.invalid",
+      "schema": "Email.json",
+      "expect": "reject",
+      "instance": "nope"
+    },
+    {
+      "id": "union.integer-branch",
+      "schema": "UnionProbe.json",
+      "expect": "accept",
+      "instance": { "id": 5 }
+    },
+    {
+      "id": "union.string-branch",
+      "schema": "UnionProbe.json",
+      "expect": "accept",
+      "instance": { "id": "abc" }
+    },
+    {
+      "id": "union.float-matches-neither",
+      "schema": "UnionProbe.json",
+      "expect": "reject",
+      "instance": { "id": 1.5 }
+    },
+    {
+      "id": "union.boolean-matches-neither",
+      "schema": "UnionProbe.json",
+      "expect": "reject",
+      "instance": { "id": true }
+    },
+    {
+      "id": "union.int-overflows-int32",
+      "schema": "UnionProbe.json",
+      "expect": "reject",
+      "instance": { "id": 3000000000 }
+    },
+    {
+      "id": "shape.circle-valid",
+      "schema": "Circle.json",
+      "expect": "accept",
+      "instance": { "kind": "circle", "radius": 2 }
+    },
+    {
+      "id": "shape.wrong-discriminator-const",
+      "schema": "Circle.json",
+      "expect": "reject",
+      "instance": { "kind": "square", "radius": 2 }
+    },
+    {
+      "id": "shape.missing-radius",
+      "schema": "Circle.json",
+      "expect": "reject",
+      "instance": { "kind": "circle" }
+    },
+    {
+      "id": "shape.negative-radius",
+      "schema": "Circle.json",
+      "expect": "reject",
+      "instance": { "kind": "circle", "radius": -1 }
+    }
+  ]
+}

@@ -18,6 +18,9 @@ pins:
   - id: gradle
     version: "8.10.2"
     note: Kotlin core build (wrapper pinned in core/gradle/wrapper).
+  - id: networknt-json-schema-validator
+    version: "1.5.4"
+    note: Independent JVM JSON Schema 2020-12 validator for the cross-language fidelity spike.
 
 resources:
   - id: run-verify
@@ -36,3 +39,7 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/self-check.ts
     description: The meta-harness — the harness that judges harnesses.
+  - id: schema-fidelity-spike
+    kind: harness
+    path: packages/cli/src/verify/scopes/schema-fidelity-spike.ts
+    description: Cross-language JSON Schema fidelity — Ajv (TS) vs networknt (JVM) must agree.

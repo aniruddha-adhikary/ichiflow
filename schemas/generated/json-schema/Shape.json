@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Shape.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "kind"
+    ],
+    "description": "Discriminated union — a tagged `oneOf` keyed on `kind`."
+}

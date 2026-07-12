@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ScalarProbe.json",
+    "type": "object",
+    "properties": {
+        "email": {
+            "$ref": "Email.json"
+        },
+        "when": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+        },
+        "ratio": {
+            "type": "number",
+            "exclusiveMinimum": 0
+        }
+    },
+    "required": [
+        "email",
+        "when",
+        "rating",
+        "ratio"
+    ],
+    "description": "`format` + numeric bounds: the classic sites of validator disagreement."
+}

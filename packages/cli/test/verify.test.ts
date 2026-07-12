@@ -7,6 +7,7 @@ import { buildEnvelope, validateEnvelope } from "../src/verify/envelope.js";
 import { deriveSeed, pass } from "../src/verify/check.js";
 import { runScope, runVerify } from "../src/verify/runner.js";
 import { selfCheckScope } from "../src/verify/scopes/self-check.js";
+import { schemaFidelitySpikeScope } from "../src/verify/scopes/schema-fidelity-spike.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -55,6 +56,16 @@ describe("self-check meta-harness", () => {
     const b = await runScope(selfCheckScope, { repoRoot });
     expect(a.seed).toBe(b.seed);
     expect(a.checks.map((c) => c.id)).toEqual(b.checks.map((c) => c.id));
+  });
+});
+
+describe("schema-fidelity-spike (Ajv side)", () => {
+  it("matches every expected accept/reject verdict via Ajv", async () => {
+    const checks = await schemaFidelitySpikeScope.run({ repoRoot, seed: deriveSeed("spike") });
+    const tsChecks = checks.filter((c) => c.id.startsWith("spike.ts."));
+    expect(tsChecks.length).toBeGreaterThanOrEqual(20);
+    const tsFailures = tsChecks.filter((c) => c.status !== "pass");
+    expect(tsFailures).toEqual([]);
   });
 });
 

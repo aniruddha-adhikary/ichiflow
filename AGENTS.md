@@ -26,8 +26,13 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.         |
 | `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses). |
 | `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).         |
+| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.      |
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                        |
-| `./core/gradlew -p core build`          | Build the Kotlin core.                                    |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core.                             |
+
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`. The last runs a hard JSON
+Schema probe corpus through **two** validators — Ajv (TS) and networknt (JVM) — and requires them
+to agree; run `pnpm spike:jvm` first to produce the JVM verdicts it cross-checks.
 
 ## Layout
 
