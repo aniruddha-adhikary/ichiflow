@@ -159,11 +159,26 @@ conformant. So the SPI **ships with a conformance suite as part of its contract*
   subset (later); a future engine passes it or is rejected. Fixtures: the TCK subset cases + ichiflow
   envelope round-trip cases. Verdict: `tck_cases_green / tck_total` per engine, plus
   capability-descriptor conformance (a declared `supports.inference` must actually infer).
+- **Decision-source projection-coverage harness (the "100% AI-authorability" proof).** Because the
+  **decision source** projection ([03](03-decision-layer.md) §2.6; ADR-0027) must cover the **full DMN
+  1.6 feature set** — not decision tables only — its completeness is a **verified metric, not a claim.**
+  A conformance suite enumerates every DMN 1.6 construct against the DMN feature matrix / TCK construct
+  set (DRDs, all boxed-expression kinds — decision tables, literal FEEL, contexts, invocations,
+  functions/BKMs, lists, relations — item definitions/types, imports) and asserts, per construct: **(a)**
+  a projection form exists, **(b)** it compiles to valid DMN 1.6 XML, and **(c)** the emitted XML
+  executes identically on the default engine to a hand-authored reference. Verdict:
+  `constructs_covered / constructs_total` — "100% AI coverage of the DMN surface" is this count green,
+  never a sentence. The **engine-native escape hatches** (DRL / rule units / CEP,
+  [03](03-decision-layer.md) §4.3) contribute a **compile-check** here too (a malformed DRL/rule-unit
+  fails `validate`), so an AI-authored escape-hatch artifact is verified pre-deploy exactly like a DMN
+  model — quarantine marks portability, not authorability.
 - **Per-DecisionModel scenario suites + coverage.** Each DecisionModel's governed scenario specs
   ([03](03-decision-layer.md) §6.1) run as checks; **rule/row coverage** ([03](03-decision-layer.md)
   §6.2) reports which rules/branches were exercised. Fixtures: scenario specs + golden datasets.
   Verdict: `scenarios_pass / total`, `coverage: 0.86` against the model's declared threshold. This is
-  the enumerable "how much of this Decision is tested."
+  the enumerable "how much of this Decision is tested." Escape-hatch (DRL/rule-unit/CEP) models run the
+  **same** scenario/coverage/golden-dataset checks — AI-authorable *and* AI-testable on the same footing
+  as DMN ([03](03-decision-layer.md) §4.3; ADR-0027).
 - **Trace-shape conformance.** Every `evaluate` must emit a **valid `DecisionTrace`**
   ([03](03-decision-layer.md) §7) — schema-validated shape, required fields present (fired rules,
   input snapshot, CodeSet id+version, model identity). A run that produces a malformed or absent trace

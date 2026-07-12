@@ -215,38 +215,49 @@ answerable via the why API. Effective-dating (§2.2) and CodeSet eligibility alr
 time/region gating; framing gating as a Decision unifies them under one governed, auditable surface
 rather than scattering boolean flags through code.
 
-### 2.6 The decision-table source — an LLM-friendly authoring projection over DMN XML
+### 2.6 The decision source — an LLM-friendly authoring projection over the full DMN 1.6 surface
 
 DMN 1.6 XML is the **executed, exported, interchange** artifact (§2.1, ADR-0001) and stays so — but it
 is LLM-hostile to author directly. Every other core artifact class was given an LLM-legible **canonical
 authoring projection that compiles one-way** to its portable-but-hostile executed form — TypeSpec →
 OpenAPI/JSON Schema ([02-schema-foundation.md](./02-schema-foundation.md) §1), the typed flow builder /
 YAML → canonical Flow JSON ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.5). Decisions —
-ichiflow's heart — get the **same two-layer treatment** (ADR-0027):
+ichiflow's heart — get the **same two-layer treatment, and it must be complete** (ADR-0027):
 
-- **The decision-table source** is a crisp markdown/JSON **decision-table form** — FEEL cells, hit
-  policy, input/output columns, and DRD wiring expressed as data — that an agent or business user
-  authors, and that **compiles deterministically one-way to DMN 1.6 XML**. It is the Decision-layer
-  mirror of TypeSpec→OpenAPI and flow-builder→FlowJSON.
+- **The decision source is a structured markdown/YAML/JSON form (FEEL throughout) covering the FULL DMN
+  1.6 feature set — not decision tables only.** It expresses **DRDs** (decision / input-data / business
+  knowledge model / knowledge-source nodes and their dependency wiring), **all boxed-expression kinds**
+  (decision tables, literal FEEL expressions, contexts, invocations, function definitions/BKMs, lists,
+  relations), and **item definitions / types + imports** — and **compiles deterministically one-way to
+  DMN 1.6 XML**. Decision tables are sugar for the common shape; **nothing in DMN is authorable only by
+  hand-writing XML.** It is the Decision-layer mirror of TypeSpec→OpenAPI and flow-builder→FlowJSON.
+- **100% AI coverage of the DMN surface is a verified metric, not a claim — a projection-coverage
+  harness.** Consistent with harness-first construction ([13-agent-harness-loops.md](./13-agent-harness-loops.md)
+  §2.b; ADR-0026), a conformance suite enumerates every DMN 1.6 construct against the DMN feature
+  matrix / TCK construct set and asserts, per construct: a projection form exists, it compiles to valid
+  DMN 1.6 XML, and the emitted XML executes identically on the default engine to a hand-authored
+  reference. Coverage is an enumerable count (`constructs_covered / constructs_total`), surfaced by
+  `ichiflow verify --scope decision-layer`.
 - **DMN XML remains the sole executed/exported/audited artifact.** The compiled `.dmn` is checked in
   beside the source and covered by the **regenerate-and-diff gate** ([02-schema-foundation.md](./02-schema-foundation.md)
   §4.3) like any two-layer artifact, so a reviewer diffs the source *and* its emitted DMN together.
   **No round-trip is promised** — the source is not regenerated from hand-edited DMN XML, and one model
   is never a persistent mix of hand-DMN and source.
-- **`authored-in` provenance extends to DecisionModels**: `dmn-xml | table-source | ai-chat` (the
-  `metadata.authoredIn` field, §2.2), mirroring a Flow's `code | yaml | ai-chat`. AI chat authors the
-  decision-table source (or DMN) from conversation; the human judges via the read-only decision-table
-  view + simulation (§5.3). **Direct DMN XML authoring stays available** for developers and for
-  imported / engine-bound models (§4.3); the spreadsheet import/export path (§5.3) targets the source
-  or the DMN.
-- **Coverage is bounded and honest.** Constructs the table source cannot express — deep
-  forward-chaining inference, CEP windows — stay **direct-DMN / DRL engine-bound escape hatches**
-  (§4.3, §8); the source records what it does not cover, exactly as the ZEN projection records what it
-  drops (§4.2).
+- **`authored-in` provenance extends to DecisionModels**: `decision-source | dmn-xml | drl | ai-chat`
+  (the `metadata.authoredIn` field, §2.2), mirroring a Flow's `code | yaml | ai-chat`. AI chat authors
+  the decision source (or DMN, or an engine-native artifact, §4.3) from conversation; the human judges
+  via the read-only decision-table/DRD view + simulation (§5.3). **Direct DMN XML authoring stays
+  available** for developers and for imported models; the spreadsheet import/export path (§5.3) targets
+  the source or the DMN.
+- **Engine-native constructs are covered by their own AI-authorable path, not left to hand-XML.**
+  Constructs DMN cannot express well — deep forward-chaining inference, CEP windows — are authored as
+  **first-class, AI-authorable DRL / rule-unit / CEP artifacts** (§4.3, §8), not as a fallback to
+  hand-writing opaque files. The decision source records where a model crosses into an engine-native
+  artifact, exactly as the ZEN projection records what it drops (§4.2).
 
 This closes the Decision-layer authorability asymmetry the rest of the architecture had already
 resolved for Schemas and Flows, without touching portability: what executes and exports is still DMN
-1.6 XML.
+1.6 XML (or, for a quarantined model, the engine-native text).
 
 ---
 
@@ -369,11 +380,28 @@ inference/CEP direction by design, and the projection compiler records what it d
 ### 4.3 Escape hatches: DRL and engine-native logic
 
 Some genuine enterprise logic — deep forward-chaining inference over a working memory, complex CEP —
-is more naturally expressed in **DRL** (Drools Rule Language) than in DMN. ichiflow permits DRL (and,
-in principle, other engine-native artifacts) as an **escape hatch**, under strict quarantine so it
-never silently erodes the portability promise.
+is more naturally expressed in **DRL** (Drools Rule Language), **rule units**, or engine-native **CEP**
+than in DMN. ichiflow permits these engine-native artifacts as an **escape hatch**, under strict
+quarantine so they never silently erode the portability promise.
 
-Rules for the escape hatch:
+**Quarantine governs *portability*, never *authorability*.** DRL, rule units, and CEP are **text-based
+and therefore already LLM-legible**, so they are **first-class AI-authorable + testable governed
+paths**, on the same footing as DMN-based Decisions (ADR-0027, amending ADR-0001's "import-source /
+projection only" framing). Concretely, an engine-native artifact is:
+
+- **schema'd and wrapped** — a declared input/output Schema contract + the ichiflow envelope (below),
+  authorable via **AI chat** or directly (`authored-in: drl | ai-chat`, §2.2);
+- **validated in `ichiflow verify`** — a DRL/rule-unit **compile-check** plus the SPI `validate` (§3.1)
+  run as checks ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.b), so a malformed
+  escape-hatch artifact fails loudly, machine-readably, pre-deploy;
+- **simulated and scenario-testable** — the same what-if simulation (§5.4), scenario specs (§6.1), and
+  golden datasets (§6.3) that gate a DMN model gate an escape-hatch model; a rule is not authoritative
+  until it passes;
+- **trace-emitting** — every activation maps into the typed `DecisionTrace` (§3.2, §7) into the
+  DecisionRecord.
+
+So "quarantined" means the artifact does not *port* to another engine unchanged — never that an agent
+cannot author, validate, simulate, or test it. The portability quarantine rules still hold:
 
 1. **Allowed only when DMN cannot express it well** — inference/CEP-heaviness, not convenience.
    Table-shaped and DRD-shaped logic must be authored as DMN.
@@ -389,11 +417,11 @@ Rules for the escape hatch:
    model is either portable DMN or quarantined engine-bound, never a silent mix.
 
 ```yaml
-# an escape-hatch DecisionModel is explicitly, visibly non-portable
+# an escape-hatch DecisionModel is explicitly, visibly non-portable — but fully AI-authorable + testable
 kind: DecisionModel
-metadata: { id: fraud-inference, version: 1.4.0, governanceState: released }
-model: { drl: ./fraud-inference.drl, entryPoint: FraudSession }
-portability: engine-bound          # <-- quarantine marker; flagged everywhere
+metadata: { id: fraud-inference, version: 1.4.0, governanceState: released, authoredIn: ai-chat }
+model: { drl: ./fraud-inference.drl, entryPoint: FraudSession }   # DRL text — AI-authored, compile-checked in verify
+portability: engine-bound          # <-- quarantine marker (portability only); flagged everywhere
 engine: { preferred: drools, requires: [inference] }
 contracts:                         # <-- mandatory exportable adapter contract
   input:  { schema: schemas/TxnWindow.json }
@@ -447,9 +475,10 @@ authors rules by **describing intent in chat** and **judging the result against 
 materially more approachable than DRL (research 01 §6.2) and FEEL's constrained surface makes LLM
 generation comparatively reliable (research 01 §3.1), the v1 loop is: *describe in chat ("decline if
 debt-to-income exceeds 43% unless the co-signer FICO is above 740") → the AI proposes a
-**decision-table source** (§2.6) that compiles one-way to DMN + FEEL → the user judges via a read-only
-decision-table view and what-if simulation → approve the diff.* ichiflow never exposes raw DRL to a
-business author.
+**decision source** (§2.6) that compiles one-way to DMN + FEEL → the user judges via a read-only
+decision-table/DRD view and what-if simulation → approve the diff.* A business author never hand-writes
+DMN XML; raw DRL is not the *business-author* surface, but it is a first-class **AI-authorable**
+governed artifact for developers/analysts who need it (§4.3).
 
 - **The decision-table view is a read-only projection.** Boxed DMN with hit-policy, completeness/
   overlap checking (via `validate`), and FEEL cells — rendered *from* the canonical DMN as the artifact
@@ -462,11 +491,12 @@ business author.
   **spreadsheet (Excel/OpenRules-style) import/export** (research 01 §3.6, §8) remains an *interchange*
   path for analysts who maintain rate/eligibility tables in a sheet — an import into the canonical DMN,
   not an in-app canvas.
-- **The decision-table source is the named authoring projection** (§2.6, ADR-0027) — not a vague
-  "guided articulation." A structured decision-table markdown/JSON form (FEEL cells + hit-policy + DRD
-  wiring) is what chat proposes and what a developer may edit directly; it **compiles deterministically
-  one-way to DMN 1.6 XML**, which stays the executed/exported artifact. It is an authoring surface, not
-  a drag-and-drop builder, and no round-trip is promised.
+- **The decision source is the named authoring projection** (§2.6, ADR-0027) — not a vague "guided
+  articulation." A structured markdown/YAML/JSON form (FEEL throughout) covering the **full DMN surface**
+  — DRDs, all boxed-expression kinds, item definitions — is what chat proposes and what a developer may
+  edit directly; it **compiles deterministically one-way to DMN 1.6 XML**, which stays the
+  executed/exported artifact. It is an authoring surface, not a drag-and-drop builder, and no round-trip
+  is promised.
 
 Every proposal follows the framework-wide contract **"AI proposes, deterministic tools + humans
 dispose"** (BRIEF vocab, research 06 §A.5): type-checked by `validate`, shown as a diff, human-approved,
@@ -692,9 +722,12 @@ ichiflow's CEP story:
 
 - **v1: CEP runs on Drools only.** A CEP DecisionModel declares `requires: [cep]`; capability
   negotiation (§3.3) pins it to Drools. Standard DMN cannot express temporal windows, so CEP models
-  are typically authored via the **DRL escape hatch** (§4.3) and carry `portability: engine-bound` —
-  visibly quarantined, with a mandatory Schema contract and golden datasets so the behavior is
-  specified even though the artifact does not port.
+  are typically authored via the **DRL/rule-unit escape hatch** (§4.3) and carry `portability:
+  engine-bound` — visibly quarantined, with a mandatory Schema contract and golden datasets so the
+  behavior is specified even though the artifact does not port. Being text-based, CEP/DRL is a
+  **first-class AI-authorable + testable** path (§4.3, ADR-0027): an agent authors it via chat, it is
+  compile-checked in `ichiflow verify`, and it is scenario/simulation-tested like any DMN model —
+  quarantine constrains portability, not authorability.
 - **Stateful working memory is explicit.** Unlike stateless `evaluate`, a CEP model owns a
   `KieSession`-style working memory into which events are inserted over time; ichiflow models this as
   a long-lived decision session bound to a Flow/Case, with the same typed-trace and DecisionRecord
@@ -816,11 +849,12 @@ a genuinely clean exit — not "one-click import."**
 ## 12. Open questions
 
 1. **BAL-like guided-rule fidelity — the authoring format is now decided (ADR-0027); fidelity
-   remains to be user-tested.** The named canonical authoring projection is the **decision-table
-   source** (§2.6): a markdown/JSON decision-table form compiling one-way to DMN 1.6 XML, mirroring
-   TypeSpec→OpenAPI and flow-builder→FlowJSON — so there is no longer an undefined "guided
-   articulation" gap. The residual, genuinely-open question is *fidelity*: how close the
-   decision-table source + NL-assisted authoring gets to the approachability of ODM BAL without a
+   remains to be user-tested.** The named canonical authoring projection is the **decision source**
+   (§2.6): a structured markdown/YAML/JSON form covering the **full DMN 1.6 surface** and compiling
+   one-way to DMN 1.6 XML, mirroring TypeSpec→OpenAPI and flow-builder→FlowJSON, with 100% construct
+   coverage verified by the projection-coverage harness (doc 13 §2.b) — so there is no longer an
+   undefined "guided articulation" gap. The residual, genuinely-open question is *fidelity*: how close
+   the decision source + NL-assisted authoring gets to the approachability of ODM BAL without a
    proprietary language, which needs user testing with business analysts (§5.3).
 2. **Portable temporal subset.** Can a useful subset of CEP/temporal patterns be lifted into the DMN
    envelope so common windows avoid the engine-bound escape hatch (§8)? Undecided.

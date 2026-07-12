@@ -418,10 +418,15 @@ the loan Case ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §6). Ev
 - **Adapter host packaging.** Is the adapter host one process embedding both Camel-Quarkus and the
   native paths, or separate deployables per binding class? Affects the modular-monolith→split-later
   story ([BRIEF.md](./BRIEF.md) §11) and DMZ footprint.
-- **Redpanda Connect / Benthos inclusion.** The research flags premium connectors gated behind a
-  Redpanda BSL/Enterprise license ([../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md)
-  §A.4). If adopted as a third binding for declarative streaming glue, a CI license-allowlist gate
-  and MIT/Apache connector pinning are prerequisites — decision deferred.
+- **Redpanda Connect / Benthos inclusion — now an SPI matter, not a core decision (§2, D4).** Adding
+  a third binding runtime for declarative streaming glue is an **Adapter-binding SPI** implementation
+  (§2), so the question is no longer "does the core take a bespoke dependency" but the ordinary
+  binding-admission checklist: does the candidate runtime **clear the CI license-allowlist** (Redpanda
+  premium connectors are gated behind a BSL/Enterprise license —
+  [../research/04-adapters-and-auth.md](../research/04-adapters-and-auth.md) §A.4; MIT/Apache connector
+  pinning required) and **pass the adapter contract/idempotency/DLQ harness**
+  ([13-agent-harness-loops.md](./13-agent-harness-loops.md) §2.d)? The residual open detail is purely
+  the license-allowlist policy for its connector set, not whether the architecture admits a new binding.
 - **Mapping generation trust boundary.** How much AI-generated mapping (JSONata/XSLT) ships without
   human review vs. requiring sign-off, and what property/parity tests gate it, given mappings can
   silently corrupt data.

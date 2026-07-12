@@ -655,6 +655,10 @@ in-flight state — a key reason Temporal is the substrate rather than a lighter
   first-class step type (§2.6): a schema'd, versioned, trace-emitting code activity alongside
   `decision-eval`/`adapter-call`, so inter-step computation is a *declared* graph node and the coarse
   "drop the whole flow to raw Temporal SDK" hatch recedes to a last resort. It shares one unified
-  code-activity contract with decision feature-functions and adapter code-transforms. The residual
-  detail is the generic code-activity worker's task-queue topology and its cold-start/versioning story
-  under load — an implementation question, not a design one.
+  code-activity contract with decision feature-functions and adapter code-transforms. The **worker is a
+  declared SPI** and the **language policy is decided** (§2.6; BRIEF §4, §21): new worker languages are
+  additive behind the schema'd-boundary + trace contract, **Kotlin/TS are the v1 implementations**, and
+  **Python is the expected first post-v1 addition** (ML feature-prep) — closed *by argued decision*, not
+  by omission. New named step *kinds* are likewise additive via **extension step types** (§2.7). The
+  residual detail is the generic code-activity worker's task-queue topology and its cold-start/versioning
+  story under load — an implementation question, not a design one.

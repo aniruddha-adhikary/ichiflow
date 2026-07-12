@@ -134,7 +134,13 @@ declared entitlement artifacts, B9.)*
 Each is a (B) surface whose *richer human app* may be built after v1. **The seam that makes this a
 phasing choice rather than a rewrite: the underlying typed API / MCP tool / PR flow that v1 already
 ships IS the contract, and a post-v1 UI is just another client of it.** No (D) surface requires new
-core capability — only a new front end over an existing contract.
+core capability — only a new front end over an existing contract. The same seam runs the *other* way
+too: the MCP surface is not a closed shim but an **extension point** — an app built on ichiflow
+registers its own schema'd domain tools into `ichiflow-mcp` through the **MCP tool-extension SPI**
+(each declaring its guardrail tier, enforced server-side identically to first-party tools;
+[`10-ai-native-experience.md`](10-ai-native-experience.md) §3.5), so both a later human UI *and* an
+app's own agent tooling are additive clients/extensions of a v1 contract, never a fork (the "closed
+core, declared extension points" doctrine, BRIEF §21).
 
 | # | Post-v1 surface | v1 (B) form it graduates from | The seam (its already-shipped contract) |
 |---|---|---|---|

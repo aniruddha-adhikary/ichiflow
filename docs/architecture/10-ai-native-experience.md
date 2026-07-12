@@ -93,6 +93,18 @@ uischemas, Adapters, policies. Its structure is deliberately optimized for agent
 
 The result: an agent's build-time loop is *edit a declarative artifact → regenerate → validate
 against schema → `ichiflow verify`* — a tight, verifiable, deterministic loop, not free-form coding.
+The regenerate step is kept sub-second by the **`ichiflow watch` / incremental-regen affordance**
+(only the artifacts affected by the change are recompiled — [02-schema-foundation.md](02-schema-foundation.md)
+§4.3), so many micro-edits do not each pay a full-tree regen cost.
+
+**`ichiflow verify` is the single umbrella, and every gate emits structured JSON.** `ichiflow verify`
+runs **all** artifact-class validators in one shot — schema round-trip/drift/oasdiff, DecisionModel
+scenarios + coverage + the decision-source projection-coverage check, Flow interpreter vectors,
+CodeSet referential integrity, policy golden tests, uischema drift + a11y/contrast — and emits one
+**machine-readable JSON verdict** ([13-agent-harness-loops.md](13-agent-harness-loops.md) §3.1–§3.2 is
+the full catalog + verdict schema; not duplicated here). The invariant an agent can rely on:
+**every CI gate emits structured JSON diagnostics** (expected/actual/artifact), never human-log prose
+— so a failure is always parseable, never a sentence to interpret.
 
 ### 2.2 The in-repo agent kit ichiflow scaffolds
 
@@ -111,10 +123,29 @@ guaranteed automation · MCP = external services · Plugin = the packaging unit.
 | **SessionStart hook + `ichiflow verify` skill** | Hooks/Skills | ensure a fresh session can build, run tests, launch the dev server | Productive in minute one (esp. Claude Code on the web / CI) |
 
 The five **core build-time skills** map one-to-one onto the declarative artifacts: `add-schema`
-(TypeSpec + regenerate), `add-decision` (DMN authoring + simulate), `add-flow` (typed flow-builder code
-or Serverless-Workflow YAML → canonical JSON, with a `compute` step for typed computation, doc 04
-§2.5–§2.6), `add-adapter` (AsyncAPI/OpenAPI port + boundary validation), `run-parity-tests` (decision
-parity harness, research 06 §A.6.3 — legacy-vs-migrated DMN over a golden dataset).
+(TypeSpec + regenerate), `add-decision` (**decision source** authoring — full-DMN projection, or a
+first-class AI-authorable DRL/rule-unit/CEP escape hatch — + simulate, doc 03 §2.6, §4.3),
+`add-flow` (typed flow-builder code or Serverless-Workflow YAML → canonical JSON, with a `compute`
+step or a declared `x-<org>/<stepType>` extension step for typed computation, doc 04 §2.5–§2.7),
+`add-adapter` (AsyncAPI/OpenAPI port + boundary validation), `run-parity-tests` (decision parity
+harness, research 06 §A.6.3 — legacy-vs-migrated DMN over a golden dataset).
+
+**Artifact-type discovery is one call.** An agent onboarding to a Workspace enumerates every governed
+artifact class — Schema, DecisionModel, CodeSet, Flow, compute-step, uischema/viewschema/pageschema/
+copyset, Entitlement, Portal, Adapter, tokens, Harness — with each class's canonical JSON Schema,
+authoring surfaces, and declared extension seams via **`ichiflow artifacts list --json`** (CLI) or the
+Tier-0 MCP **`list_artifact_types`** tool ([02-schema-foundation.md](02-schema-foundation.md) §10). This
+is the *global* artifact-type index that complements the per-CodeSet dependency graph (doc 02 §9.4), so
+an agent discovers what it can author without reading the docs first.
+
+**The guaranteed-execution hooks are dev/env-scoped, not blanket blockers.** The scaffolded hooks
+(block-generated-edits, regenerate-and-diff, `repro-before-fix`) are guardrails, but two are explicitly
+**scoped so they never block greenfield dev iteration**: **`repro-before-fix`** applies to
+**fixes-against-existing-cases** (a bug fix must show the reproducing case going red→green, §4) and is a
+**no-op / advisory in greenfield authoring**, where there is no captured Case to reproduce; and the
+**block-generated-edits** hook **logs-not-blocks under `governance: off`** (Dev, doc 03 §5.6) while
+still hard-blocking at `full`. A runtime-incident discipline is thus never applied unconditionally to a
+dev-tier agent authoring something brand-new.
 
 ### 2.3 Headless CI recipes
 
@@ -234,6 +265,33 @@ deliberately short for prod/customer-data writes. This maps to OWASP Agentic Top
 is audited into the **same append-only ledger** as human and decision actions (doc 08), attributed
 to the NHI, with the approval record and tool inputs/outputs.
 
+### 3.5 The MCP tool-extension SPI — apps register their own domain tools
+
+`ichiflow-mcp`'s default catalog (§3.2) is a small, sharp set over the why/case/flow primitives — but
+for an LLM-native framework the catalog cannot be **closed to the domain**. An application built on
+ichiflow (a permit app, a claims app) registers its **own schema'd domain tools** into the *same*
+server through a declared **MCP tool-extension SPI** (BRIEF §21; the "closed core, declared extension
+points" doctrine, [00-vision-and-principles.md](00-vision-and-principles.md)):
+
+- **Schema'd, reusing the app's own contracts.** A domain tool (e.g. `simulate_permit_fee`,
+  `check_zoning_eligibility`) declares its I/O as **JSON Schema 2020-12 reusing the app's canonical
+  Schemas** ([02-schema-foundation.md](02-schema-foundation.md) §10) — no adapter, the same document
+  that validates the API boundary constrains the tool call.
+- **Each tool declares its guardrail tier, enforced server-side identically to first-party tools.** A
+  registered tool declares Tier-0 / Tier-1 / Tier-2, and the server enforces it **exactly as for the
+  built-in catalog** (§3.3): a registered Tier-0 tool is proven to have no write path; a registered
+  Tier-2 tool gets JIT-NHI + human approval + an audit-ledger entry. An app **cannot** self-grant a
+  weaker guardrail than its declared risk — tiering is server-side, because "an untrusted registration
+  can lie" the same way an untrusted server can.
+- **Discoverable via the artifact catalog.** Registered tools are governed Workspace artifacts and
+  surface in `list_artifact_types` / `ichiflow artifacts list` (§2.2) and in MCP tool discovery, so an
+  agent enumerates first-party and app-domain tools uniformly.
+- **Additive, not a fork.** Adding a domain tool is a declared artifact + a PR — never patching the
+  server — so the MCP surface grows with the app while the guardrail enforcement stays first-party.
+
+This makes `ichiflow-mcp` a **facade an app extends**, not a fixed shim: the same three-tier safety
+model covers every tool an agent can call, whether ichiflow shipped it or the app declared it.
+
 ---
 
 ## 4. Determinism + one-command repro make agent debugging *verifiable*
@@ -331,6 +389,14 @@ functional-equivalence/parity assessment step; and **conversion never applied st
 production** — it lands in a reviewable, parity-tested target first. Every mapping decision, migration
 approval, and parity result is logged to the append-only **DecisionRecord** (doc 08), so an auditor
 can answer "why was this column mapped this way / this migration approved."
+
+**The Copilot set is not a closed core — it is additive instances of one pattern.** Each Copilot is
+"the existing Copilot pattern pointed at different artifacts + checks" (§7.1): a **persona + an
+artifact API it proposes against + a deterministic backstop**. A fifth Copilot is therefore a new
+*instance* of the same guardrail DNA, not a core change — consistent with the "closed core, declared
+extension points" doctrine (BRIEF §21; [00-vision-and-principles.md](00-vision-and-principles.md)). The
+four named here are the v1-scoped set (all post-v1 as packaged UX); new personas ride the identical
+propose/dispose/provenance rails.
 
 ### 7.1 Business-user AI assistance
 

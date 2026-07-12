@@ -122,3 +122,7 @@ Negative / costs:
 - Research 02 §2 (paradigm analysis), §5 (declarative-DSL-over-durable-engine prior art)
 - CNCF Serverless Workflow — https://serverlessworkflow.io/ · Zigflow — https://zigflow.dev/articles/why-i-built-a-yaml-dsl-for-temporal-workflows/
 - Related: [0003](0003-temporal-durable-execution-substrate.md), [0005](0005-first-party-case-and-human-task-module.md), [0006](0006-typespec-authoring-openapi-jsonschema-canonical.md)
+- Related: [0027](0027-dmn-authoring-projection.md) applies this same one-way-projection pattern to
+  Decisions (the **decision source** → DMN 1.6 XML); Doc 04 §2.7 adds **extension Flow step types**
+  (`x-<org>/<stepType>`) as a declared seam over the closed canonical step-type set, and Doc 04 §2.6
+  declares the **code-activity worker SPI** (Kotlin/TS v1; Python expected first post-v1).
