@@ -18,7 +18,12 @@ covers —
 - how **field/row-level authz** from the central PDP shapes what the generated UI renders, and the
   user-facing **"why is this hidden"** explanation;
 - the **designer workflow** step by step (scaffold → override → schema evolves → nothing breaks);
-- **manual-review Task UIs**;
+- **manual-review Task UIs**, the **customer status model**, and the **human support/ops console**;
+- **app-level i18n** alongside per-audience code rendering;
+- the **Design Kit** — the first-party designer toolchain (DTCG token pipeline, component
+  workbench, live playground) and the **designer safety contract**;
+- proposed designer artifacts beyond uischema (**pageschema**, **copyset**) and the **mock-first**
+  (schema-driven MSW) design-time workflow;
 - where **fully custom frontends** plug in (headless APIs, BFF contract) so the UI layer stays
   optional.
 
@@ -161,6 +166,27 @@ audience-appropriate layer selected from the Portal's audience config (§8). Bec
 lives in the governed CodeSet, a code's meaning is authored once and stays consistent across every
 Portal, the why API, and printed correspondence.
 
+### 4.2 App-level internationalization (i18n / l10n)
+
+CodeSet display metadata carries per-locale `plainLanguage` for coded values (§4.1, doc 02 §9.2) —
+the *code/label* layer. Application-level i18n is the complementary layer and has an explicit
+strategy:
+
+- **Locale on the Principal.** The active locale is an attribute of the authenticated Principal (with
+  a per-tenant default and a Portal fallback), negotiated at login and overridable per session, so
+  every rendered screen, notification, and formatted value resolves against one locale source.
+- **ICU message catalogs for UI chrome.** Static UI strings (labels, buttons, empty/error states) are
+  **ICU MessageFormat** catalog entries keyed by message id, per locale — handling plurals, gender,
+  and interpolation — rather than English strings inlined in renderers.
+- **Locale-aware formatting.** Dates, numbers, and **money** format via the platform's locale/ICU
+  facilities; currency amounts render from a **typed money value** (minor units + currency code, as in
+  the canonical schemas) so formatting is presentation-only and never mutates the stored amount.
+- **RTL and script.** The token-driven renderer set is direction-aware, so right-to-left locales are a
+  layout concern resolved by the renderer, not per-screen bespoke work.
+
+This keeps localization consistent across Portals, notifications ([05-adapters.md](05-adapters.md)
+§4.2), and the why API — all resolving text and formatting from the same locale on the Principal.
+
 ---
 
 ## 5. Auto-generated CRUD / case screens
@@ -252,6 +278,25 @@ from **post-approval obligations**, each with its **state** (pending / fulfilled
   duty paid, record inspection passed, waive), which emit the fulfilment signal/event that satisfies a
   `condition-gate` (§2.3 in doc 04).
 
+### 7.2 Customer status model and the human support/ops console
+
+Two error-UX gaps for a *stuck* Case (adapter down, engine error) close onto existing primitives:
+
+- **Customer-safe status model.** The customer Portal renders an explicit Case-status projection that
+  includes **delayed / needs-attention / error** states with next-step messaging — not only
+  "submitted / decided." These are **display projections** (§8; the DMZ back-channel carries display
+  projections only, [09-deployment-and-topology.md](09-deployment-and-topology.md) §6.1), so a
+  customer sees a truthful "we're on it / we need X from you" state at 2am rather than an opaque
+  spinner. Which states and wording are customer-facing is governed by the same per-audience code
+  metadata (§4.1) and disclosure policy (Open questions §5).
+- **A human support/ops console.** The MCP Tier-2 actuators (signal / retry / cancel / re-drive /
+  reassign — [10-ai-native-experience.md](10-ai-native-experience.md) §3.2) are exposed to *agents*;
+  the same operations need a **human twin**: a back-office support console that is the human PEP over
+  the *same* machinery, gated by the PDP (§6) and audited into the DecisionRecord, so a support
+  operator has the same re-drive/retry/reassign actuators an agent does. The console is a generated
+  back-office surface over the Case-status + Tier-2 primitives, not a bespoke tool — otherwise the
+  agent out-tools the human.
+
 ---
 
 ## 8. Portals — audience-scoped deployables
@@ -277,7 +322,8 @@ Portal:
   broker: { realm: customer, idps: [google-oidc, acme-saml] }   # Keycloak realm-per-portal
   tokenExchange: { sts: keycloak, downstreamAudiences: [loan-svc, billing-svc] }  # RFC 8693
   entitlements: { model: rebac+abac, relationships: openfga://ichiflow/1, policies: cedar://ichiflow/1 }
-  tokens: brand-customer             # design-token set
+  tokens: brand-customer             # design-token set (look)
+  copyset: voice-customer            # per-audience microcopy / voice (proposed artifact — see §13)
   screens: [loan-application-form, my-cases-list, case-detail]
 ```
 
@@ -290,6 +336,10 @@ Portal:
   one-way async relay bridges zones (BRIEF §11). The Portal declaration carries its `zone`.
 - **Own entitlements.** Each Portal binds its own OpenFGA relationships + Cedar policies, so the
   same schema-generated screen renders differently per audience because the PDP answers differently.
+- **Brand = look + voice + composition.** A Portal binds its **design-token set** (look), and — as
+  the designer surface generalizes (§13) — a **`copyset`** (per-audience voice/microcopy) and
+  optionally a **`pageschema`** set (screen composition), so the audience-selecting-the-layer pattern
+  (§4.1) extends from CodeSet display to the whole designer surface, not just theming.
 
 ---
 
@@ -338,11 +388,161 @@ well-defined seams:
 
 ---
 
+## 11. The designer's toolchain — the Design Kit
+
+The override *model* (§1–§4) makes a customization survive regeneration; the **Design Kit** is the
+first-party surface a designer actually operates, so the persona is defined by the human's tools, not
+only by the override mechanism. It is the design-side parallel to the AI-native agent kit (doc 10),
+and its core properties ride rails that already exist — one schema source, deterministic generation,
+the regenerate-and-diff CI gate, a reason-returning PDP.
+
+### 11.1 Design-token pipeline (DTCG → theme)
+
+Design tokens (§4) are the theming spine; the Design Kit makes their **source** a standard,
+checked-in format rather than a hand-written file:
+
+- **DTCG is the checked-in token format.** Tokens live as `contracts/ui/tokens/*.tokens.json` in the
+  W3C **Design Tokens (DTCG)** shape (`$value`/`$type`), beside uischema. A Portal's `tokens:
+  brand-customer` (§8) resolves to a DTCG file set. The format is tool-neutral — Figma Variables,
+  Tokens Studio, Penpot, or a hand-authored file can all produce it — so the **token format, not any
+  one design tool, is the contract**.
+- **A deterministic Style-Dictionary-class transform** compiles DTCG → the renderer set's runtime
+  theme (CSS custom properties / TS theme object) as a build step. Because it is deterministic it
+  slots straight into the existing regenerate-and-diff CI gate (§3): a token change is a reviewable
+  diff exactly like a schema change.
+- **Three-layer token structure** (primitive → semantic → component), separate files with alias
+  chains intact, so one primitive rebrand propagates everywhere.
+
+A brand change that touches zero uischema is already the architecture's promise (§4); the token
+pipeline just makes the token *source* a standard design artifact.
+
+### 11.2 Component workbench (all states, incl. PDP states)
+
+The Design Kit ships the reference **renderer set as a component workbench** (Storybook-class): one
+story per renderer × every state — empty, loading, populated, read-only, error, validation-failed,
+and the ichiflow-unique **PDP-shaped states**. Stories are driven by the **real generated renderers +
+sample data** (§14), so the workbench shows the actual component a Portal ships, not a hand-built
+mock. Accessibility checks (axe-core / WCAG 2.2 AA) run *in* the workbench so violations surface at
+component-design time.
+
+**PDP-shaped states are first-class designable states.** The PDP can render a field **hidden by
+policy**, **read-only by policy**, or present with a **"why" affordance** (§6). These are not runtime
+surprises — they are **states a designer must be able to see and design**, so every renderer carries
+mandated workbench stories for `PDP-hidden` (with the "why" affordance) and `PDP-read-only` alongside
+its ordinary states.
+
+### 11.3 Live playground (the authoring surface)
+
+The Design Kit ships a **live playground** (in the dev server) that loads a chosen Schema + its
+baseline uischema + a **mocked BFF** (§14) seeded with sample Case data and renders the real screen,
+with a **token/theme switch** and an **audience toggle** (customer / back-office / partner) so
+per-audience code rendering (§4.1) and PDP-shaped visibility are visible live.
+
+The design principle this settles: **the uischema JSON is a compile target, not an authoring
+surface.** Just as TypeSpec is the authoring surface and JSON Schema is the canonical artifact (doc 02
+§1), the **visual playground is the designer's authoring surface and uischema/viewschema is the
+canonical artifact** it emits. v1 delivers a read-only live preview (real screens, token/theme
+switching, audience toggle); a visual inspector that round-trips edits back to `contracts/ui/` is a
+later, larger capability (Open questions §6).
+
+---
+
+## 12. The designer safety contract
+
+The framework already checks plenty (drift lint §3, regenerate-and-diff, oasdiff) — but it checks
+*for the build*, and tells the designer only via a red CI run *after* they commit. The Design Kit
+reframes the same checks as a **designer-facing, pre-commit safety contract**, surfaced in the
+playground before a PR is opened. **The designer's safety net is the same CI that guards the contract
+— but rendered as a screen, a contrast report, and an a11y verdict, not a build log.**
+
+| Check | Status | Designer-facing form |
+|---|---|---|
+| uischema scope resolves against schema (drift lint, §3) | exists | runs live in the playground; a dangling scope shows inline, not as a build failure |
+| `@renamedFrom` scope auto-migration (§3) | exists | shown as a review card: "field X renamed → Y, we updated your layout" |
+| Token contract (WCAG 2.2 contrast, semantic-role coverage) | **new** | ≥ 4.5:1 text / 3:1 UI contrast, every semantic role bound, no raw hex outside primitives — the token-side analogue of the scope lint |
+| a11y — WCAG 2.2 AA (axe-core) | **new** | axe on every workbench story and playground screen; AA violations block |
+| i18n coverage | **new** | a customer-facing screen has no missing plain-language / locale strings (§4.2) |
+| PDP-state coverage | partial | every placed field renders acceptably in hidden / read-only / error states (workbench, §11.2) |
+
+**Reuse the Workspace PR flow — do not invent a parallel governance path.** Designer output is
+`contracts/ui/**` + `tokens/**` — Workspace edits that go through the same git PR / CI / review flow
+(doc 10 §2). What the Design Kit adds is the friendly surface on top:
+
+- **Preview-environment-per-change.** Every uischema/token PR spins up an ephemeral preview (the
+  playground pinned to that branch, MSW-mocked, no backend needed — §14). The PR carries a live link +
+  before/after visual diff + the a11y/contrast/drift report — a *screen*, not a JSON diff, is the
+  review artifact.
+- **A low-risk `contracts/ui` + `tokens` change class.** A pure UI/token change (no schema, no policy,
+  no renderer-code touch) is a distinct low-risk change class the framework can *prove* cannot break
+  the contract (scopes lint, tokens satisfy roles, no code path touched). *Whether* a design lead may
+  approve that class without engineering sign-off is an org/governance decision flagged for the
+  founder (Open questions §7), not asserted here.
+
+---
+
+## 13. Where designers need more than uischema (proposed extensions)
+
+uischema is a **form-layout** language; a lot of what a designer owns is not a form. Today the answer
+for the following is "register a higher-priority renderer" — i.e. a developer writes code, which is
+exactly the dependency the persona should escape. The extensions below all reuse the existing
+register / reference / version DNA, so they extend the architecture rather than fight it. **Each new
+*governed artifact class* below is a proposal pending an ADR** (surface-area cost: schema, CI gates,
+registry entry, generator, docs, agent skill); they are named here as vocabulary so the designer
+surface has a target shape.
+
+- **`pageschema` (screen composition).** A case-detail or dashboard screen is *N* regions (summary
+  header, timeline, obligation checklist, task actions, related cases) — a composition, not a single
+  uischema. A **`pageschema`** (same tester/registry DNA) composes multiple uischema/viewschema regions
+  + static blocks into a screen keyed to a Schema/Case. It is the natural sibling to `viewschema`; the
+  two should be **pinned together** as one vocabulary work item (Open questions §1).
+- **`copyset` (translator-friendly microcopy).** Labels, help text, **error messages**, empty-state
+  copy, and button text are currently scattered inline in uischema. A **`copyset`** is an i18n-keyed
+  message catalog (one key per string, per locale) that uischema/pageschema reference *by key* —
+  exactly the CodeSet pattern (doc 02 §9). It yields a translator-friendly surface, governed
+  validation-error copy, and consistency with CodeSet `plainLanguage`; indeed **`copyset` and CodeSet
+  `plainLanguage` should share one i18n substrate** (§4.2). Whether `copyset` is a new class or an
+  extension of the CodeSet mechanism is part of the ADR.
+- **Presentation mode.** Single-page / wizard / stepper / accordion is a top designer control and must
+  not require code. Make **presentation mode a declared uischema-level option** the playground can flip.
+- **Declared empty / loading / error / partial states.** Make these **declared** per screen/region
+  (empty-state copy + illustration token + CTA; skeleton vs spinner; error affordance) so they are
+  designed, versioned, and previewable — closing the loop with the workbench stories (§11.2) that
+  already need them.
+
+---
+
+## 14. Mock-first: designing before (and alongside) the backend
+
+ichiflow's schema-first spine makes the org reality — designers iterate *before the backend exists*
+and hand off cleanly — nearly free, and the Design Kit leans on it explicitly:
+
+- **Schema-driven mocks, no running backend.** The OpenAPI / JSON Schema artifacts (doc 02) are
+  exactly what the mock toolchain consumes: **orval** (already the named TS codegen fallback, doc 02
+  §4.2) generates a typed client **plus Faker mock factories plus MSW handlers** from one OpenAPI spec.
+  The mock capability is one config flag away, not a new dependency. **A designer renders a real,
+  correct, fully-populated screen the moment the schema exists — before a line of backend runs.**
+- **Ahead-of-dev.** The schema *is* the contract, so a designer working the playground (§11.3) against
+  MSW-mocked schema data is working against the real contract. When the backend lands, nothing in the
+  uischema/tokens changes — the regeneration-survival guarantee, extended to "backend not built yet."
+- **Clean handoff.** Because the designer's output is `contracts/ui/**` + `tokens/**` (data, not code)
+  through the same PR/CI/preview flow (§12), handoff is just a merged PR with a green preview — no
+  redlines-to-tickets translation, no "the dev built it slightly wrong."
+- **Sample-Case fixture generator.** Mock *Case* data is richer than mock request/response data — a
+  back-office screen needs a plausible DecisionRecord, obligation checklist, task state, and per-field
+  PDP verdicts. The Design Kit includes a **sample-Case fixture generator** that seeds realistic Cases
+  from the Schema + CodeSets + a Flow (incl. per-field PDP verdicts), reusing the seeded-data /
+  `reproduce_case` machinery in [10-ai-native-experience.md](10-ai-native-experience.md) §3.2, so the
+  playground shows believable screens rather than lorem-ipsum.
+
+---
+
 ## Open questions
 
-1. **viewschema standardization.** JSON Forms has no table/detail schema; ichiflow defines
-   viewschema on TanStack Table. Its exact vocabulary (column sets, cell-renderer testers,
-   grouping) needs to be pinned down and, ideally, share tester semantics with uischema.
+1. **viewschema + pageschema vocabulary.** JSON Forms has no table/detail schema; ichiflow defines
+   viewschema on TanStack Table, and screen composition needs a **pageschema** (§13). Their exact
+   vocabularies (column sets, cell-renderer testers, region composition) must be **pinned down
+   together**, sharing tester semantics with uischema. Committing `pageschema` (and `copyset`) as new
+   governed artifact classes is an ADR-level decision (§13).
 2. **uischema auto-migration coverage.** How much of a `@renamedFrom`-driven scope migration can
    be applied automatically vs. must be flagged for the designer (§3) is unvalidated — reshapes
    (a field splitting into two) have no clean automatic answer.
@@ -356,5 +556,16 @@ well-defined seams:
 5. **"Why hidden" disclosure limits.** Surfacing the denial *reason* to end users can itself leak
    policy structure. Which reasons are user-facing vs. audit-only (and per-audience) is a policy
    question the PDP + Portal config must jointly answer.
-6. **Designer tooling.** Whether designers hand-edit uischema JSON, use a visual editor, or an
-   AI-assisted authoring skill (parallel to the schema/rule Copilots) is an open product decision.
+6. **Designer authoring surface — resolved in principle.** Designers do **not** hand-edit uischema
+   JSON: the **visual playground is the authoring surface and uischema/viewschema is the compile
+   target** (§11.3), with an AI-assisted UI/Design Copilot (doc 10 §7) proposing edits under the same
+   propose/approve guardrails. The residual product decision is *how far the playground round-trips in
+   v1* — read-only live preview (v1) vs a full visual inspector that writes edits back to
+   `contracts/ui/` (later, highest-effort item).
+7. **Scoped designer approval authority.** §12 defines a low-risk `contracts/ui` + `tokens` change
+   class the framework can prove cannot break the contract. Whether a design lead may approve that
+   class **without** engineering sign-off is an org/governance (trust/liability) decision for the
+   founder, not an architecture one.
+8. **Visual-regression gating.** Whether Chromatic-class pixel-diff snapshots become a **required** CI
+   gate on token/renderer changes (vs opt-in/local) has real cost (snapshot infra, flaky-diff triage,
+   the BRIEF §14 licensing lens) and is deferred.

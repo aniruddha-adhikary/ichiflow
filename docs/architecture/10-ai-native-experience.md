@@ -6,7 +6,8 @@
 > plugin), and headless CI recipes. **Run time:** the first-party `ichiflow-mcp` server as a thin
 > typed facade over the why API / case queries / flow histories, its tool catalog, the three
 > server-enforced guardrail tiers, agents as non-human identities, deterministic replay + seeded
-> repro, shadow-mode-first writes, the self-heal loop, and the three governed Copilots.
+> repro, shadow-mode-first writes, the self-heal loop, and the governed Copilots (the three core
+> Copilots plus a design-facing UI/Design Copilot on the same contract).
 >
 > **Position in the system.** This is the *AI-native surface* realizing locked decision §12 of
 > [`BRIEF.md`](./BRIEF.md), grounded in research
@@ -126,6 +127,26 @@ ships reference recipes (research 07 §3.2):
 
 Recipes track `total_cost_usd` (per-model breakdown in the JSON output) and carry budget guards —
 cost is a first-class CI concern (research 07 §3.2, §8.7).
+
+### 2.4 Schema-driven mocks and test data (build-time DX)
+
+Because the canonical OpenAPI/JSON Schema artifacts (doc 02) fully describe every boundary, the
+Workspace supports a **mock-first** workflow with no running backend: **orval** (the named TS
+generator, doc 02 §4.2) emits a typed client **+ Faker mock factories + MSW handlers** from one spec,
+so a screen, a client, or a test renders against real, schema-correct data the moment the schema
+exists. This is the substrate for the designer's live playground
+([07-ui-and-portals.md](07-ui-and-portals.md) §14) and for front-end work that runs ahead of the
+backend.
+
+Two test-data capabilities round out the DX story:
+
+- **A sample-Case fixture generator** seeds realistic Cases from a Schema + CodeSets + a Flow —
+  including a plausible DecisionRecord, obligation checklist, task state, and per-field PDP verdicts —
+  reusing the seeded-data / `reproduce_case` machinery (§3.2), so mocks and previews show believable
+  Cases rather than lorem-ipsum.
+- **Factories + anonymized-prod-subset tooling** let a developer generate fixtures for *their own*
+  domain (not only the scaffolded sample) and derive a safe, anonymized subset of production data for
+  local testing — closing the gap between the scaffold's demo data and a real domain.
 
 ---
 
@@ -261,17 +282,21 @@ verification is against the real failing Case. ichiflow **integrates** with on-c
 
 ---
 
-## 7. The three Copilots — governed framework features
+## 7. The governed Copilots — framework features
 
 The Copilots are **framework features with hard guardrails**, not a chat bolt-on (locked decision
-§12, §13; research 06). All three obey **"AI proposes; deterministic tools + humans dispose,"** with
-**provenance on every proposal**:
+§12, §13; research 06). All obey **"AI proposes; deterministic tools + humans dispose,"** with
+**provenance on every proposal**. The three core Copilots (BRIEF vocabulary) target the business
+user and the migrator; a fourth, **design-facing** Copilot rides the identical guardrail DNA to give
+the UX-designer persona an AI on-ramp that is peer to the business user's (its omission would be a
+tell that designers are second-party):
 
 | Copilot | Direction | What it does | Deterministic backstop |
 |---|---|---|---|
 | **Domain Modeling Copilot** | greenfield front door | Interviews a business user ("what decisions does this process make? what data do you store? who reviews exceptions?") → draft Schema + DMN skeleton + Flow with human-task steps | schema validation; parity tests before any rule is authoritative (research 06 §B.3.2) |
 | **Migration Copilot** | brownfield back door | Introspects legacy DB → proposes canonical mappings (ranked, with confidence + rationale) → expand/contract plan → reconciliation + **decision-parity** tests | Atlas lint (50+ analyzers) + pgroll execute; dry-run; never touches prod (research 06 §A.5.3) |
 | **Rule Authoring assistance** | business-user, in-context | Guides a business user authoring + testing DMN rules; suggests conditions, generates test cases | DMN simulation + decision-parity harness (cross-ref `03-decision-layer.md`) |
+| **UI / Design Copilot** | designer, in-context | Proposes a uischema/pageschema variant from a target Schema (and, later, a Figma frame); suggests a11y fixes; applies a brand across screens; drafts microcopy / `copyset` | drift lint + axe-core/contrast + token-contract lint; renders live in the playground (`07-ui-and-portals.md` §11) for approval; lands as a `contracts/ui`/`tokens` PR |
 
 **Shared guardrail DNA** (research 06 §A.5.2, §A.5.3): a workspace where AI proposes and a human
 reviews/edits **every** object; explainability for each proposal; learning from human corrections; a
@@ -290,6 +315,13 @@ same canonical model; research 06 cross-cutting synthesis). Rule Authoring assis
 test cases, but a rule is not authoritative until confirmed and parity-tested. Detailed authoring UX,
 DMN governance, and simulation live in `03-decision-layer.md`; this doc governs the *AI-assistance
 contract* over them.
+
+The **UI / Design Copilot** is the **designer's** peer on-ramp: it proposes uischema/pageschema
+variants, a11y fixes, brand applications, and microcopy/`copyset` drafts, but — like every Copilot —
+it only *proposes*. The playground (`07-ui-and-portals.md` §11) is its review surface (as the
+DecisionRecord is for the rule Copilots), the designer safety-contract checks (`07` §12) are its
+deterministic *dispose*, and the Workspace PR is its landing. So it is not new infrastructure — it is
+the existing Copilot pattern pointed at the designer artifacts and checks.
 
 ---
 
