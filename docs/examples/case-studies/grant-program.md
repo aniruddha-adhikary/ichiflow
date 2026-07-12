@@ -589,6 +589,13 @@ applications share a double-funding constraint" or "this org is over its active-
 (shared with insurance):** a **Case-association entity** (typed link kind, PDP-scoped, audited) + a
 **portfolio-constraint check** over the association set. Until then: ad-hoc queries outside the artifact layer.
 
+**Resolved (2026-07 gap-fix round):** adopted as the first-class **`Case association`**
+([ADR-0032](../../adr/0032-case-association.md), [04 §5.11](../../architecture/04-flow-and-case-layer.md)) — a
+typed (`portfolio-of-applicant`), PDP-scoped, audited many-to-many peer link with cross-Case invariant
+checks (over-active-award-cap / double-funding) expressible over the association set + the entity store,
+carrying its own DecisionRecord. Confirmed jointly with the insurance SIU gap. Whether the check runs at
+link time, as a scheduled sweep, or both remains an **Open question** (doc 04 §5.11).
+
 ### G2 — Multi-authority scoring: `CompositeOutcome` works, but two seams strain — **MINOR**
 
 This case is the design's **first correct exercise of `CompositeOutcome`** (D2), and it **holds** — N
@@ -604,6 +611,13 @@ reviewers *are* N authorities, quorum/weighted/custom compose them properly, hon
    **per-criterion, per-reviewer** breakdown, which today rides in the trace + the composite's `members[]`,
    not as a typed `Outcome` contract. This **confirms** the recommendation for a typed `Outcome.scoreBreakdown?`
    — and adds that it must survive **composition** (per-member breakdowns rolling into a consensus).
+
+**Resolved (2026-07 gap-fix round):** both seams closed. The **two-level composition modelling rule** — a
+composite member's Outcome may itself be a DRD score; per-criterion scoring stays *within* the member,
+composition stays *across* members — is now in [03 §2.3](../../architecture/03-decision-layer.md), and typed
+**`Outcome.scoreBreakdown[]`** (`ScoreLine = { criterion, points, band, whyRef }`) is first-class in
+[02 §9.3](../../architecture/02-schema-foundation.md), declared to **survive `CompositeOutcome` composition**
+(each member's breakdown rolls into the consensus without losing its authority attribution).
 
 ### G3 — Budget-pool residual strains beyond the `QuotaLedger` proposal — **MINOR (bordering blocking)**
 
