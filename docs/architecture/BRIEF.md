@@ -17,7 +17,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 1. **Rule engine**: pluggable engine SPI; canonical rule representation is DMN 1.6 (DRD + FEEL);
    Apache KIE / Drools is the default/reference engine (JVM, inference, CEP); GoRules ZEN is the
    planned second engine (TS/edge/embedded). ichiflow builds its own governance, authoring,
-   simulation, and explainability layer (the true gap vs IBM ODM Decision Center).
+   simulation, and explainability layer (the true gap vs IBM ODM Decision Center). DMN 1.6 XML stays
+   the **executed/exported/interchange** artifact, but — because DMN XML is LLM-hostile to author
+   directly — an LLM-friendly canonical **decision-table source** (a markdown/JSON decision-table
+   form) **compiles deterministically one-way** to it, mirroring TypeSpec→OpenAPI and the flow
+   builder→FlowJSON; `authored-in` provenance extends to DecisionModels (`dmn-xml | table-source |
+   ai-chat`), and direct DMN XML authoring stays available (ADR-0027).
 2. **Orchestration**: Temporal is the durable-execution substrate. ichiflow ships a declarative
    flow definition (JSON/YAML, CNCF-Serverless-Workflow-aligned, schema'd) interpreted on
    Temporal. Computation that is neither a Decision nor an Adapter runs in a first-class **`compute`
@@ -28,15 +33,24 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    **canonical flow JSON is the single executed/audited/exported artifact**: the typed builder
    compiles **one-way** to it (mirroring TypeSpec→OpenAPI; simple flows may still be authored as YAML
    directly, no fake round-trip), and every flow carries `authored-in: code | yaml | ai-chat`
-   provenance. Human tasks / manual review / case management is a first-party ichiflow module
-   (await-signal + SLA timers + escalation; assignment routing is itself a decision).
+   provenance. The canonical step-type set is closed, but new step kinds are **additive at a declared
+   seam**: **custom Flow step types** are schema'd, interpreter-registered **compute-variants** under
+   a Workspace-declared extension namespace (e.g. `x-<org>/<stepType>`), each backed by the unified
+   code-activity contract and validated + trace-emitting like `compute` — so a new step kind is
+   discoverable and additive, not a fork to the raw Temporal SDK. Human tasks / manual review / case
+   management is a first-party ichiflow module (await-signal + SLA timers + escalation; assignment
+   routing is itself a decision).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
 4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
    TypeScript edges (portals/UI, BFFs, CLI/tooling). The deterministic Temporal **flow-interpreter
    workflow runs in TypeScript** — Temporal has no first-class Kotlin SDK, so workflow (orchestration)
    code is TS and Kotlin is confined to activity workers (see ADRs 0003/0007). Types on both sides
-   are generated from one schema source.
+   are generated from one schema source. The unified **code-activity worker is a declared SPI**: new
+   worker languages are **additive behind the schema'd boundary + trace contract**; **Kotlin/TS are
+   the only v1 implementations**, and **Python is the expected first post-v1 addition** (ML
+   feature-prep). The language is never the audit boundary — the schema'd `ref` boundary + emitted
+   trace are.
 5. **Schema strategy**: author in TypeSpec; emitted OpenAPI 3.1+ / JSON Schema 2020-12 are the
    canonical checked-in contract artifacts; AsyncAPI 3.1 for message contracts ($ref shared
    schemas). Codegen: Fabrikt (Kotlin), hey-api or orval (TS, pinned). Runtime validation from
