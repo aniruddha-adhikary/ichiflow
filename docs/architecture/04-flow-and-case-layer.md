@@ -329,7 +329,7 @@ declared SPI beneath it, never in the step vocabulary.
 
 **Step declaration.** An `external-task` declares, all as schema-validated data:
 
-- **request** — the canonical **request schema** (`$ref`'d, doc 02 §5) and the **outbound Adapter** the
+- **request** — the canonical **request schema** (`$ref`'d, [02-schema-foundation.md](./02-schema-foundation.md) §3) and the **outbound Adapter** the
   request is submitted through.
 - **response** — the canonical **response schema** (`$ref`'d) and the **inbound Adapter** the correlated
   reply arrives on. The reply is validated against this schema before the flow resumes; a schema-invalid

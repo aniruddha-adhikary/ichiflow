@@ -43,7 +43,13 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    code-activity contract and validated + trace-emitting like `compute` — so a new step kind is
    discoverable and additive, not a fork to the raw Temporal SDK. Human tasks / manual review / case
    management is a first-party ichiflow module (await-signal + SLA timers + escalation; assignment
-   routing is itself a decision).
+   routing is itself a decision). Its **machine analog is a canonical `external-task` (delegation)
+   step**: submit a schema'd request to an external system through an outbound Adapter, durably await a
+   **correlated** response through an inbound Adapter, validate it, and resume (with timeout / escalation /
+   compensation paths) — reusing the same await-signal + pausable-SLA machinery, with *which* external
+   system to use itself a Decision. Transport is pluggable beneath the one step via the Adapter
+   request-reply bindings (HTTP sync/callback/polling + message-queue request-reply in v1; an **SFTP
+   file round-trip** profile is **designed now, implemented post-v1**) (ADR-0028).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
 4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
@@ -96,9 +102,11 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     not tenants** — an ownership/role boundary, distinct from the tenant boundary whose
     multi-tenant seams remain for later (ADR-0025).
 12. **AI-native surfaces**: in-repo agent kit (AGENTS.md, .claude/ skills, hooks, subagents,
-    plugin) + first-party `ichiflow-mcp` runtime MCP server exposing the why/case/flow query
-    APIs with three server-enforced guardrail tiers (read-only / sandbox-mutating /
-    prod-mutating with JIT + approval + audit). Agents are non-human identities under §7/§8.
+    plugin) + a pinned **`resources` manifest** (version-matched authoritative references,
+    `get_resources` at run time) + first-party `ichiflow-mcp` runtime MCP server exposing the
+    why/case/flow query APIs with three server-enforced guardrail tiers (read-only /
+    sandbox-mutating / prod-mutating with JIT + approval + audit). Agents are non-human
+    identities under §7/§8.
 13. **Migration**: "map first, migrate last." Ring 0 declarative schema-mapping/ACL over the
     existing DB (zero/additive DDL); Ring 1 coexist via CDC + outbox + strangler; Ring 2
     assisted expand/contract structural migration (Atlas + pgroll). Migration Copilot and
@@ -228,6 +236,17 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   the unified code-activity contract, validated + trace-emitting like `compute`. The canonical
   step-type set stays closed; new step kinds are additive + discoverable at this declared seam rather
   than a fork.
+- **external-task / delegation step** — a **canonical Flow step** (the closed set gains this member, not
+  an extension type) that **offloads a unit of work to an external system**: submit a schema'd request
+  through an **outbound Adapter**, durably **await a correlated response** through an **inbound Adapter**,
+  validate it against a response schema, then resume (or take timeout / escalation / compensation paths).
+  It is the **machine analog of the human `Task`** (await-signal + SLA), reusing the pausable-clock +
+  escalation machinery; *which* external system is chosen can itself be a Decision (mirror of assignment
+  routing). Transport is pluggable underneath via **Adapter request-reply bindings** and the Request-Reply
+  EIP — HTTP sync / async-callback / polling, message-queue request-reply, and an SFTP file round-trip
+  (the SFTP profile is **designed now, implemented post-v1**). Failure is a first-class taxonomy
+  (no-response timeout / negative-ack / malformed → DLQ + Case surfacing). See doc 04 §2.8/§5.8, doc 05
+  §11, ADR-0028.
 - **Case** — a unit of business work flowing through Flows (incl. manual review); carries the
   global `case_id` and its DecisionRecord. Supports post-submission operations (amend, cancel,
   withdraw, appeal, correct).
@@ -262,6 +281,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   `plainLanguage` i18n substrate). Versioned and CI-gated like any other contract.
 - **Workspace** — the design-time project (schemas, decisions, flows, uischemas, adapters,
   policies) — a git repo an AI agent can operate on.
+- **resources manifest** — a schema'd, versioned agent-kit artifact mapping topics → authoritative
+  references (docs, specs, conformance repos, ichiflow's own specs/fixtures), **pinned to the
+  dependency version in use** and updated with it; skills consult it before non-trivial authoring,
+  `ichiflow-mcp` exposes it at run time via `get_resources(topic)`, and air-gapped installs resolve
+  topics to vendored offline copies. Every subsystem gets one; the decision layer (Drools/Apache
+  KIE) is the exemplar and the v1-mandatory manifest.
 - **DecisionRecord / why API** — the audit/explainability object and its query surface.
 - **Copilots** — Domain Modeling Copilot (greenfield), Migration Copilot (brownfield), Rule
   Authoring assistance for business users; all follow "AI proposes, deterministic tools +
