@@ -180,16 +180,14 @@ edit — and because it is **effective-dated per round**, Round 3's rates can me
 ### 2.3 DecisionModels — eligibility, COI-assignment, per-reviewer scoring, panel composition, award
 
 Five DecisionModels, all authored as **decision source** (the LLM-friendly projection over full DMN 1.6;
-[doc 03 §2.6](../../architecture/03-decision-layer.md#26-the-decision-source--an-llm-friendly-authoring-projection-over-the-full-dmn-16-surface)),
-`authored-in: decision-source`.
+[doc 03 §2.6](../../architecture/03-decision-layer.md#26-the-decision-source--an-llm-friendly-authoring-projection-over-the-full-dmn-16-surface)).
 
 **(a) Eligibility — AI-assisted, competent-authority-validated (D6).** A DMN decision reads the validated
 org facts, sector eligibility, and budget ceiling and emits a canonical `Outcome`. Where the proposal text
 must be *screened for scope fit*, an **AI agent** produces a **recommendation** (a non-human principal under
 [BRIEF §8/§12](../../architecture/BRIEF.md); [doc 06 Part 5](../../architecture/06-identity-and-access.md)) that a
 **program officer Task validates** — "AI proposes, humans dispose." The AI's suggestion is *never* the
-decision of record; the officer's confirmation is, and both land on the audit spine attributed to their
-principals.
+decision of record; the officer's confirmation is, both on the audit spine attributed to their principals.
 
 ```text
 # decisions/eligibility.decision-source — output: Outcome. inputs: applicantOrg.validationState (from registry
