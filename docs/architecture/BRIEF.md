@@ -135,6 +135,14 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     underlying typed APIs / MCP tools **are** the seam, so a post-v1 UI is just another client of a
     contract v1 already ships — **only the v1 phasing of surfaces changes, never a seam or contract**
     (ADR-0024; surface inventory in doc 12).
+20. **Harness-first construction**: every subsystem ships a deterministic verification harness
+    (fixtures/golden data + executable checks + machine-readable JSON verdict + enumerable progress
+    metric) BEFORE its implementation — the agent-era analog of TDD. `ichiflow verify --scope … --json`
+    is the single entry point; verdicts are JSON (never prose) and "how much is done" is a
+    conformance/coverage count, not a claim. The Decision Engine SPI ships a DMN-TCK conformance suite
+    any engine must pass; harness definitions are governed Workspace artifacts that also ship to
+    app-builders. Building ichiflow itself runs harness-first (each phase's exit = its harness green in
+    CI), and the two v1 acceptance exercises are the outermost harnesses (ADR-0026, doc 13).
 
 ## Core vocabulary (use these names consistently)
 
