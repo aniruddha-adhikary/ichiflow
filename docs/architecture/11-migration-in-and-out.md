@@ -144,6 +144,40 @@ flowchart LR
   R1 -->|earns right to| R2
 ```
 
+### 2.5 Migrating reference data and legacy outcome patterns
+
+Two brownfield realities sit beside data and rules: existing **published code tables**, and legacy
+**outcome/submission shapes** that the mapping layer must model without structural migration.
+
+#### 2.5a Import existing code tables into governed CodeSets
+
+Legacy systems carry published **code tables** — reason codes, condition codes, cancellation reasons,
+field-eligibility (non-amendable-field) lists, and tariff/rate tables — often with legal meaning and a
+dated revision history. Migration IN ingests these into governed **CodeSets**
+([02-schema-foundation.md](./02-schema-foundation.md) §9.1), **preserving historical, effective-dated
+versions** so that a past Case remains reconstructable against the **code meanings in force at its
+decision time** (bitemporal as-of, [08-audit-and-observability.md](./08-audit-and-observability.md) §3).
+Importing a code table is a Ring 0 mapping activity: an agent proposes the CodeSet rows + display
+metadata, a human diffs and approves, and the result is a versioned artifact — not a free-string enum
+buried in a rule.
+
+#### 2.5b Map legacy immutable-message and composite-authority patterns onto the Case model
+
+The Ring 0 mapping layer must model two common legacy shapes directly onto the Case /
+`CompositeOutcome` model, with **zero structural migration**:
+
+- **Immutable submission + new-correlation-id-on-correction.** A legacy channel where a submission is a
+  legal artifact that is never mutated — a rejection is corrected by a *new* submission with a *new*
+  correlation id — maps onto ichiflow's immutable-submission adapter pattern
+  ([05-adapters.md](./05-adapters.md) §2.1) and correlated child-Case correction
+  ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.6). The original Case closes as
+  rejected/superseded; the correction is a correlated child.
+- **One record routed to many authorities.** A legacy pattern where one declaration/application is
+  routed to N authorities, each applying its own rules, maps onto the composite-decision model — N
+  independent Decisions composed into one `CompositeOutcome` under a declared policy
+  ([03-decision-layer.md](./03-decision-layer.md) §2.3), each member's codes attributed to its
+  authority. Authority-selection maps onto a routing Decision over an imported classification CodeSet.
+
 ---
 
 ## 3. Rule migration: from ODM / Blaze / legacy code into DMN
@@ -209,11 +243,18 @@ Decision layer (doc 03 §6).
 
 ### 4.1 Golden-dataset replay
 
-Build a **golden dataset** of historical cases with **known legacy outcomes** (approve/deny/route +
-reason codes). Replay each case through the migrated DMN and **compare the decision, not aggregates**.
-A mismatch is either a migration bug *or* a discovered legacy quirk to codify deliberately — and it is
-fed back into rule authoring (doc 03 §5). Parity results tie to the DecisionRecord provenance chain so
-they are auditable (research 06 §A.6.3).
+Build a **golden dataset** of historical cases with **known legacy outcomes**. Replay each case through
+the migrated DMN and **compare the decision, not aggregates**. A mismatch is either a migration bug *or*
+a discovered legacy quirk to codify deliberately — and it is fed back into rule authoring (doc 03 §5).
+Parity results tie to the DecisionRecord provenance chain so they are auditable (research 06 §A.6.3).
+
+**Parity is over outcome *shape*, not just a scalar value.** The comparison asserts the full typed
+**`Outcome`** ([02-schema-foundation.md](./02-schema-foundation.md) §9.3) — its `type`, its `reasons`,
+its attached **`conditions[]` (with their codes and `kind`)**, and, for a composite decision, the
+**per-authority attribution** of each member — not merely a scalar approve/deny. A legacy "approved with
+condition Z" must migrate to the *same typed outcome* (conditional-approve carrying that condition), or
+**parity fails**. This is what makes parity meaningful for regulated systems whose outcomes are
+condition-bearing, not binary.
 
 ### 4.2 Scientist-style shadow experiments
 
@@ -230,13 +271,18 @@ Parity expectations are also expressed as **business-readable Gherkin parity sce
 standing guard.
 
 ```gherkin
-# parity/loan-decline-parity.feature  (business-readable; runs continuously)
-Feature: Migrated loan-eligibility matches legacy ODM outcomes
+# parity/loan-parity.feature  (business-readable; runs continuously)
+Feature: Migrated loan-eligibility matches legacy outcomes — including outcome shape
   Scenario: High-DTI applicant with no co-signer
     Given a case from golden dataset "prod-2025-declines" with dti 0.45 and no co-signer
-    When evaluated by legacy ODM and by ichiflow DecisionModel "loan-eligibility@3.2.0"
-    Then both outcomes are "DECLINE"
+    When evaluated by the legacy engine and by ichiflow DecisionModel "loan-eligibility@3.2.0"
+    Then both outcome types are "deny"
     And both reason codes include "DTI_OVER_LIMIT"
+  Scenario: Approved-with-condition must migrate to the same typed outcome
+    Given a case from golden dataset "prod-2025-approvals" that the legacy engine approved with condition "RETAIN_RECORDS"
+    When evaluated by ichiflow DecisionModel "loan-eligibility@3.2.0"
+    Then the outcome type is "conditional-approve"
+    And the outcome carries condition "RETAIN_RECORDS" of kind "post-approval-obligation"
 ```
 
 ### 4.4 Data reconciliation (companion)
@@ -311,6 +357,7 @@ open, "export" is largely "hand over what is already the source of truth."
 | Decision tables | **Excel / CSV** | OpenRules-style portability, spreadsheets |
 | **Flows** | **flow DSL (JSON/YAML, CNCF-Serverless-Workflow-aligned)** | portable spec; other SW-aligned interpreters (research 02) |
 | **Schemas** | **TypeSpec + OpenAPI 3.1 / JSON Schema 2020-12**; AsyncAPI 3.1 for events | any conformant tooling (BRIEF §5) |
+| **CodeSets / reference data** | versioned, effective-dated **code + rate tables** (JSON/CSV over their JSON Schema), all historical versions | any store; re-usable as governed reference data (doc 02 §9.1) |
 | **UI** | **JSON Forms data + UI schemas** (two versioned documents) | any JSON Forms renderer (BRIEF §6) |
 | **Adapters** | declared **adapter configs** (schema'd, versioned) | re-bindable ports (BRIEF vocab) |
 | **Case data** | **open data formats** (SQL / Parquet / JSON) over Postgres | any store; nothing proprietary |

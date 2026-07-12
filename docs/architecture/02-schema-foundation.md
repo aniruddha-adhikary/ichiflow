@@ -329,12 +329,129 @@ model Applicant {
 - **why API / DecisionRecord** ([research 05](../research/05-audit-observability-deployment.md)):
   the per-case DecisionRecord references the `LoanApplication` `$id` + version it was decided
   against, and bitemporal as-of queries reconstruct the exact shape known at decision time.
-- **LLM tool schema** (§9): `LoanApplication.json` is handed verbatim to `ichiflow-mcp` tools
+- **LLM tool schema** (§10): `LoanApplication.json` is handed verbatim to `ichiflow-mcp` tools
   like `simulate_decision` as their input schema — no translation step.
 
 ---
 
-## 9. How AI agents interact with schemas
+## 9. Reference data (CodeSets) and canonical decision contracts
+
+Two artifact classes ride the same pipeline as the schemas above but are not the everyday
+request/response payloads of §1–§8: **governed reference data** and the **typed decision contracts**
+every Decision and outbound decision event speaks in. Both are canonical, checked-in, registry-governed
+artifacts; neither is inlined ad-hoc where it is used.
+
+### 9.1 `CodeSet` — reference data as a first-class governed artifact
+
+Alongside Schema, DecisionModel ([03-decision-layer.md](03-decision-layer.md)), and Flow
+([04-flow-and-case-layer.md](04-flow-and-case-layer.md)), ichiflow treats **reference data** as its own
+governed artifact class: a **CodeSet**. A CodeSet is a schema'd, row-structured reference table — reason
+codes, condition codes, cancellation reasons, field-eligibility (amendability) rules, and fee/rate
+tables — that is **semver-versioned and effective-dated**, checked into the Workspace, registered in
+Apicurio, and gated by the same regenerate-and-diff / oasdiff breaking-change CI machinery as any other
+contract (§4.3, §6.2).
+
+The rationale is separation of governance cadence: legally-precise codes and rate tables evolve on their
+own schedule, independent of the logic that emits them. So **Decisions, Flows, and the UI reference a
+CodeSet by `id@version`; they never inline its rows.** A released Decision pins the exact CodeSet
+version it evaluated against ([03-decision-layer.md](03-decision-layer.md) §2.2), and that pin flows into
+the DecisionRecord ([08-audit-and-observability.md](08-audit-and-observability.md) §1) so "which code,
+under which table version" is reconstructable.
+
+```yaml
+# A governed CodeSet — checked in, registry-versioned, effective-dated (illustrative)
+kind: CodeSet
+metadata:
+  id: obligations
+  version: 4.3.0                       # semver; breaking row/schema changes gated like any contract
+  governanceState: released           # draft | in-review | released | deprecated
+  effective: { from: 2026-08-01, to: null }
+schema: contracts/jsonschema/ConditionCode.json    # the row shape (§9.2)
+rows:
+  - code: PRESENT_FOR_INSPECTION
+    kind: blocking
+    display:
+      technical: "INSP"
+      professionalLabel: "Present goods/records for inspection"
+      plainLanguage:
+        en: "You must make the item available for inspection before it can be released."
+  - code: RETAIN_RECORDS
+    kind: post-approval-obligation
+    retainFor: P5Y
+    display:
+      technical: "RET5"
+      professionalLabel: "Retain records five years"
+      plainLanguage:
+        en: "Keep your supporting documents for five years in case of an audit."
+```
+
+### 9.2 Standard code-row shape with per-audience display metadata
+
+Every CodeSet row conforms to a canonical `Code` shape so that machine consumers and every Portal
+audience read from **one** source:
+
+```typespec
+@jsonSchema
+@doc("A single governed reference-data row (reason / condition / cancellation / eligibility code).")
+model Code {
+  @doc("Stable machine identifier with legal meaning; the key Decisions and events carry.") code: string;
+  @doc("Behavioural class where applicable (e.g. condition kind).") kind?: string;
+  // ...domain-specific fields (retainFor, gates, rate, eligibility, ...)
+  display: CodeDisplay;
+}
+
+@jsonSchema
+model CodeDisplay {
+  @doc("Raw token professionals recognise instantly.") technical: string;
+  @doc("Short professional-facing label.") professionalLabel: string;
+  @doc("Plain-language explanation for lay audiences, per locale (i18n map).")
+  plainLanguage: Record<string>;
+}
+```
+
+The UI selects the layer by Portal audience — technical code + professional label for professional /
+back-office audiences, plain-language + i18n for lay / customer audiences
+([07-ui-and-portals.md](07-ui-and-portals.md) §11) — but no rendering duplicates the code meaning: it
+all resolves against the referenced CodeSet.
+
+### 9.3 Canonical `Outcome` and `CompositeOutcome`
+
+A Decision result is richer than approve/deny. ichiflow canonicalises a first-class **`Outcome`** type in
+the shared contracts, so every Decision output and every outbound decision event references it instead of
+ad-hoc `{outcome, reasonCodes}` pairs:
+
+```typespec
+@jsonSchema
+@doc("The typed result of a Decision.")
+model Outcome {
+  @doc("Open outcome type.") type: OutcomeType;   // approve | deny | refer | conditional-approve | partial | ...
+  @doc("Machine-readable reasons drawn from governed CodeSets.") reasons: CodeRef[];
+  @doc("Attached, individually-stateful conditions (see doc 04).") conditions: Condition[];
+  @doc("Set when this Outcome is a member of a CompositeOutcome.") authority?: string;
+}
+
+@jsonSchema
+@doc("N independent authority Outcomes composed into one result.")
+model CompositeOutcome {
+  @doc("Declared composition policy.") policy: CompositionPolicy;   // all-must-approve | any-blocks | quorum(k) | weighted
+  members: Outcome[];                 // each attributed to its originating authority
+  @doc("Rolled-up result computed from policy over members.") rolledUp: OutcomeType;
+}
+
+@jsonSchema
+@doc("A reference to a governed CodeSet row, pinning the version used.")
+model CodeRef { code: string; codeSet: string; }   // e.g. codeSet: "obligations@4.3.0"
+```
+
+`Condition` (its `kind`/`state` lifecycle) and the composition semantics live with the Case and Decision
+layers that own them ([04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5.5,
+[03-decision-layer.md](03-decision-layer.md) §2.3); this document only fixes their **shape** as canonical,
+$ref-able contracts so the same typed outcome travels through Decisions, Flows, outbound Adapters
+([05-adapters.md](05-adapters.md) §4.1), the UI, and the DecisionRecord without divergence.
+
+---
+
+## 10. How AI agents interact with schemas
 
 ichiflow is AI-native at build time and run time (BRIEF §12), and the schema layer is deliberately
 shaped for agents ([research 03 §8](../research/03-schema-and-types.md),

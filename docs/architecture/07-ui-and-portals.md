@@ -143,6 +143,24 @@ it cannot be silently clobbered or silently orphaned.**
 - **Design tokens** (color, spacing, typography, radius, elevation) are the theming spine. A
   Portal selects a token set; brand changes never touch uischema or viewschema documents.
 
+### 4.1 Per-audience code rendering from CodeSet display metadata
+
+Reason codes, condition codes, and status codes are governed reference data
+([02-schema-foundation.md](02-schema-foundation.md) §9.1), and every code row carries **per-audience
+display metadata** — a technical token, a short professional label, and a plain-language explanation with
+i18n (doc 02 §9.2). The UI renders codes through that metadata, with the **Portal audience selecting the
+layer**:
+
+- **Professional / back-office audiences** see the raw **technical code + professional label** (a
+  domain expert recognises the token instantly).
+- **Lay / customer audiences** see the **plain-language explanation + i18n**, never the bare token.
+
+This is **not a new UI primitive**: it reuses the renderer-registry / tester mechanism (§2–§4). A
+`format: code` tester resolves a coded value against its referenced `CodeSet@version` and renders the
+audience-appropriate layer selected from the Portal's audience config (§8). Because the display text
+lives in the governed CodeSet, a code's meaning is authored once and stays consistent across every
+Portal, the why API, and printed correspondence.
+
 ---
 
 ## 5. Auto-generated CRUD / case screens
@@ -213,6 +231,26 @@ any screen:
   submit **signals the Flow** (BRIEF §2). Field-level authz applies exactly as in §6.
 - Escalation and SLA state render from the Case model; no bespoke task-UI code is required for the
   common path, and unusual review UIs are just higher-priority renderer registrations.
+
+### 7.1 Case-operation and obligation surfaces
+
+The generated **Case detail** screen exposes the permitted **post-submission Case operations**
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.6) — **amend** (only within amendable
+fields, driven by the field-amendability CodeSet), **cancel** (with a reason picker over the
+cancellation-reason CodeSet), **withdraw**, and **appeal**. Availability is gated jointly by **Case
+state** and the **PDP** (§6), so an operation the lifecycle or policy forbids is not offered, and when a
+hard gate blocks an operation the UI surfaces the alternative-remediation path rather than a dead button.
+
+The same screen renders the Case's **condition / obligation checklist**
+([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.5), distinguishing **blocking conditions**
+from **post-approval obligations**, each with its **state** (pending / fulfilled / waived / breached) and
+**deadline**. The two audiences see it differently, via the per-audience code metadata (§4.1):
+
+- **Customer audience** — a plain-language *"what you must still do"* view (outstanding obligations,
+  deadlines, and what each condition means).
+- **Back-office audience** — the technical codes plus **fulfilment actions** (mark returned, record
+  duty paid, record inspection passed, waive), which emit the fulfilment signal/event that satisfies a
+  `condition-gate` (§2.3 in doc 04).
 
 ---
 

@@ -68,10 +68,24 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
 - **Schema** — canonical typed model (TypeSpec-authored; JSON Schema artifact).
 - **Decision** — a rule-evaluated determination; authored as DMN; evaluated by an Engine via the
   Decision Engine SPI. A **DecisionModel** is versioned + governed.
+- **Outcome** — the typed result of a Decision: `{ type (approve | deny | refer | conditional-approve
+  | partial | …), reasons[], conditions[], authority? }`. Replaces ad-hoc `{outcome, reasonCodes}`.
+  A **CompositeOutcome** aggregates N per-authority Outcomes under a declared composition policy
+  (all-must-approve / any-blocks / quorum(k) / weighted); each member's codes stay attributed to their
+  originating authority.
+- **Condition** — an individually typed, stateful obligation carried by an Outcome:
+  `kind ∈ {blocking, post-approval-obligation}`, `state ∈ {pending, fulfilled, waived, breached}`.
+  Blocking Conditions gate a later Flow step; post-approval obligations are deadline-bearing and
+  tracked after the Case closes.
+- **CodeSet / ReferenceData** — a schema'd, row-structured, semver-versioned + effective-dated
+  reference table (reason codes, condition codes, cancellation reasons, field-eligibility rules,
+  fee/rate tables) governed like any other contract; Decisions, Flows, and the UI reference a CodeSet
+  by `id@version` rather than inlining its rows. Each row carries per-audience display metadata.
 - **Flow** — declarative long-running process definition interpreted on Temporal.
 - **Case** — a unit of business work flowing through Flows (incl. manual review); carries the
-  global `case_id` and its DecisionRecord.
-- **Task** — a human work item within a Case (assignment, SLA, escalation).
+  global `case_id` and its DecisionRecord. Supports post-submission operations (amend, cancel,
+  withdraw, appeal, correct).
+- **Task** — a human work item within a Case (assignment, SLA, escalation; SLA clocks are pausable).
 - **Adapter** — declared (schema'd, versioned) port in/out: REST, MQ/JMS/Kafka/AMQP, file/SFTP,
   SOAP, webhook, CDC. Inbound → canonical command/event; outbound from canonical.
 - **Portal** — an audience-scoped UI + BFF (back-office, customer, partner) with its own IdP

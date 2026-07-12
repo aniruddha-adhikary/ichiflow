@@ -91,7 +91,10 @@ model:
   entryPoint: LoanEligibility    # named decision to evaluate
 contracts:
   input:  { schema: schemas/LoanApplication.json }   # JSON Schema (BRIEF §5)
-  output: { schema: schemas/EligibilityResult.json }
+  output: { schema: schemas/Outcome.json }           # canonical typed Outcome (doc 02 §9.3)
+references:                      # governed CodeSets this model reads (doc 02 §9.1); NOT inlined
+  - credit-reasons@2.1.0         # reason-code CodeSet
+  - fee-schedule@2026.3.0        # versioned rate table used by a fee decision (§2.4)
 engine:
   preferred: drools              # capability-negotiated at deploy (§3.3)
   requires: [decisionTables, feel-full]
@@ -106,10 +109,53 @@ provenance:                      # for migrated models (§11)
 ```
 
 The envelope binds a Decision to its **Schema** contracts (input/output JSON Schema, BRIEF §5), its
-**governance state**, its **tests**, its **provenance**, and any **projections**. Input and output
-are validated against their JSON Schema at the SPI boundary using the same runtime validators as
-every other adapter (networknt/OptimumCode on Kotlin; BRIEF §5) — a Decision is a schema'd port like
-any other.
+**governance state**, its **tests**, its **provenance**, any **projections**, and — via `references:` —
+the **CodeSets** it reads. Input and output are validated against their JSON Schema at the SPI boundary
+using the same runtime validators as every other adapter (networknt/OptimumCode on Kotlin; BRIEF §5) —
+a Decision is a schema'd port like any other.
+
+**Decisions reference governed CodeSets; they do not inline them.** Reason codes, condition codes,
+cancellation reasons, field-eligibility rules, and fee/rate tables are governed **reference data**
+(`kind: CodeSet`, [02-schema-foundation.md](./02-schema-foundation.md) §9.1), versioned and effective-dated
+on their own governance cadence. The `references:` block pins the exact `codeSet@version` the model reads,
+so a **released** DecisionModel is reproducible against the reference-data version it evaluated against —
+and that pin is captured in the typed trace (§7) and the DecisionRecord. A model's output is a canonical
+typed **`Outcome`** (doc 02 §9.3), not an ad-hoc `{outcome, reasonCodes}` pair.
+
+### 2.3 Composite decisions: multiple authorities, one CompositeOutcome
+
+Some Cases are not decided by one rule-owner. A single Case can carry **N independent Decisions from N
+authorities** (rule-owners / agencies / lines-of-business), each applying its own rules and emitting its
+own `Outcome` with its own codes. The permit/approval issues only when the members compose to a positive
+result; a rejection or condition from *any* member attaches to the one Case, **attributed to its
+originating authority**.
+
+Composition is **declared and governed**, never an ad-hoc FEEL merge. The **composition policy** — how
+member Outcomes roll up — is itself a governed artifact (a small DMN or a typed policy value):
+
+| Policy | Rolls up to a positive result when… |
+|---|---|
+| `all-must-approve` | every member approves (conditional-approve carries its conditions forward) |
+| `any-blocks` | no member denies; a single deny blocks the whole |
+| `quorum(k)` | at least *k* members approve |
+| `weighted` | the weighted tally of member Outcomes clears a threshold |
+
+The result is a canonical **`CompositeOutcome`** (doc 02 §9.3): `{ policy, members[], rolledUp }`, each
+member Outcome and its codes staying attributed to their authority all the way into the DecisionRecord
+([08-audit-and-observability.md](./08-audit-and-observability.md) §1). *Which* authorities apply is itself a
+**routing Decision over a CodeSet** (a classification/controlled-items table), not hard-wired — the same
+"routing is a Decision" stance as Task assignment ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.3).
+The Flow executes the fan-out and the policy join ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md)
+§2.3, §5.7); this section governs the *shape and semantics* of the composition.
+
+### 2.4 Fee, tariff, and tax decisions over versioned rate tables
+
+Fee, tariff, and tax computation is an ordinary Decision — DMN decision tables are the natural fit for
+rate tables — with one discipline: the **rate tables are governed CodeSets (§2.2, doc 02 §9.1), not
+inlined in the DMN**, so a bundling rule, a tiered tariff, a time-based charge, or a pro-rated annual
+fee reads its rates from a versioned, effective-dated table. The **rate-table version used** is recorded
+in the DecisionRecord alongside the computed amount (§7; [08-audit-and-observability.md](./08-audit-and-observability.md) §1.5), so a fee is
+reconstructable as of the rates in force at decision time.
 
 **FEEL as the expression primitive everywhere.** Where ichiflow needs an inline predicate outside a
 full DecisionModel (a Flow guard condition, a Task assignment expression), it uses FEEL as the single
@@ -127,7 +173,7 @@ directly, so an engine is swappable and a DecisionModel is portable across the e
 
 | Operation | Signature (conceptual) | Purpose |
 |---|---|---|
-| `evaluate` | `(DecisionModelRef, input, evalContext) → DecisionResult` | Run the decision; return typed outputs validated against the output Schema. |
+| `evaluate` | `(DecisionModelRef, input, evalContext) → DecisionResult` | Run the decision; return a typed **`Outcome`** (doc 02 §9.3) — `{ type, reasons[], conditions[], authority? }` — validated against the output Schema. For composite decisions the result is a `CompositeOutcome` (§2.3). |
 | `trace` | emitted *with* every `evaluate` | A **typed evaluation trace**: fired rules/decisions, input snapshot, intermediate values, timings (§7). Not optional and not a separate call — evaluation is trace-producing by construction. |
 | `validate` | `(DecisionModel) → ValidationReport` | Static validation: DMN well-formedness, FEEL type-checks, schema-contract conformance, coverage gaps, unreachable rules, table completeness/overlap (hit-policy) checks. Runs in CI and in the authoring UI. |
 | `capabilities` | `() → CapabilityDescriptor` | What the engine can do (§3.3), so ichiflow can route a model to a compatible engine and refuse an incompatible one at deploy time, not runtime. |
@@ -339,23 +385,29 @@ DecisionModel**, readable and writable by business users, and required for relea
 
 ### 6.1 Scenario specs
 
-A **scenario** is a business-readable given/expect spec: named inputs → expected outputs (and,
-optionally, expected fired rules / reason codes). They are stored with the DecisionModel, versioned
-with it, and authored in the same UI. They double as documentation of intent.
+A **scenario** is a business-readable given/expect spec: named inputs → expected outputs. The `expect`
+block asserts a full typed **`Outcome`** (doc 02 §9.3) — its `type`, its `reasons`, and, where relevant,
+its attached `conditions[]` (each with expected `kind` and `state`) and per-authority attribution — not
+merely a scalar `outcome` + `reasonCodes`. Optionally it also asserts the fired rules. Scenarios are
+stored with the DecisionModel, versioned with it, and authored in the same UI; they double as
+documentation of intent.
 
 ```yaml
-# scenarios/high-dti-decline.yaml  (business-readable scenario spec)
-scenario: High DTI is declined unless strong co-signer
+# scenarios/high-dti-conditional.yaml  (business-readable scenario spec)
+scenario: High DTI is declined unless a strong co-signer, then conditionally approved
 decisionModel: loan-eligibility@3.2.0
 cases:
   - name: DTI 45% no co-signer -> DECLINE
     given: { dti: 0.45, coSigner: null, ficoPrimary: 690 }
     expect:
-      outcome: DECLINE
-      reasonCodes: [DTI_OVER_LIMIT]
-  - name: DTI 45% strong co-signer -> APPROVE
+      type: deny
+      reasons: [ { code: DTI_OVER_LIMIT, codeSet: credit-reasons@2.1.0 } ]
+  - name: DTI 45% strong co-signer -> APPROVE with a records-retention obligation
     given: { dti: 0.45, coSigner: { fico: 760 } }
-    expect: { outcome: APPROVE }
+    expect:
+      type: conditional-approve
+      conditions:
+        - { code: RETAIN_RECORDS, codeSet: obligations@4.3.0, kind: post-approval-obligation, state: pending }
 ```
 
 ### 6.2 Coverage
@@ -392,8 +444,14 @@ Every `evaluate` emits a **typed `DecisionTrace`** — not a log line, a typed d
   hit policy, which DRL rules activated and in what agenda order (for the inference escape hatch);
 - **input snapshot**: the exact inputs the decision saw, as-of evaluation time;
 - **intermediate values**: the outputs of upstream DRD decisions and named FEEL sub-expressions;
-- **outputs + reason codes**: the result and the business-facing reasons (adverse-action / ECOA /
-  GDPR Art. 22 grade — research 05);
+- **outputs + reason codes**: the typed `Outcome` (or `CompositeOutcome`) and the business-facing
+  reasons/conditions (adverse-action / ECOA / GDPR Art. 22 grade — research 05);
+- **reference-data provenance**: for each fired decision, the **CodeSet id + version** it read and the
+  specific reason / condition / rate rows it selected — so "which code, under which table version" is
+  reconstructable (feeds the code/authority attribution in
+  [08-audit-and-observability.md](./08-audit-and-observability.md) §1.5);
+- **authority attribution**: for a composite decision (§2.3), the **emitting authority** of each member
+  Outcome, carried through so every code stays attributed to its rule-owner;
 - **model identity**: DecisionModel id + version + effective window + engine + capability set.
 
 The trace flows into the per-Case **DecisionRecord**, which stitches Flow event history + fired-rule
