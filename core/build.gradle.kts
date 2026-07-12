@@ -27,6 +27,10 @@ dependencies {
     // jsr310 handles the `date-time` fields that Fabrikt maps to java.time.OffsetDateTime.
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2")
+    // Apache KIE / Drools DMN is the v1 reference decision engine (ADR-0002), pinned to KIE 10.2.0
+    // (build plan 2.1). Phase 2.0 embeds it to execute DMN 1.6 (the hard boxed-expression kinds).
+    // Apache-2.0 — clean under ADR-0016.
+    implementation("org.kie:kie-dmn-core:10.2.0")
     testImplementation(kotlin("test"))
 
     fabrikt("com.cjbooms:fabrikt:26.1.0")
@@ -64,6 +68,16 @@ tasks.register<JavaExec>("runContractVectors") {
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("ai.ichiflow.core.spike.SpikeValidatorKt")
     args("schemas/vectors/contract-corpus.json", "build/contract-vector-results.json")
+}
+
+// Compile the decision-source fixture to DMN 1.6 and execute it and the hand-authored reference on
+// KIE/Drools across the input vectors (build plan 2.0). Writes core/build/decision-projection-results.json,
+// consumed by the TS `decision-projection-spike` scope.
+tasks.register<JavaExec>("runDecisionSpike") {
+    group = "verification"
+    description = "Compile decision-source → DMN 1.6, execute vs the reference DMN on KIE, and write core/build/decision-projection-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.DecisionProjectionSpike")
 }
 
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")

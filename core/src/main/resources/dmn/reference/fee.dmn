@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 2.0 hand-authored reference DMN (build plan 2.0, ADR-0001/0027). Exercises the *hardest*
+  boxed-expression kinds the decision-source projection must cover: a Business Knowledge Model whose
+  encapsulated logic is a FEEL function, a boxed Context decision, and an Invocation binding. The
+  decision-projection-spike compiles the sibling decision-source fixture to DMN and asserts it
+  executes identically to this reference on every input vector.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/"
+             xmlns:feel="https://www.omg.org/spec/DMN/20240513/FEEL/"
+             namespace="https://ichiflow.ai/dmn/fee"
+             id="fee"
+             name="fee">
+
+  <inputData id="idIncome" name="Income">
+    <variable name="Income" typeRef="number"/>
+  </inputData>
+  <inputData id="idRegion" name="Region">
+    <variable name="Region" typeRef="string"/>
+  </inputData>
+
+  <businessKnowledgeModel id="bkmBaseFee" name="Base Fee">
+    <variable name="Base Fee" typeRef="number"/>
+    <encapsulatedLogic>
+      <formalParameter name="region" typeRef="string"/>
+      <literalExpression>
+        <text>if region = "A" then 100 else 200</text>
+      </literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+
+  <decision id="decFee" name="Fee">
+    <variable name="Fee" typeRef="number"/>
+    <informationRequirement>
+      <requiredInput href="#idIncome"/>
+    </informationRequirement>
+    <informationRequirement>
+      <requiredInput href="#idRegion"/>
+    </informationRequirement>
+    <knowledgeRequirement>
+      <requiredKnowledge href="#bkmBaseFee"/>
+    </knowledgeRequirement>
+    <context>
+      <contextEntry>
+        <variable name="base" typeRef="number"/>
+        <invocation>
+          <literalExpression>
+            <text>Base Fee</text>
+          </literalExpression>
+          <binding>
+            <parameter name="region"/>
+            <literalExpression>
+              <text>Region</text>
+            </literalExpression>
+          </binding>
+        </invocation>
+      </contextEntry>
+      <contextEntry>
+        <variable name="adjusted" typeRef="number"/>
+        <literalExpression>
+          <text>base * (Income / 1000)</text>
+        </literalExpression>
+      </contextEntry>
+      <contextEntry>
+        <literalExpression>
+          <text>adjusted</text>
+        </literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+
+</definitions>

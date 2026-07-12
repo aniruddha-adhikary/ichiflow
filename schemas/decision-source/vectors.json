@@ -1,0 +1,9 @@
+{
+  "decision": "Fee",
+  "vectors": [
+    { "id": "regionA-income2000", "inputs": { "Income": 2000, "Region": "A" }, "expect": "200" },
+    { "id": "regionB-income5000", "inputs": { "Income": 5000, "Region": "B" }, "expect": "1000" },
+    { "id": "regionA-income500", "inputs": { "Income": 500, "Region": "A" }, "expect": "50" },
+    { "id": "regionB-income1000", "inputs": { "Income": 1000, "Region": "B" }, "expect": "200" }
+  ]
+}
