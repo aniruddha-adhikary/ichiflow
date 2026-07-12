@@ -681,6 +681,14 @@ and render fine, but issuance would be sturdier if the amounts and itemized cond
 Outcome** the Document binds, not reconstructed from binding expressions over trace internals — the same
 minor gap the sibling study raised, surfacing again from the issuance side.
 
+**Resolved (2026-07 gap-fix round):** the Document / doctemplate / issue-document vocabulary is now normatively
+owned by [ADR-0029](../../adr/0029-document-issuance.md) / [04 §2.9](../../architecture/04-flow-and-case-layer.md)
+/ [07 §15](../../architecture/07-ui-and-portals.md) — the CCP's `issued → superseded → revoked` lifecycle and
+API-first checkpoint verification match its normative definition directly. The typed-Outcome strain this note
+raised (fee riding the trace) is closed by typed **`Outcome.feeBreakdown[]`** in
+[02 §9.3](../../architecture/02-schema-foundation.md), so the doctemplate can bind typed Outcome fields rather
+than reconstruct from trace internals.
+
 ---
 
 ### Where to go deeper
