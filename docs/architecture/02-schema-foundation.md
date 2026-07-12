@@ -518,6 +518,26 @@ model Outcome {
   @doc("Machine-readable reasons drawn from governed CodeSets.") reasons: CodeRef[];
   @doc("Attached, individually-stateful conditions (see doc 04).") conditions: Condition[];
   @doc("Set when this Outcome is a member of a CompositeOutcome.") authority?: string;
+  @doc("Itemized per-criterion points tally (points-based decisions).") scoreBreakdown?: ScoreLine[];
+  @doc("Itemized fee/tariff computation (an operative fee's line items).") feeBreakdown?: FeeLine[];
+}
+
+@jsonSchema
+@doc("One criterion's contribution to a points tally.")
+model ScoreLine {
+  @doc("The scored criterion.") criterion: string;
+  @doc("Points awarded for this criterion.") points: number;
+  @doc("The band/tier the points fall in.") band: string;
+  @doc("Trace/why reference explaining the award.") whyRef: string;
+}
+
+@jsonSchema
+@doc("One line item of an itemized fee.")
+model FeeLine {
+  @doc("The fee component (duty, GST, processing fee, …).") component: string;
+  @doc("The base amount the rate applies to.") base: number;
+  @doc("CodeRef into the governed rate table used (§2.2, §9.4).") rateRef: CodeRef;
+  @doc("The computed amount for this component.") amount: number;
 }
 
 @jsonSchema
@@ -532,6 +552,18 @@ model CompositeOutcome {
 @doc("A reference to a governed CodeSet row, pinning the version used.")
 model CodeRef { code: string; codeSet: string; }   // e.g. codeSet: "obligations@4.3.0"
 ```
+
+**The typed breakdowns make a points tally / an itemized fee a first-class CONTRACT, not an audit-time
+reconstruction.** `scoreBreakdown?: ScoreLine[]` (`{ criterion, points, band, whyRef }`) and
+`feeBreakdown?: FeeLine[]` (`{ component, base, rateRef, amount }`) are $ref-able contracts in their own
+right, so a statutory per-criterion breakdown or a permit's operative fee travels *as data* through the
+Decision output, the UI, and the DecisionRecord — instead of being reconstructed after the fact from the
+DecisionTrace ([03-decision-layer.md](03-decision-layer.md) §7). Both are optional, so a plain approve/deny
+Outcome carries neither. They **survive `CompositeOutcome` composition**: when member Outcomes roll up, each
+member's breakdown stays attributed to its originating authority (the per-member tallies roll into a
+consensus without losing member attribution) — see the composition semantics in
+[03-decision-layer.md](03-decision-layer.md) §2.3, which also fixes when a points system is a single-authority
+DRD rather than a composite.
 
 **`OutcomeType` is open at a declared seam, not silently open** (BRIEF §21; the "closed core, declared
 extension points" rule). The reserved canonical types (`approve | deny | refer | conditional-approve |
@@ -624,11 +656,30 @@ shaped for agents ([research 03 §8](../research/03-schema-and-types.md),
   enumerate *every* governed artifact class in one call: `ichiflow artifacts list --json` (and the
   MCP Tier-0 `list_artifact_types`) returns each class — Schema, DecisionModel, CodeSet, Flow,
   compute-step/code-activity, uischema, viewschema, pageschema, copyset, **doctemplate** (the
-  document-rendering template, [07-ui-and-portals.md](07-ui-and-portals.md) §15), Entitlement, Portal,
-  Adapter, tokens, Harness — with its canonical JSON Schema, its authoring surfaces, and its declared
-  extension seams (the `x-`/SPI points of BRIEF §21). This complements the per-CodeSet dependency graph (§9.4,
-  "what depends on this code?") with a *global* artifact-type index, so an agent discovers what it can
-  author without reading the docs first (cross-ref [10-ai-native-experience.md](10-ai-native-experience.md) §2.2).
+  document-rendering template, [07-ui-and-portals.md](07-ui-and-portals.md) §15), **CaseType catalog** (the
+  case-type manifest, below), Entitlement, Portal, Adapter, tokens, Harness — with its canonical JSON
+  Schema, its authoring surfaces, and its declared extension seams (the `x-`/SPI points of BRIEF §21). This
+  complements the per-CodeSet dependency graph (§9.4, "what depends on this code?") with a *global*
+  artifact-type index, so an agent discovers what it can author without reading the docs first (cross-ref
+  [10-ai-native-experience.md](10-ai-native-experience.md) §2.2).
+
+**The `CaseType` catalog — an additive, optional governed manifest.** A `CaseType` is a versioned governed
+manifest that **binds a case type's artifact bundle** — its schema, applicability Decision, Flow, fee
+CodeSet, `doctemplate`, SLA, operation set, and issuance mode — together with **applicability metadata**
+(e.g. an industry/activity classification a guided journey can match on). It is **owned by a Team**,
+**versioned as a unit**, and **discoverable** — enumerable, pinnable, and resolvable via `ichiflow-mcp`
+(BRIEF §12). Crucially it **adds no new runtime mechanism**: every member of the bundle is an existing
+governed ref, and the manifest merely names them as a coherent set, so a `CaseType` **resolves to the same
+artifacts** a single-product Workspace pins directly. Its payoff is *aggregation and discovery* — a
+**guided-journey Decision can quantify over the catalog** ("for each `CaseType` in the catalog, evaluate its
+applicability Decision, then recommend the matching case types") instead of hard-coding the roster of
+products, and a bundle's heterogeneous children resolve their per-member `caseType` through it
+([04-flow-and-case-layer.md](04-flow-and-case-layer.md) §5.10). It is an **optional aggregation layer, never
+a mandatory wrapper** (BRIEF §21b, closed-core/declared-extension): a **single-product Workspace needs
+none** — it just pins its schema+decisions+flow+uischema directly; the catalog earns its place only where
+many case types are governed together. See [ADR-0031](../adr/0031-set-level-cases.md) (the bundle's
+per-member `caseType` resolves through it) and [ADR-0033](../adr/0033-packaging-and-placement.md) (its place
+in the packaging/placement doctrine).
 
 ---
 

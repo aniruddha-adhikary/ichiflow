@@ -165,6 +165,33 @@ member Outcome and its codes staying attributed to their authority all the way i
 The Flow executes the fan-out and the policy join ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md)
 §2.3, §5.7); this section governs the *shape and semantics* of the composition.
 
+**Two-level composition — the modeling rule.** Whether a multi-part determination is a `CompositeOutcome`
+at all turns on *how many authorities* decide, not on how many numbers are involved:
+
+- **A single authority scoring N criteria is a DRD, *not* a `CompositeOutcome`.** One rule-owner weighing N
+  criteria into one score is *one* Outcome; the per-criterion structure lives in its **DRD** (a DMN
+  requirement graph of sub-decisions) and surfaces as `Outcome.scoreBreakdown[]` (doc 02 §9.3) — not as N
+  fake "authorities."
+- **N independent authorities compose as a `CompositeOutcome`.** N rule-owners each emitting their own
+  Outcome is the shape this section governs.
+- **A review panel is a DRD-per-reviewer, composed across reviewers.** Each reviewer's own multi-criterion
+  score is a DRD (one authority); the panel of reviewers then composes as a `CompositeOutcome` under
+  `quorum(k)` / `weighted` / `custom`.
+
+**Misuse warning.** `weighted` *looks* superficially applicable to a single-authority points tally — both
+sum weighted numbers against a threshold — but modeling a points system that way **misattributes each
+criterion as an "authority"** and **smuggles a numeric threshold into a policy designed for approve/deny
+votes across rule-owners**. Do not model points systems as fake multi-authority composites: a one-authority
+tally is a **DRD with a `scoreBreakdown[]`**, and `weighted` is reserved for genuinely independent
+authorities. (This is the line [work-pass GAP #2](../examples/case-studies/work-pass-compass.md#gaps) and
+[grants G2a](../examples/case-studies/grant-program.md) drew.)
+
+**Breakdowns survive composition.** A composite member's Outcome may itself be a DRD score, and its
+`Outcome.scoreBreakdown[]` / `feeBreakdown[]` (doc 02 §9.3) **survive the roll-up with per-member attribution
+intact** — each member's breakdown stays keyed to its originating authority, so the per-member tallies roll
+into a consensus without collapsing into an anonymous aggregate (cross-ref [02-schema-foundation.md](./02-schema-foundation.md)
+§9.3).
+
 ### 2.4 Fee, tariff, and tax decisions over versioned rate tables
 
 Fee, tariff, and tax computation is an ordinary Decision — DMN decision tables are the natural fit for
@@ -202,6 +229,28 @@ counts against the workspace portability score (G6). CEL is reserved for interna
 stub-able in scenario tests, and trace-emitting into the DecisionRecord. So "move computation to typed
 code" means the same governed, audited primitive everywhere it appears, whether the computation feeds
 a Decision, a Flow step, or an Adapter mapping.
+
+**Graph feature-prep — multi-hop relational eligibility belongs in a feature-function, not in FEEL.**
+Some eligibility is *relational*: a household nucleus resolved over a residency/relationship graph, a
+conflict-of-interest relationship walked over the Team graph. This is **not legibly expressible in nested
+FEEL `some`/`every`** — FEEL *can* technically express a bounded walk, but the result is write-only graph
+plumbing illegible to a steward or a reviewer. The pattern is **"graph predicate → `compute`
+feature-function → decision-table key"**: a schema'd, trace-emitting feature-function walks the graph and
+returns a **typed key** (a `nucleusKind`, a set of typed COI facts) that the decision **table keys on** —
+keeping the **rule in DMN** and the **graph walk in typed code**, on the same feature-function machinery as
+any other derived input (above). The walk's output is snapshotted into the DecisionTrace (§7) like every
+other feature, so the auditor sees the resolved key the table saw. (This is the seam ballot G3 identified:
+[public-housing-ballot §2.3a](../examples/case-studies/public-housing-ballot.md).)
+
+**Reviewer / workload-aware assignment — an honesty note.** Assignment-routing Decisions (routing is a
+Decision, §2.3, [04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §5.3) **may consume
+load / capacity / expertise features** through the same feature-functions — capacity-constrained matching
+modeled as a `compute` over the candidate cohort, its result feeding the routing table. But a boundary must
+be stated plainly: **COI / fairness correctness is bounded by graph data quality.** A resolver can only
+exclude the relationships it *holds* — a missing recent co-authorship or an unrecorded affiliation is a
+**data-completeness boundary, not a rule bug**. The Decision is correct with respect to the graph it is
+given; the residual risk lives in the completeness of that graph, and should be surfaced as such rather than
+mistaken for a defect in the rule. (Grants G5: [grant-program](../examples/case-studies/grant-program.md).)
 
 ### 2.5 Feature gating is a Decision
 
@@ -623,6 +672,15 @@ reviewable and diffable, never a bare console click.
   even an emergency terminates in version control. **Net: both content and activation trace to a
   commit; the registry is a cache, never an authority.** (Cross-environment promotion mechanics and the
   pin-file schema live in [09-deployment-and-topology.md](./09-deployment-and-topology.md) §6.3.)
+- **Env-pin activation may be partitioned by owning Team.** When many Teams/agencies govern artifacts in
+  one deployment, a single `environments/prod.pins.yaml` forces them onto one shared activation commit even
+  though ownership (edit/approve) is already per-Team. Activation may therefore be **partitioned by owning
+  Team** into `environments/prod/<team>.pins.yaml` files, so **Teams release independently while the
+  deployment composes the partitions** into the effective pin set. This is **still a git commit per pin**
+  (BRIEF §21a — version control stays the write path; the registry is still only a downstream cache), and it
+  **scopes activation to the same ownership boundary that governs edit/approve**, *without* crossing the
+  tenancy line (Teams are sub-structures, not tenants). See
+  [09-deployment-and-topology.md](./09-deployment-and-topology.md) §6.3 and ADR-0025 (amended).
 
 ### 5.8 Reference-data (CodeSet) change governance and the deprecation/impact-review flow
 
