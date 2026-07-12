@@ -7,7 +7,8 @@ we know when we decided it?"** — with a full, reconstructable causal chain tha
 support staff, adverse-action letters, and AI agents from *one* source. It specifies:
 
 - The **DecisionRecord** as a first-class typed domain object per `case_id`, and the typed, queryable
-  **"why" API** over it.
+  **"why" API** over it — including the **lifecycle audit + verification** of issued **`Document`s**
+  (permits/certificates/offers) and their crypto-shredding-compatible redaction (§1.6).
 - **Storage strategy** — event-source only the decision/flow core; append-only audit tables +
   transactional outbox elsewhere; optional tamper-evident ledger SPI; bitemporal "as-of" with a
   PostgreSQL-first pragmatism and XTDB as an optional audit store.
@@ -163,6 +164,41 @@ Post-submission operations — **amendment, cancellation, appeal, withdrawal, co
 the artifact's versions** (§1.1, the versioned governed output artifact), so the causal chain survives
 amendments and every version is **bitemporally as-of reconstructable** (§3). A correction's child Case
 references the parent DecisionRecord, keeping the lineage queryable end to end.
+
+### 1.6 Issued Documents — lifecycle events, verification, and redaction
+
+The **versioned governed output artifact** a Case emits (§1.5, §1.1) is a **`Document`** issued by an
+`issue-document` step ([04-flow-and-case-layer.md](./04-flow-and-case-layer.md) §2.9) — a permit, licence,
+certificate, or grant Letter of Offer. Its issuance and its whole later lifecycle are **audit-first-class**,
+recorded as distinct, queryable events in the same append-only DecisionRecord stream (§1.1, §2.2),
+`case_id`-correlated, exactly like obligation-breach and SLA-pause events (§4.6):
+
+- **`document.allocated` / `document.issued` / `document.delivered`** — the reference number drawn from its
+  number-allocation contract (gap-free vs gapped, doc 04 §2.9.1), the Document issued from a **data snapshot +
+  a pinned `doctemplate` version**, and delivered to a Portal and/or notification Adapter. Each carries the
+  reference number, the template pin, the snapshot reference, the verification hash, and the actor.
+- **`document.superseded`** — a reissue/variation (§1.5 amend/correct) minted a **new version** that
+  supersedes its predecessor; the DecisionRecord spans all versions.
+- **`document.revoked`** — a cancellation/clawback terminated it with a `cancellation-reasons` codeRef.
+- **`document.accepted` / `document.declined`** — for an **offer-type** Document (doc 04 §2.9.2), the
+  holder's decision, with its timestamp and actor — the acceptance participates in the Flow *and* is on the
+  causal chain, so "issued, and accepted at T by whom" is answerable.
+
+**Verification reads this same record.** The optional **public verification endpoint** (doc 04 §2.9.4) does
+not consult a side store — it returns the Document's **current lifecycle status** (`issued | superseded |
+revoked | accepted`) and a hash match from the DecisionRecord, so a presenter's authenticity/status check and
+an auditor's "what did we issue and is it still valid" query are guaranteed consistent. The endpoint is
+**data-minimal by construction** — status + authenticity, never Case contents (doc 07 §15.6).
+
+**Redaction — immutability vs GDPR (crypto-shredding).** A `Document` is immutable, but its **binary is
+derived** (doc 04 §2.9.3): canonical truth is the data snapshot + template pin. Erasure therefore reconciles
+with immutability the same way as the rest of the record (open-q4): the snapshot's PII is encrypted per
+subject, **erasure destroys the key** and the cached binary is purged from object storage (doc 02 §11) — the
+PII and any re-render become unrecoverable, while the Document's **structural** record (reference number,
+lifecycle events, hash, version lineage) stays intact so the audit chain and the number register remain
+verifiable. The honest limit: after shredding, the verification hash can still prove *a* Document existed
+with that status and lineage, but the **content** it attested is gone by design — which is exactly the GDPR
+Art. 17 outcome, not a gap.
 
 ---
 
@@ -455,7 +491,8 @@ packaged BI embed + SSO + PDP-scoped embedding lands after v1). A cross-pointer 
 | OpenLineage / BCBS 239 data lineage | **compliance profile** (OSS, optional install; not v1-core) | Deeper warehouse/pipeline coverage |
 | Reporting: governed read models (cases/outcomes/conditions/SLAs/decision stats) | ✅ (projections are the §4.4 substrate) | **Embedded OSS BI** (Metabase/Superset) + SSO-via-broker + PDP-scoped embedding (Part 7, ADR-0021) — post-v1 |
 | Deterministic replay as forensic tool | ✅ | One-command repro env parity across tiers |
-| Crypto-shredding redaction (§7) | ✅ (design) | Automated retention-policy engine |
+| Document issuance lifecycle events + data-minimal public verification (§1.6) | ✅ | Externally-anchored/notarized verification (e.g. transparency-log) |
+| Crypto-shredding redaction (§1.6, open-q4) | ✅ (design) | Automated retention-policy engine |
 
 ---
 

@@ -267,6 +267,9 @@ Following the Temporal-MCP pattern (small default set, opt-in for power; researc
   known, outcome — the *same* object a human/auditor UI renders (doc 08).
 - `get_workflow_history(workflow_id, limit=200, page?)` → Temporal-style event history, paginated.
 - `list_stuck_cases(since, stage?, error_class?)` → structured, filtered triage feed.
+- `get_case_documents(case_id)` → the issued **`Document`**s for a Case (doc 04 §2.9) — reference number,
+  version, lifecycle status, `doctemplate` pin, verification hash — **PDP-scoped** so a caller sees only
+  Documents it may see (doc 07 §15.6). Read-only.
 - `get_resources(topic)` → the **pinned, authoritative reference set** for a topic (§2.5) — e.g.
   `decision-layer` returns the version-matched Drools/DMN/DMN-TCK/FEEL/decision-source pointers (or
   their vendored offline copies in an air-gapped install), so a runtime agent reasons from the same
@@ -285,7 +288,9 @@ Following the Temporal-MCP pattern (small default set, opt-in for power; researc
   effects.
 
 **Tier-2 — production-mutating (JIT non-human identity + human approval + audit; `destructiveHint: true`)**
-- `signal_workflow` · `retry_activity` · `cancel_workflow` · `re_drive_case` · `patch_case_data`.
+- `signal_workflow` · `retry_activity` · `cancel_workflow` · `re_drive_case` · `patch_case_data` ·
+  `reissue_document` · `revoke_document` (the last two mutate an issued Document's lifecycle — reissue a new
+  version / revoke on clawback, doc 04 §2.9.2 — as audited DecisionRecord events, doc 08 §1.6).
   Every call: a scoped short-lived credential, an approval gate, and an entry in the audit ledger
   (doc 08) attributing the action to the agent's non-human identity. **Prefer re-drive/repro over
   in-place mutation** wherever possible (research 07 §8.3).

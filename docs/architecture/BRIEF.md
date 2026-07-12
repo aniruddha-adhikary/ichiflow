@@ -49,7 +49,13 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
    compensation paths) — reusing the same await-signal + pausable-SLA machinery, with *which* external
    system to use itself a Decision. Transport is pluggable beneath the one step via the Adapter
    request-reply bindings (HTTP sync/callback/polling + message-queue request-reply in v1; an **SFTP
-   file round-trip** profile is **designed now, implemented post-v1**) (ADR-0028).
+   file round-trip** profile is **designed now, implemented post-v1**) (ADR-0028). The closed set also gains
+   a canonical **`issue-document` step**: approvals **issue** immutable, versioned domain **Documents**
+   (a Customs Clearance Permit, a grant Letter of Offer) from a data snapshot + Outcome via a governed
+   **`doctemplate`**, allocating a reference number and driving a Document lifecycle — canonical (not a
+   compute-variant) because it owns exactly-once-memoized number allocation + lifecycle mutation (+ the
+   offer-acceptance await), while the pure render is a **pluggable rendering-engine SPI** beneath it
+   (ADR-0029).
 3. **Deployment target**: self-hosted enterprise first (K8s/Helm/operator, air-gap capable),
    with a single-binary/docker-compose dev mode; progressive ladder from laptop to zoned HA.
 4. **Languages**: Kotlin core (rules eval, flow **activity** workers, core domain services),
@@ -247,6 +253,26 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   (the SFTP profile is **designed now, implemented post-v1**). Failure is a first-class taxonomy
   (no-response timeout / negative-ack / malformed → DLQ + Case surfacing). See doc 04 §2.8/§5.8, doc 05
   §11, ADR-0028.
+- **Document** — an **immutable, versioned, issued artifact** a Case produces: a permit, licence,
+  certificate, or grant **Letter of Offer**, generated from a **data snapshot + Outcome** through a
+  `doctemplate`, stamped with an allocated **reference number** (**gap-free** or **gapped** per its
+  number-allocation contract) and a **verification hash** (+ an optional QR/**public verification endpoint**
+  that confirms authenticity + current status **without exposing Case data**). Lifecycle: `issued →
+  superseded` (reissue/variation) `→ revoked` (cancellation/clawback), each an audited DecisionRecord event;
+  an **offer-type** Document adds `issued → accepted | declined`, **participating in the Flow**. The
+  **binary is derived** (data snapshot + template version → deterministic re-render), so it is a cache, not
+  the truth — this is the versioned governed output artifact of doc 04 §5.1. See doc 04 §2.9, doc 07 §15,
+  doc 08 §1.6, ADR-0029.
+- **doctemplate** — a **governed designer artifact class** (sibling of uischema/pageschema/copyset): a
+  versioned template binding **schema'd fields → a print/PDF layout**, authored via **AI chat + read-only
+  preview** (Design Kit) and rendered through a **pluggable rendering-engine SPI** (**Typst** default;
+  WeasyPrint alternative), i18n via copyset/CodeSet display, **PDF/UA** accessibility. See doc 07 §15,
+  ADR-0029.
+- **issue-document** — the **canonical Flow step** that issues a **Document**: declares a `doctemplate` ref
+  + field binding + number-allocation ref + **delivery** (portal link and/or outbound notification adapter).
+  Canonical, not an extension compute-variant, because it owns exactly-once-memoized **number allocation +
+  Document-lifecycle mutation** (and, for offers, the acceptance await); the render is a **pure activity
+  dispatched beneath it** through the rendering SPI. See doc 04 §2.9, §5.1, ADR-0029.
 - **Case** — a unit of business work flowing through Flows (incl. manual review); carries the
   global `case_id` and its DecisionRecord. Supports post-submission operations (amend, cancel,
   withdraw, appeal, correct).
