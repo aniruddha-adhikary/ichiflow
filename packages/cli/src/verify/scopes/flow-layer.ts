@@ -35,6 +35,10 @@ interface VectorOutcome {
   slaMatch: boolean;
   traceStepIds: string[];
   traceComplete: boolean;
+  caseId: string;
+  events: string[];
+  expectedEvents: string[] | null;
+  eventsMatch: boolean;
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
@@ -66,9 +70,11 @@ function buildAjv(): Ajv2020 {
  * (`FlowConformanceVector.json` → `Flow.json`) — an ill-formed step or unknown `ref` is rejected. **Skeleton
  * conformance**: the same interpreter, run over each vector on Temporal's time-skipping test env, hits
  * each vector's independently-pinned oracle (final blackboard/steps/SLA + a complete per-step trace +
- * timer fast-forward) and its history
- * replays twice with no non-determinism violation. The DSL check runs in-process (deterministic); the
- * interpreter run is captured by `${PRODUCER}` into the verdict artifact this scope reads.
+ * the pinned Case/Task **event history** (§5.1/§5.2) where declared, keyed by a non-empty `case_id` +
+ * timer fast-forward) and its history replays twice with no non-determinism violation. Phase 3.3
+ * vectors exercise assignment-as-Decision (§5.3), the pausable SLA clock (§5.7), and the escalation
+ * chain (§5.2) under time-skip. The DSL check runs in-process (deterministic); the interpreter run is
+ * captured by `${PRODUCER}` into the verdict artifact this scope reads.
  */
 export const flowLayerScope: Scope = {
   id: "flow-layer",
@@ -154,10 +160,26 @@ export const flowLayerScope: Scope = {
       checks.push(
         assert(
           `flow-layer.vector.${v.flowId}`,
-          v.varsMatch && v.stepsMatch && v.slaMatch && v.traceComplete && v.fastForwarded,
+          v.varsMatch &&
+            v.stepsMatch &&
+            v.slaMatch &&
+            v.traceComplete &&
+            v.eventsMatch &&
+            v.fastForwarded,
           {
-            expected: `vars=${JSON.stringify(v.expectedVars)}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, complete trace, fast-forwarded`,
-            actual: `vars=${JSON.stringify(v.vars)}, steps=${v.steps}, slaMs=${v.slaMs}, traceComplete=${v.traceComplete}, fastForwarded=${v.fastForwarded}`,
+            expected: `vars=${JSON.stringify(v.expectedVars)}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, complete trace, events=${JSON.stringify(v.expectedEvents)}, fast-forwarded`,
+            actual: `vars=${JSON.stringify(v.vars)}, steps=${v.steps}, slaMs=${v.slaMs}, traceComplete=${v.traceComplete}, events=${JSON.stringify(v.events)}, eventsMatch=${v.eventsMatch}, fastForwarded=${v.fastForwarded}`,
+          },
+        ),
+      );
+      // The Case must carry a global case_id (doc 04 §5.1) — the key the DecisionRecord (3.4) stitches by.
+      checks.push(
+        assert(
+          `flow-layer.case-id.${v.flowId}`,
+          typeof v.caseId === "string" && v.caseId.length > 0,
+          {
+            expected: "a non-empty case_id",
+            actual: JSON.stringify(v.caseId),
           },
         ),
       );

@@ -14,6 +14,10 @@ interface TraceEntry {
   type: string;
 }
 
+interface CaseEvent {
+  type: string;
+}
+
 export interface ReplayOutcome {
   attempt: number;
   ok: boolean;
@@ -35,6 +39,11 @@ export interface VectorOutcome {
   /** One typed trace entry per executed step (doc 04 §2.6) — proves every declared step ran, in order. */
   traceStepIds: string[];
   traceComplete: boolean;
+  /** The Case's `case_id` (doc 04 §5.1) and its ordered Case/Task event-history types (§5.2). */
+  caseId: string;
+  events: string[];
+  expectedEvents: string[] | null;
+  eventsMatch: boolean;
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
@@ -50,10 +59,12 @@ export interface ConformanceResult {
 
 interface WorkflowReturn {
   flowId: string;
+  caseId: string;
   steps: number;
   vars: Vars;
   slaMs: number;
   trace: TraceEntry[];
+  events: CaseEvent[];
 }
 
 function shallowEqualVars(a: Vars, b: Vars): boolean {
@@ -96,14 +107,19 @@ export async function runConformance(opts: {
           taskQueue: "flow-conformance",
         });
 
-        // Deliver scripted resolutions at their declared offsets; time-skip advances the clock between them.
+        // Deliver scripted signals (resolve / pause / resume) at their declared offsets; time-skip
+        // advances the clock between them so pausable-SLA windows and month-long budgets verify in ms.
         let clock = 0;
         for (const sig of [...(vector.signals ?? [])].sort((a, b) => a.afterMs - b.afterMs)) {
           if (sig.afterMs > clock) {
             await env.sleep(sig.afterMs - clock);
             clock = sig.afterMs;
           }
-          await handle.signal("resolveTask", { stepId: sig.stepId, value: sig.value });
+          await handle.signal("taskSignal", {
+            stepId: sig.stepId,
+            action: sig.action ?? "resolve",
+            value: sig.value,
+          });
         }
 
         const ret = (await handle.result()) as WorkflowReturn;
@@ -125,6 +141,8 @@ export async function runConformance(opts: {
         }
 
         const traceStepIds = ret.trace.map((t) => t.stepId);
+        const events = ret.events.map((e) => e.type);
+        const expectedEvents = vector.expect.events ?? null;
         outcomes.push({
           name: vector.name,
           flowId: vector.flow.id,
@@ -141,6 +159,13 @@ export async function runConformance(opts: {
           traceComplete:
             traceStepIds.length === vector.flow.steps.length &&
             traceStepIds.every((id, i) => id === vector.flow.steps[i]?.id),
+          caseId: ret.caseId,
+          events,
+          expectedEvents,
+          eventsMatch:
+            expectedEvents === null ||
+            (events.length === expectedEvents.length &&
+              events.every((t, i) => t === expectedEvents[i])),
           replays,
           replayClean: replays.every((r) => r.ok),
           // No scheduled wait ⇒ nothing to fast-forward (trivially satisfied); otherwise require a 1000× collapse.
@@ -157,7 +182,13 @@ export async function runConformance(opts: {
     sdkVersion: SDK_VERSION,
     vectors: outcomes,
     vectorsGreen: outcomes.filter(
-      (o) => o.varsMatch && o.stepsMatch && o.slaMatch && o.traceComplete && o.fastForwarded,
+      (o) =>
+        o.varsMatch &&
+        o.stepsMatch &&
+        o.slaMatch &&
+        o.traceComplete &&
+        o.eventsMatch &&
+        o.fastForwarded,
     ).length,
     determinismClean: outcomes.every((o) => o.replayClean),
   };

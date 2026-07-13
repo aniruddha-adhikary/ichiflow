@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "SignalAction.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "resolve",
+            "description": "Resolve the Task with `value` (the reviewer's outcome)."
+        },
+        {
+            "type": "string",
+            "const": "pause",
+            "description": "Enter `awaiting-applicant` — pause (clock-stop) the SLA (§5.7)."
+        },
+        {
+            "type": "string",
+            "const": "resume",
+            "description": "Leave `awaiting-applicant` — resume the SLA clock (§5.7)."
+        }
+    ],
+    "description": "The action a scripted signal performs against a `human-task` step (doc 04 §5.2, §5.7)."
+}

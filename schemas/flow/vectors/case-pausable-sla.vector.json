@@ -1,0 +1,37 @@
+{
+  "name": "pausable SLA (§5.7) — a 10-day awaiting-applicant pause is excluded, so a 3-day budget survives a 12-day wall and resolves (not escalates)",
+  "flow": {
+    "id": "case-pausable-sla",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "x": 0 } },
+    "steps": [
+      {
+        "id": "review",
+        "type": "human-task",
+        "assignee": "ops-queue",
+        "slaMs": 259200000,
+        "out": "approved",
+        "onTimeout": -1
+      }
+    ]
+  },
+  "signals": [
+    { "afterMs": 86400000, "stepId": "review", "action": "pause" },
+    { "afterMs": 950400000, "stepId": "review", "action": "resume" },
+    { "afterMs": 1036800000, "stepId": "review", "action": "resolve", "value": 5 }
+  ],
+  "expect": {
+    "vars": { "x": 0, "approved": 5 },
+    "steps": 1,
+    "slaMs": 0,
+    "events": [
+      "case.created",
+      "task.created",
+      "task.assigned",
+      "sla.paused",
+      "sla.resumed",
+      "task.resolved",
+      "case.resolved"
+    ]
+  }
+}

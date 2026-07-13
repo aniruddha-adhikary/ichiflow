@@ -6,26 +6,28 @@ import { loadVectors } from "../src/vectors.js";
 
 const workflowsPath = join(dirname(fileURLToPath(import.meta.url)), "../src/interpreter.ts");
 
-describe("Phase 3.2 — flow-layer conformance (core step types)", () => {
+describe("Phase 3.2–3.3 — flow-layer conformance (core step types + Case/Task)", () => {
   let result: ConformanceResult;
 
   it("interprets every committed conformance vector on the time-skipping test env", async () => {
     result = await runConformance({ workflowsPath, vectors: loadVectors() });
-    expect(result.vectors.length).toBeGreaterThanOrEqual(6);
+    expect(result.vectors.length).toBeGreaterThanOrEqual(9);
   }, 120_000);
 
-  it("hits each vector's pinned oracle (blackboard, steps, SLA, trace, fast-forward)", () => {
+  it("hits each vector's pinned oracle (blackboard, steps, SLA, trace, events, fast-forward)", () => {
     for (const v of result.vectors) {
       expect(v.varsMatch, `${v.flowId} vars`).toBe(true);
       expect(v.stepsMatch, `${v.flowId} steps`).toBe(true);
       expect(v.slaMatch, `${v.flowId} slaMs`).toBe(true);
       expect(v.traceComplete, `${v.flowId} trace`).toBe(true);
+      expect(v.eventsMatch, `${v.flowId} events`).toBe(true);
+      expect(v.caseId.length, `${v.flowId} case_id`).toBeGreaterThan(0);
       expect(v.fastForwarded, `${v.flowId} fast-forward`).toBe(true);
     }
     expect(result.vectorsGreen).toBe(result.vectors.length);
   });
 
-  it("covers decision-eval (both branches) and human-task (resolve + escalate)", () => {
+  it("covers decision-eval, human-task resolve/escalate, and Case/Task (assignment, pausable SLA, escalation)", () => {
     const ids = result.vectors.map((v) => v.flowId);
     for (const id of [
       "decision-approve",
@@ -33,9 +35,25 @@ describe("Phase 3.2 — flow-layer conformance (core step types)", () => {
       "human-task-resolved",
       "human-task-escalated",
       "mixed-full",
+      "case-assignment",
+      "case-pausable-sla",
+      "case-escalation",
     ]) {
       expect(ids, `vector ${id} present`).toContain(id);
     }
+  });
+
+  it("pins the Case/Task event history for the pausable-SLA scenario (§5.7 clock-stop)", () => {
+    const pausable = result.vectors.find((v) => v.flowId === "case-pausable-sla")!;
+    expect(pausable.events).toEqual([
+      "case.created",
+      "task.created",
+      "task.assigned",
+      "sla.paused",
+      "sla.resumed",
+      "task.resolved",
+      "case.resolved",
+    ]);
   });
 
   it("replays every vector's history twice with no determinism violation", () => {
