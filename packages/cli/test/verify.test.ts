@@ -266,6 +266,36 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, JSON.stringify(body));
   };
+  const writeCoverage = (root: string, body: unknown) => {
+    const p = join(root, "core/build/projection-coverage-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
+  const goodCoverage = {
+    engine: "drools",
+    engineVersion: "10.2.0",
+    suite: "cov",
+    constructs: [
+      {
+        construct: "literalExpression",
+        decision: "R",
+        kind: "number",
+        expect: "42",
+        actual: "42",
+        errors: false,
+        covered: true,
+      },
+      {
+        construct: "relation",
+        decision: "Rows",
+        kind: "list",
+        expect: "[{a=1}]",
+        actual: "[{a=1}]",
+        errors: false,
+        covered: true,
+      },
+    ],
+  };
 
   it("passes when every TCK case matches and capabilities conform", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
@@ -296,11 +326,70 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
           },
         ],
       });
+      writeCoverage(tmp, goodCoverage);
       const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
       expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
       const green = checks.find((c) => c.id === "decision-layer.tck-cases-green")!;
       expect(green.value).toBe(2);
       expect(green.threshold).toBe(2);
+      const covered = checks.find((c) => c.id === "decision-layer.constructs-covered")!;
+      expect(covered.value).toBe(2);
+      expect(covered.threshold).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the uncovered construct and the constructs-covered aggregate", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      writeResults(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        suite: "s",
+        capabilities: goodCaps,
+        cases: [],
+      });
+      writeCoverage(tmp, {
+        ...goodCoverage,
+        constructs: [
+          goodCoverage.constructs[0],
+          {
+            construct: "relation",
+            decision: "Rows",
+            kind: "list",
+            expect: "[{a=1}]",
+            actual: null,
+            errors: true,
+            covered: false,
+            message: "RuntimeException: boom",
+          },
+        ],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decision-layer.projection.relation");
+      expect(failed).toContain("decision-layer.constructs-covered");
+      expect(failed).not.toContain("decision-layer.projection.literalExpression");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the projection-coverage artifact is missing", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      writeResults(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        suite: "s",
+        capabilities: goodCaps,
+        cases: [],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const present = checks.find((c) => c.id === "decision-layer.coverage-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("runProjectionCoverage");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

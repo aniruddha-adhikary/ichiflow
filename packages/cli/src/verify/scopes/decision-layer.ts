@@ -5,6 +5,8 @@ import type { CheckResult, Scope, ScopeContext } from "../types.js";
 
 const RESULTS_REL = "core/build/decision-tck-results.json";
 const JVM_COMMAND = "cd core && ./gradlew runDecisionTck";
+const COVERAGE_REL = "core/build/projection-coverage-results.json";
+const COVERAGE_COMMAND = "cd core && ./gradlew runProjectionCoverage";
 
 interface Capabilities {
   engineId: string;
@@ -33,6 +35,24 @@ interface Results {
   suite: string;
   capabilities: Capabilities;
   cases: CaseResult[];
+}
+
+interface ConstructResult {
+  construct: string;
+  decision: string;
+  kind: string | null;
+  expect: string | null;
+  actual: string | null;
+  errors: boolean;
+  covered: boolean;
+  message?: string;
+}
+
+interface CoverageResults {
+  engine: string;
+  engineVersion: string;
+  suite: string;
+  constructs: ConstructResult[];
 }
 
 /** Numeric-tolerant equality for `kind: "number"` cases so FEEL scale (`80` vs `80.0`) is not a mismatch. */
@@ -126,6 +146,47 @@ export const decisionLayerScope: Scope = {
       threshold: results.cases.length,
     });
 
+    checks.push(...coverageChecks(repoRoot));
+
     return checks;
   },
 };
+
+/**
+ * Projection-coverage checks (build plan 2.2): every construct in the DMN feature matrix must
+ * project one-way to DMN 1.6 and execute correctly on the reference engine. Asserts each construct is
+ * covered plus the aggregate `constructs_covered == total`.
+ */
+function coverageChecks(repoRoot: string): CheckResult[] {
+  const coveragePath = join(repoRoot, COVERAGE_REL);
+  if (!existsSync(coveragePath)) {
+    return [
+      fail("decision-layer.coverage-present", {
+        diff: `missing ${COVERAGE_REL}; run \`${COVERAGE_COMMAND}\` to project the feature matrix on the SPI engine`,
+      }),
+    ];
+  }
+
+  const coverage = JSON.parse(readFileSync(coveragePath, "utf8")) as CoverageResults;
+  const checks: CheckResult[] = [];
+  let covered = 0;
+  for (const c of coverage.constructs) {
+    if (c.covered) covered += 1;
+    checks.push(
+      assert(`decision-layer.projection.${c.construct}`, c.covered, {
+        expected: `${c.decision} = ${c.expect ?? "(none)"} (projects + executes)`,
+        actual: c.message ?? (c.errors ? "errored" : (c.actual ?? "(none)")),
+      }),
+    );
+  }
+
+  checks.push({
+    id: "decision-layer.constructs-covered",
+    status: covered === coverage.constructs.length ? "pass" : "fail",
+    metric: "constructs_covered",
+    value: covered,
+    threshold: coverage.constructs.length,
+  });
+
+  return checks;
+}

@@ -1,0 +1,254 @@
+{
+  "suite": "ichiflow-dmn-projection-coverage",
+  "note": "The DMN 1.6 feature matrix the decision-source projector (DecisionSourceCompiler) must cover (build plan 2.2, ADR-0027). Each construct embeds a decision-source that is compiled one-way to DMN and executed on the reference engine behind the SPI; `covered` iff the projected model executes and matches the expected outcome. Expected strings are the reference engine's deterministic FEEL result form.",
+  "constructs": [
+    {
+      "construct": "literalExpression",
+      "decision": "Result",
+      "kind": "number",
+      "inputs": { "N": 21 },
+      "expect": "42",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/literal",
+        "name": "literal",
+        "inputs": [{ "name": "N", "type": "number" }],
+        "decision": { "name": "Result", "type": "number", "requires": ["N"], "literal": "N * 2" }
+      }
+    },
+    {
+      "construct": "feelBuiltins",
+      "decision": "Result",
+      "kind": "string",
+      "inputs": { "Name": "alice" },
+      "expect": "ALI5",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/feel",
+        "name": "feel",
+        "inputs": [{ "name": "Name", "type": "string" }],
+        "decision": {
+          "name": "Result",
+          "type": "string",
+          "requires": ["Name"],
+          "literal": "upper case(substring(Name, 1, 3)) + string(string length(Name))"
+        }
+      }
+    },
+    {
+      "construct": "decisionTable.UNIQUE",
+      "decision": "Grade",
+      "kind": "string",
+      "inputs": { "Score": 95 },
+      "expect": "A",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/dt-unique",
+        "name": "dtUnique",
+        "inputs": [{ "name": "Score", "type": "number" }],
+        "decision": {
+          "name": "Grade",
+          "type": "string",
+          "requires": ["Score"],
+          "decisionTable": {
+            "hitPolicy": "UNIQUE",
+            "inputs": [{ "expr": "Score", "type": "number" }],
+            "output": { "type": "string" },
+            "rules": [
+              { "whenTests": [">= 90"], "then": "\"A\"" },
+              { "whenTests": ["[70..90)"], "then": "\"B\"" },
+              { "whenTests": ["< 70"], "then": "\"C\"" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "construct": "decisionTable.FIRST",
+      "decision": "Band",
+      "kind": "string",
+      "inputs": { "Amount": 150 },
+      "expect": "HIGH",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/dt-first",
+        "name": "dtFirst",
+        "inputs": [{ "name": "Amount", "type": "number" }],
+        "decision": {
+          "name": "Band",
+          "type": "string",
+          "requires": ["Amount"],
+          "decisionTable": {
+            "hitPolicy": "FIRST",
+            "inputs": [{ "expr": "Amount", "type": "number" }],
+            "output": { "type": "string" },
+            "rules": [
+              { "whenTests": ["> 100"], "then": "\"HIGH\"" },
+              { "whenTests": ["> 0"], "then": "\"POSITIVE\"" },
+              { "whenTests": ["-"], "then": "\"NONE\"" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "construct": "decisionTable.COLLECT",
+      "decision": "Tags",
+      "kind": "list",
+      "inputs": { "N": 50 },
+      "expect": "[positive, small]",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/dt-collect",
+        "name": "dtCollect",
+        "inputs": [{ "name": "N", "type": "number" }],
+        "decision": {
+          "name": "Tags",
+          "type": "string",
+          "requires": ["N"],
+          "decisionTable": {
+            "hitPolicy": "COLLECT",
+            "inputs": [{ "expr": "N", "type": "number" }],
+            "output": { "type": "string" },
+            "rules": [
+              { "whenTests": ["> 0"], "then": "\"positive\"" },
+              { "whenTests": ["< 100"], "then": "\"small\"" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "construct": "businessKnowledgeModel",
+      "decision": "Fee",
+      "kind": "number",
+      "inputs": { "Region": "A" },
+      "expect": "100",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/bkm",
+        "name": "bkm",
+        "inputs": [{ "name": "Region", "type": "string" }],
+        "bkms": [
+          {
+            "name": "Base Fee",
+            "type": "number",
+            "parameters": [{ "name": "region", "type": "string" }],
+            "body": "if region = \"A\" then 100 else 200"
+          }
+        ],
+        "decision": {
+          "name": "Fee",
+          "type": "number",
+          "requires": ["Region"],
+          "knowledge": ["Base Fee"],
+          "context": [
+            {
+              "name": "base",
+              "type": "number",
+              "invoke": { "bkm": "Base Fee", "bindings": { "region": "Region" } }
+            },
+            { "result": true, "expr": "base" }
+          ]
+        }
+      }
+    },
+    {
+      "construct": "invocation",
+      "decision": "Doubled",
+      "kind": "number",
+      "inputs": { "N": 8 },
+      "expect": "16",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/invoke",
+        "name": "invoke",
+        "inputs": [{ "name": "N", "type": "number" }],
+        "bkms": [
+          {
+            "name": "Double",
+            "type": "number",
+            "parameters": [{ "name": "x", "type": "number" }],
+            "body": "x * 2"
+          }
+        ],
+        "decision": {
+          "name": "Doubled",
+          "type": "number",
+          "requires": ["N"],
+          "knowledge": ["Double"],
+          "invoke": { "bkm": "Double", "bindings": { "x": "N" } }
+        }
+      }
+    },
+    {
+      "construct": "context",
+      "decision": "Net",
+      "kind": "number",
+      "inputs": { "Price": 100 },
+      "expect": "80",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/context",
+        "name": "context",
+        "inputs": [{ "name": "Price", "type": "number" }],
+        "decision": {
+          "name": "Net",
+          "type": "number",
+          "requires": ["Price"],
+          "context": [
+            { "name": "rate", "type": "number", "expr": "0.2" },
+            { "result": true, "expr": "Price * (1 - rate)" }
+          ]
+        }
+      }
+    },
+    {
+      "construct": "informationRequirement",
+      "decision": "Final",
+      "kind": "number",
+      "inputs": { "N": 4 },
+      "expect": "50",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/inforeq",
+        "name": "inforeq",
+        "inputs": [{ "name": "N", "type": "number" }],
+        "decisions": [
+          { "name": "Base", "type": "number", "requires": ["N"], "literal": "N + 1" },
+          {
+            "name": "Final",
+            "type": "number",
+            "requiresDecisions": ["Base"],
+            "literal": "Base * 10"
+          }
+        ]
+      }
+    },
+    {
+      "construct": "list",
+      "decision": "Nums",
+      "kind": "list",
+      "inputs": {},
+      "expect": "[1, 2, 3]",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/list",
+        "name": "list",
+        "decision": { "name": "Nums", "type": "Any", "list": ["1", "2", "3"] }
+      }
+    },
+    {
+      "construct": "relation",
+      "decision": "Rows",
+      "kind": "list",
+      "inputs": {},
+      "expect": "[{a=1, b=2}, {a=3, b=4}]",
+      "source": {
+        "namespace": "https://ichiflow.ai/dmn/cov/relation",
+        "name": "relation",
+        "decision": {
+          "name": "Rows",
+          "type": "Any",
+          "relation": {
+            "columns": ["a", "b"],
+            "rows": [
+              ["1", "2"],
+              ["3", "4"]
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

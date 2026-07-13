@@ -82,6 +82,9 @@ jobs:
       - name: Decision layer — DMN-TCK subset on the SPI reference engine
         run: pnpm decision-tck:jvm
 
+      - name: Decision layer — decision-source→DMN projection coverage (feature matrix)
+        run: pnpm projection:jvm
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

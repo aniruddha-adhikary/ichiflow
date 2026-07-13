@@ -121,6 +121,10 @@ resources:
     kind: pattern
     path: schemas/decision-tck/cases.json
     description: Expected-outcome vectors for the DMN-TCK subset consumed by the decision-layer scope.
+  - id: projection-coverage-matrix
+    kind: pattern
+    path: schemas/decision-source/projection/matrix.json
+    description: The DMN feature matrix (build plan 2.2) — each construct's decision-source, inputs, and expected outcome; projected to DMN 1.6 and executed on the SPI engine by runProjectionCoverage.
   - id: code-quality
     kind: harness
     path: packages/cli/src/verify/scopes/code-quality.ts

@@ -27,6 +27,7 @@
     "vectors:jvm": "cd core && ./gradlew -q runContractVectors",
     "decision:jvm": "cd core && ./gradlew -q runDecisionSpike",
     "decision-tck:jvm": "cd core && ./gradlew -q runDecisionTck",
+    "projection:jvm": "cd core && ./gradlew -q runProjectionCoverage",
     "quality:jvm": "cd core && ./gradlew -q detekt test",
     "verify": "node packages/cli/dist/cli.js verify"
   },
