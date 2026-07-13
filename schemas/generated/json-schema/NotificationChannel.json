@@ -1,0 +1,17 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationChannel.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "email",
+            "description": "Email — delivered through an SMTP/ESP provider driver."
+        },
+        {
+            "type": "string",
+            "const": "sms",
+            "description": "SMS — delivered through an SMS-gateway provider driver."
+        }
+    ],
+    "description": "The outbound channel a notification is delivered over (doc 05 §4.2). Each is an ordinary outbound\nAdapter port type whose provider driver is selected by this value; the v1 delivery SPI ships an\nemail (SMTP/ESP) driver and an SMS (gateway) driver, both driven against a mock (no live provider)."
+}

@@ -19,40 +19,41 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 
 ## Commands
 
-| Command                                 | What it does                                                                     |
-| --------------------------------------- | -------------------------------------------------------------------------------- |
-| `pnpm install`                          | Install the TS workspace.                                                        |
-| `pnpm build`                            | Build every workspace package.                                                   |
-| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.                                |
-| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).                        |
-| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).                                |
-| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.                             |
-| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                            |
-| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.                     |
-| `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).                      |
-| `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.            |
-| `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).               |
-| `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).            |
-| `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).                        |
-| `pnpm interpreter:spike`                | Run the flow-interpreter determinism harness on Temporal (chunk 3.0).            |
-| `pnpm flow:conformance`                 | Interpret the flow-JSON DSL conformance vectors on Temporal (chunk 3.1).         |
-| `pnpm entity:jvm`                       | Replay the entity-store CRUD/audit/outbox vectors (chunk 4.1).                   |
-| `pnpm api:contract`                     | Replay the generated-BFF API contract vectors vs emitted OpenAPI (4.2).          |
-| `pnpm authz:jvm`                        | Replay the authz PDP allow/deny vectors + design-time=runtime parity (4.3).      |
-| `pnpm ui:generate`                      | (Re)generate the generated-once baseline uischema from the data schema (4.5).    |
-| `pnpm ui:preview`                       | Render the PDP-state stories + axe-core AA + preview snapshots (uischema, 4.5).  |
-| `pnpm portal:preview`                   | Render the Portal inbox + Case/review harness → `portal-results.json` (4.4).     |
-| `pnpm adapters:preview`                 | Run adapter mapping goldens + binding contracts + idempotency/DLQ vectors (5.1). |
-| `pnpm issuance:preview`                 | Run Document render/number/lifecycle/verification vectors (5.3).                 |
-| `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.                         |
-| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).                        |
-| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                                 |
-| `pnpm contract:diff`                    | Run oasdiff → write the breaking-change results `contract-gate` reads.           |
-| `pnpm contract:accept`                  | Accept an intentional contract change (advance the baseline).                    |
-| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                               |
-| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                           |
+| Command                                 | What it does                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm install`                          | Install the TS workspace.                                                         |
+| `pnpm build`                            | Build every workspace package.                                                    |
+| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.                                 |
+| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).                         |
+| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).                                 |
+| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.                              |
+| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                             |
+| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.                      |
+| `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).                       |
+| `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.             |
+| `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).                |
+| `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).             |
+| `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).                         |
+| `pnpm interpreter:spike`                | Run the flow-interpreter determinism harness on Temporal (chunk 3.0).             |
+| `pnpm flow:conformance`                 | Interpret the flow-JSON DSL conformance vectors on Temporal (chunk 3.1).          |
+| `pnpm entity:jvm`                       | Replay the entity-store CRUD/audit/outbox vectors (chunk 4.1).                    |
+| `pnpm api:contract`                     | Replay the generated-BFF API contract vectors vs emitted OpenAPI (4.2).           |
+| `pnpm authz:jvm`                        | Replay the authz PDP allow/deny vectors + design-time=runtime parity (4.3).       |
+| `pnpm ui:generate`                      | (Re)generate the generated-once baseline uischema from the data schema (4.5).     |
+| `pnpm ui:preview`                       | Render the PDP-state stories + axe-core AA + preview snapshots (uischema, 4.5).   |
+| `pnpm portal:preview`                   | Render the Portal inbox + Case/review harness → `portal-results.json` (4.4).      |
+| `pnpm adapters:preview`                 | Run adapter mapping goldens + binding contracts + idempotency/DLQ vectors (5.1).  |
+| `pnpm issuance:preview`                 | Run Document render/number/lifecycle/verification vectors (5.3).                  |
+| `pnpm notifications:preview`            | Run notification render goldens + delivery-SPI selection + idempotency/DLQ (5.4). |
+| `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.                          |
+| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).                         |
+| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                                  |
+| `pnpm contract:diff`                    | Run oasdiff → write the breaking-change results `contract-gate` reads.            |
+| `pnpm contract:accept`                  | Accept an intentional contract change (advance the baseline).                     |
+| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                                |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                            |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `issuance`, `code-quality`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `issuance`, `notifications`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -130,6 +131,19 @@ produces normalized-identical bytes twice and passes binding-scope + PDF/UA/cont
 is memoized by `(case_id, step.id)` with gap-free/gapped semantics; issued→superseded/revoked/accepted
 transitions are audited; replay cannot allocate or issue twice; and genuine/tampered/unknown public
 verification vectors return only status/hash authenticity metadata. Run `pnpm issuance:preview` first.
+`notifications` is the Phase 5.4 notification gate (doc 05 §4.2): it proves the **outbound notification
+boundary** — email/SMS as ordinary outbound Adapter port types — **without a live provider**. Committed
+`NotificationTemplate`/render-golden/reliability fixtures (`schemas/notifications/`) validate against
+their emitted TypeSpec schemas (**contract tests**); each governed template's **pure** per-locale render
+reproduces its `RenderedMessage` golden (a template/param change is a visible diff) and every v1 channel
+(email/sms) is covered; the **delivery SPI** selects a provider driver per channel and a message really
+passes through the mock capture driver; and the idempotency/DLQ vectors hold — a duplicate
+`notificationId` is deduped once, a poison provider lands in the DLQ after bounded attempts, and a crash
+redelivery sends once (`dedup: pass`, `dlq: pass`). Delivery emits the `notify.*` **adapter-call** events
+the DecisionRecord stitches (build plan 5.4). Run `pnpm notifications:preview` first. Phase 5.4 also
+re-greens `decisionrecord`: the orphan detector now stitches the **issuance** (`document.*`) and
+**notification/adapter-call** (`notify.*`) correlation families, so an issued Document that never
+delivers, or a `notify.sent` with no originating `notify.requested`, is a flagged orphan.
 
 ## Layout
 
@@ -142,6 +156,7 @@ verification vectors return only status/hash authenticity metadata. Run `pnpm is
 - `packages/portal/` — the Phase 4.4 first Portal (React, headless under jsdom): a PDP-filtered SLA-ordered Task inbox + Case/review view (decision trace, an action form that signals the Flow, obligation checklist, field-level entitlements) + its deterministic `portal:preview` harness.
 - `packages/adapters/` — the Phase 5.1 adapter runtime: the canonical↔wire boundary — pure declarative Message-Translator mappings, REST/broker/webhook bindings, and the Idempotent Receiver / DLQ reliability machinery + its deterministic `adapters:preview` harness (mapping goldens · contract round-trips · idempotency/DLQ vectors), all against mocks.
 - `packages/issuance/` — the Phase 5.3 issuance core: deterministic Typst-default rendering SPI, exactly-once number allocator, immutable Document registry/lifecycle, data-minimal verification, and the `issuance:preview` harness.
+- `packages/notifications/` — the Phase 5.4 notifications layer: email/SMS as ordinary outbound Adapter port types (doc 05 §4.2) — a governed per-locale template renderer (pure), a provider delivery SPI selected by channel, and the Idempotent Receiver / DLQ reliability machinery + its deterministic `notifications:preview` harness (render goldens · driver selection · idempotency/DLQ vectors), all against mocks.
 - `core/` — the Kotlin core (Gradle); generated contract models (Fabrikt) in `core/generated/`.
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
 - `.ichiflow/resources.manifest.yaml` — version pins + named resources (doc 10 §2.5).

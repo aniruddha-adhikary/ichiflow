@@ -1,0 +1,27 @@
+{
+  "name": "permit-issued email renders the en subject + body with all params substituted",
+  "templateId": "permit-issued@1.0.0",
+  "request": {
+    "schemaVersion": "notification/v1",
+    "notificationId": "notif-permit-000123-en",
+    "correlationId": "case-permit-1/issue",
+    "caseId": "case-permit-1",
+    "stepId": "issue",
+    "template": "permit-issued@1.0.0",
+    "locale": "en",
+    "recipient": "jordan@example.test",
+    "params": {
+      "applicantName": "Jordan Rivera",
+      "referenceNumber": "PERMIT-000123",
+      "effectiveDate": "2026-08-01",
+      "feeAmount": "$250.00"
+    }
+  },
+  "expected": {
+    "channel": "email",
+    "locale": "en",
+    "recipient": "jordan@example.test",
+    "subject": "Your permit PERMIT-000123 has been issued",
+    "body": "Dear Jordan Rivera, your permit PERMIT-000123 is issued and effective from 2026-08-01. The fee of $250.00 has been recorded."
+  }
+}

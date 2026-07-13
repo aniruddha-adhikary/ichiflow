@@ -12,4 +12,5 @@ import "./entity-api.tsp";
 import "./authz.tsp";
 import "./ui.tsp";
 import "./adapters.tsp";
+import "./notifications.tsp";
 import "./document.tsp";

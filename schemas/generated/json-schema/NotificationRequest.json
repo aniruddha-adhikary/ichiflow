@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationRequest.json",
+    "type": "object",
+    "properties": {
+        "schemaVersion": {
+            "$ref": "NotificationSchemaVersion.json"
+        },
+        "notificationId": {
+            "type": "string",
+            "description": "Stable idempotency key — delivery dedups on this (doc 05 §reliability)."
+        },
+        "correlationId": {
+            "type": "string",
+            "description": "Correlation Identifier tying the request to its Case (doc 05 §11)."
+        },
+        "caseId": {
+            "type": "string",
+            "description": "The Case this notification belongs to — a DecisionRecord stitch key (doc 04 §5.1)."
+        },
+        "stepId": {
+            "type": "string",
+            "description": "The flow step that requested the notification — the DecisionRecord stitch key for `notify.*` events."
+        },
+        "template": {
+            "type": "string",
+            "description": "The referenced template (`id@version`); its `channel` selects the provider driver."
+        },
+        "locale": {
+            "type": "string",
+            "description": "The BCP-47 locale to render — must resolve to an entry in the template's `text` map."
+        },
+        "recipient": {
+            "type": "string",
+            "description": "The delivery address (email address / phone number) — opaque to rendering."
+        },
+        "params": {
+            "$ref": "#/$defs/RecordString",
+            "description": "The substitution values for the template's declared `params`."
+        }
+    },
+    "required": [
+        "schemaVersion",
+        "notificationId",
+        "correlationId",
+        "caseId",
+        "stepId",
+        "template",
+        "locale",
+        "recipient",
+        "params"
+    ],
+    "description": "A canonical **notification request** (doc 05 §4.2) — the outbound event fed from the transactional\noutbox to the notification port. `notificationId` is the stable idempotency key the Idempotent\nReceiver dedups on; `correlationId` + `caseId` + `stepId` tie it to its Case for DecisionRecord\nstitching. `params` supplies the values the referenced template substitutes for its declared params.",
+    "$defs": {
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        }
+    }
+}

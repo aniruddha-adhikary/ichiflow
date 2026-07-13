@@ -1,0 +1,34 @@
+{
+  "name": "orphan detector — a document.allocated + document.issued that never reaches delivery/accept/decline is a dangling Document (issuance chain incomplete)",
+  "result": {
+    "flowId": "orphan-dangling-document",
+    "caseId": "orphan-dangling-document-1",
+    "steps": 1,
+    "vars": {},
+    "slaMs": 0,
+    "trace": [],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      {
+        "seq": 1,
+        "type": "document.allocated",
+        "stepId": "pending-doc",
+        "referenceNumber": "PENDING-000001"
+      },
+      {
+        "seq": 2,
+        "type": "document.issued",
+        "stepId": "pending-doc",
+        "referenceNumber": "PENDING-000001",
+        "documentStatus": "issued"
+      },
+      { "seq": 3, "type": "case.resolved" }
+    ]
+  },
+  "expect": {
+    "chainComplete": false,
+    "orphans": ["document.allocated for step pending-doc has no document delivery/decision"],
+    "decisions": 0,
+    "tasks": 0
+  }
+}

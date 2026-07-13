@@ -1,0 +1,38 @@
+{
+  "name": "orphan detector — document.issued/document.delivered with no originating document.allocated do not stitch (issuance gap, chain incomplete)",
+  "result": {
+    "flowId": "orphan-issuance",
+    "caseId": "orphan-issuance-1",
+    "steps": 1,
+    "vars": {},
+    "slaMs": 0,
+    "trace": [],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      {
+        "seq": 1,
+        "type": "document.issued",
+        "stepId": "ghost-doc",
+        "referenceNumber": "GHOST-000001",
+        "documentStatus": "issued"
+      },
+      {
+        "seq": 2,
+        "type": "document.delivered",
+        "stepId": "ghost-doc",
+        "referenceNumber": "GHOST-000001",
+        "documentStatus": "issued"
+      },
+      { "seq": 3, "type": "case.resolved" }
+    ]
+  },
+  "expect": {
+    "chainComplete": false,
+    "orphans": [
+      "document.issued@seq:1 for step ghost-doc has no originating document.allocated",
+      "document.delivered@seq:2 for step ghost-doc has no originating document.allocated"
+    ],
+    "decisions": 0,
+    "tasks": 0
+  }
+}

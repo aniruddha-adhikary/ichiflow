@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DeliveryDisposition.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "sent",
+            "description": "Delivered once by the selected provider driver."
+        },
+        {
+            "type": "string",
+            "const": "deduped",
+            "description": "A duplicate `notificationId` deduped once by the Idempotent Receiver (never delivered twice)."
+        },
+        {
+            "type": "string",
+            "const": "dlq",
+            "description": "Quarantined in the Dead Letter Channel after bounded attempts (never dropped, never retried forever)."
+        }
+    ],
+    "description": "How a delivery settled (doc 05 §reliability) — the terminal disposition the DecisionRecord stitches."
+}

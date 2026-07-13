@@ -1,0 +1,54 @@
+{
+  "name": "decision-eval → issue-document (non-offer) → notify-applicant stitches into a complete chain including issuance + adapter-call events (1 Decision, 0 Tasks, no orphans)",
+  "result": {
+    "flowId": "issue-and-notify",
+    "caseId": "case-issue-and-notify-1",
+    "steps": 2,
+    "vars": { "eligible": 1, "fee": 250 },
+    "slaMs": 0,
+    "trace": [
+      {
+        "stepId": "s1",
+        "type": "decision-eval",
+        "decision": "permit-eligibility",
+        "out": "eligible",
+        "value": 1,
+        "outcomeType": "APPROVE"
+      },
+      {
+        "stepId": "s2",
+        "type": "issue-document",
+        "referenceNumber": "PERMIT-000123",
+        "documentStatus": "issued",
+        "verificationHash": "sha256:pinned"
+      }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      {
+        "seq": 1,
+        "type": "document.allocated",
+        "stepId": "s2",
+        "referenceNumber": "PERMIT-000123"
+      },
+      {
+        "seq": 2,
+        "type": "document.issued",
+        "stepId": "s2",
+        "referenceNumber": "PERMIT-000123",
+        "documentStatus": "issued"
+      },
+      {
+        "seq": 3,
+        "type": "document.delivered",
+        "stepId": "s2",
+        "referenceNumber": "PERMIT-000123",
+        "documentStatus": "issued"
+      },
+      { "seq": 4, "type": "notify.requested", "stepId": "s2" },
+      { "seq": 5, "type": "notify.sent", "stepId": "s2" },
+      { "seq": 6, "type": "case.resolved" }
+    ]
+  },
+  "expect": { "chainComplete": true, "orphans": [], "decisions": 1, "tasks": 0 }
+}

@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationDeliveryAttempt.json",
+    "type": "object",
+    "properties": {
+        "notificationId": {
+            "type": "string",
+            "description": "The idempotency key delivery dedups on."
+        },
+        "poison": {
+            "type": "boolean",
+            "description": "True iff the selected provider driver deterministically fails every attempt (a poison delivery)."
+        }
+    },
+    "required": [
+        "notificationId"
+    ],
+    "description": "One inbound copy of a notification in a reliability vector — a `notificationId` plus whether the provider rejects it."
+}

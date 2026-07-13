@@ -1,0 +1,27 @@
+{
+  "name": "permit-issued email renders the es locale — same governed content, per-locale plain-language text",
+  "templateId": "permit-issued@1.0.0",
+  "request": {
+    "schemaVersion": "notification/v1",
+    "notificationId": "notif-permit-000123-es",
+    "correlationId": "case-permit-1/issue",
+    "caseId": "case-permit-1",
+    "stepId": "issue",
+    "template": "permit-issued@1.0.0",
+    "locale": "es",
+    "recipient": "jordan@example.test",
+    "params": {
+      "applicantName": "Jordan Rivera",
+      "referenceNumber": "PERMIT-000123",
+      "effectiveDate": "2026-08-01",
+      "feeAmount": "$250.00"
+    }
+  },
+  "expected": {
+    "channel": "email",
+    "locale": "es",
+    "recipient": "jordan@example.test",
+    "subject": "Su permiso PERMIT-000123 ha sido emitido",
+    "body": "Estimado/a Jordan Rivera, su permiso PERMIT-000123 está emitido y vigente desde 2026-08-01. Se ha registrado la tarifa de $250.00."
+  }
+}

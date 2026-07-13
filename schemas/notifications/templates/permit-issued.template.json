@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "notification/v1",
+  "id": "permit-issued",
+  "version": "1.0.0",
+  "channel": "email",
+  "codeSet": "codeset://notifications/permit-comms@1.0.0",
+  "text": {
+    "en": {
+      "subject": "Your permit {{referenceNumber}} has been issued",
+      "body": "Dear {{applicantName}}, your permit {{referenceNumber}} is issued and effective from {{effectiveDate}}. The fee of {{feeAmount}} has been recorded."
+    },
+    "es": {
+      "subject": "Su permiso {{referenceNumber}} ha sido emitido",
+      "body": "Estimado/a {{applicantName}}, su permiso {{referenceNumber}} está emitido y vigente desde {{effectiveDate}}. Se ha registrado la tarifa de {{feeAmount}}."
+    }
+  },
+  "params": ["applicantName", "referenceNumber", "effectiveDate", "feeAmount"]
+}

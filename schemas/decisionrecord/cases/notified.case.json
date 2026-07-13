@@ -1,0 +1,30 @@
+{
+  "name": "a resolved human-task followed by an outbound notify-applicant delivery stitches clean — the adapter-call event correlates to its request (0 Decisions, 1 Task, no orphans)",
+  "result": {
+    "flowId": "task-then-notify",
+    "caseId": "case-task-then-notify-1",
+    "steps": 1,
+    "vars": { "approved": 7 },
+    "slaMs": 259200000,
+    "trace": [
+      {
+        "stepId": "review",
+        "type": "human-task",
+        "out": "approved",
+        "value": 7,
+        "resolution": "resolved",
+        "assignee": "ops-queue"
+      }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.created", "stepId": "review" },
+      { "seq": 2, "type": "task.assigned", "stepId": "review", "assignee": "ops-queue" },
+      { "seq": 3, "type": "task.resolved", "stepId": "review" },
+      { "seq": 4, "type": "notify.requested", "stepId": "review" },
+      { "seq": 5, "type": "notify.sent", "stepId": "review" },
+      { "seq": 6, "type": "case.resolved" }
+    ]
+  },
+  "expect": { "chainComplete": true, "orphans": [], "decisions": 0, "tasks": 1 }
+}
