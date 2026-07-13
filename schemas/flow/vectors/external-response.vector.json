@@ -1,0 +1,39 @@
+{
+  "name": "external-task response (§2.8) — a correlated reply arriving 5 days later validates against the response schema and the flow resumes (await + resume verified under time-skip)",
+  "flow": {
+    "id": "external-response",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "applicantId": 42 } },
+    "steps": [
+      {
+        "id": "screen",
+        "type": "external-task",
+        "requestRef": "adapter://vetting/credential-check-submit",
+        "responseSchema": "schema://vetting/CredentialCheckResult/1",
+        "in": ["applicantId"],
+        "out": "verdict",
+        "provider": "acme-vetting",
+        "slaMs": 2592000000,
+        "onTimeout": -1
+      }
+    ]
+  },
+  "replies": [
+    {
+      "afterMs": 432000000,
+      "stepId": "screen",
+      "correlationId": "conformance-external-response/screen",
+      "messageId": "reply-1",
+      "value": 1
+    }
+  ],
+  "expect": {
+    "vars": { "applicantId": 42, "verdict": 1 },
+    "steps": 1,
+    "slaMs": 0,
+    "events": ["case.created", "external.submitted", "external.responded", "case.resolved"],
+    "correlations": [
+      { "stepId": "screen", "correlationId": "conformance-external-response/screen" }
+    ]
+  }
+}

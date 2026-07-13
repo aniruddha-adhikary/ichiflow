@@ -9,11 +9,11 @@
         },
         "type": {
             "type": "string",
-            "description": "The step type: `compute` | `decision-eval` | `human-task` | `timer`."
+            "description": "The step type: `compute` | `decision-eval` | `human-task` | `timer` | `external-task`."
         },
         "out": {
             "type": "string",
-            "description": "Blackboard variable written (compute/decision-eval/human-task)."
+            "description": "Blackboard variable written (compute/decision-eval/human-task/external-task)."
         },
         "value": {
             "type": "number",
@@ -33,7 +33,7 @@
         },
         "resolution": {
             "$ref": "TaskResolution.json",
-            "description": "How a `human-task` settled — `resolved` by signal or `escalated` on SLA exhaustion."
+            "description": "How a `human-task`/`external-task` settled — `resolved` (by signal / correlated reply) or `escalated` on SLA exhaustion."
         },
         "durationMs": {
             "type": "integer",
@@ -41,7 +41,7 @@
         },
         "assignee": {
             "type": "string",
-            "description": "The routed assignee/queue (human-task steps)."
+            "description": "The routed assignee/queue (human-task steps) or resolved provider / escalation queue (external-task steps)."
         },
         "referenceNumber": {
             "type": "string",

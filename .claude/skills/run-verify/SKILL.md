@@ -90,8 +90,14 @@ signals), and an **escalation** chain, `timer`) — hits its independently-pinne
 blackboard/steps/SLA + a complete per-step trace + the pinned Case/Task **event history** keyed by
 `case_id` + timer fast-forward) with clean replay determinism under time-skip (`vectors_green ==
 total`). It also asserts **real-source DecisionRecord completeness** — every vector's assembled record
-stitches into a gap-free chain (orphan detector clean). The DSL check runs in-process; run
-`pnpm flow:conformance` before `pnpm verify` to produce
+stitches into a gap-free chain (orphan detector clean). Phase 5.2 adds the `external-task`
+**delegation** step (doc 04 §2.8): submit through a mock outbound Adapter (reusing the 5.1
+`packages/adapters` Idempotent-Receiver/DLQ machinery, no live system), inject a deterministic
+correlation id (doc 05 §11.1), then await a correlated reply against the same pausable SLA +
+escalation. The committed delegation family — submit / response / timeout (time-skip) / dup-response
+(deduped once) / malformed (→ DLQ + Case surfacing, never a stuck flow) — pins each vector's injected
+correlation id and is gated as a family (`delegation_vectors_green == total`). The DSL check runs
+in-process; run `pnpm flow:conformance` before `pnpm verify` to produce
 `packages/flow/build/flow-conformance-results.json`.
 
 `decisionrecord` is the Phase 3.4 gate (ADR-0011, doc 08 §1, doc 13 §2.g): the per-Case

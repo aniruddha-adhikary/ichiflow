@@ -127,6 +127,9 @@ importers:
 
   packages/flow:
     dependencies:
+      '@ichiflow/adapters':
+        specifier: workspace:*
+        version: link:../adapters
       '@ichiflow/issuance':
         specifier: workspace:*
         version: link:../issuance

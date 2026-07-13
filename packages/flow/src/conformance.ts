@@ -4,7 +4,11 @@ import { Worker } from "@temporalio/worker";
 import { activities } from "./activities.js";
 import { assembleDecisionRecord } from "./decisionrecord.js";
 import type { FlowConformanceVector, Vars } from "./dsl.js";
-import type { CaseEvent as InterpreterCaseEvent, TraceEntry } from "./interpreter.js";
+import type {
+  CaseCorrelation,
+  CaseEvent as InterpreterCaseEvent,
+  TraceEntry,
+} from "./interpreter.js";
 import { ensureRuntime } from "./runtime.js";
 
 const require = createRequire(import.meta.url);
@@ -43,6 +47,12 @@ export interface VectorOutcome {
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
+  /** True iff this flow exercises the `external-task` delegation step (build plan 5.2, doc 04 §2.8). */
+  delegation: boolean;
+  /** The correlation ids the interpreter injected on each `external-task` submit (doc 05 §11.1). */
+  correlations: CaseCorrelation[];
+  expectedCorrelations: CaseCorrelation[] | null;
+  correlationsMatch: boolean;
 }
 
 export interface ConformanceResult {
@@ -50,6 +60,9 @@ export interface ConformanceResult {
   sdkVersion: string;
   vectors: VectorOutcome[];
   vectorsGreen: number;
+  /** Delegation (`external-task`) vectors that hit their full oracle — the build plan 5.2 gate (`delegation_vectors_green == total`). */
+  delegationVectorsGreen: number;
+  delegationVectorsTotal: number;
   determinismClean: boolean;
 }
 
@@ -61,6 +74,7 @@ interface WorkflowReturn {
   slaMs: number;
   trace: TraceEntry[];
   events: InterpreterCaseEvent[];
+  correlations: CaseCorrelation[];
 }
 
 function shallowEqualVars(a: Vars, b: Vars): boolean {
@@ -103,26 +117,45 @@ export async function runConformance(opts: {
           taskQueue: "flow-conformance",
         });
 
-        // Deliver scripted signals (resolve / pause / resume) at their declared offsets; time-skip
-        // advances the clock between them so pausable-SLA windows and month-long budgets verify in ms.
+        // Deliver scripted `human-task` signals (resolve / pause / resume) and `external-task` correlated
+        // replies at their declared offsets, merged on one timeline; time-skip advances the clock between
+        // them so pausable-SLA windows and month-long budgets verify in ms. A stable sort keeps signals
+        // before replies (and replies in authored order) at an equal offset, so dedup is deterministic.
+        type Delivery = { afterMs: number; send: () => Promise<void> };
+        const deliveries: Delivery[] = [
+          ...(vector.signals ?? []).map((sig) => ({
+            afterMs: sig.afterMs,
+            send: () =>
+              sig.action === "accept" || sig.action === "decline"
+                ? handle.signal("documentSignal", {
+                    stepId: sig.stepId,
+                    action: sig.action,
+                  })
+                : handle.signal("taskSignal", {
+                    stepId: sig.stepId,
+                    action: sig.action ?? "resolve",
+                    value: sig.value,
+                  }),
+          })),
+          ...(vector.replies ?? []).map((reply) => ({
+            afterMs: reply.afterMs,
+            send: () =>
+              handle.signal("replySignal", {
+                stepId: reply.stepId,
+                correlationId: reply.correlationId,
+                messageId: reply.messageId,
+                value: reply.value,
+                malformed: reply.malformed,
+              }),
+          })),
+        ];
         let clock = 0;
-        for (const sig of [...(vector.signals ?? [])].sort((a, b) => a.afterMs - b.afterMs)) {
-          if (sig.afterMs > clock) {
-            await env.sleep(sig.afterMs - clock);
-            clock = sig.afterMs;
+        for (const delivery of [...deliveries].sort((a, b) => a.afterMs - b.afterMs)) {
+          if (delivery.afterMs > clock) {
+            await env.sleep(delivery.afterMs - clock);
+            clock = delivery.afterMs;
           }
-          if (sig.action === "accept" || sig.action === "decline") {
-            await handle.signal("documentSignal", {
-              stepId: sig.stepId,
-              action: sig.action,
-            });
-          } else {
-            await handle.signal("taskSignal", {
-              stepId: sig.stepId,
-              action: sig.action ?? "resolve",
-              value: sig.value,
-            });
-          }
+          await delivery.send();
         }
 
         const ret = (await handle.result()) as WorkflowReturn;
@@ -146,6 +179,9 @@ export async function runConformance(opts: {
         const traceStepIds = ret.trace.map((t) => t.stepId);
         const events = ret.events.map((e) => e.type);
         const expectedEvents = vector.expect.events ?? null;
+        const correlations = ret.correlations ?? [];
+        const expectedCorrelations = vector.expect.correlations ?? null;
+        const delegation = vector.flow.steps.some((s) => s.type === "external-task");
         // Assemble the per-Case DecisionRecord from the real interpreter output and run the orphan
         // detector — completeness on current sources (build plan 3.4 §2.c / doc 13 §2.g).
         const record = assembleDecisionRecord(ret);
@@ -178,6 +214,17 @@ export async function runConformance(opts: {
           replayClean: replays.every((r) => r.ok),
           // No scheduled wait ⇒ nothing to fast-forward (trivially satisfied); otherwise require a 1000× collapse.
           fastForwarded: vector.expect.slaMs === 0 || wallMs < vector.expect.slaMs / 1000,
+          delegation,
+          correlations,
+          expectedCorrelations,
+          correlationsMatch:
+            expectedCorrelations === null ||
+            (correlations.length === expectedCorrelations.length &&
+              correlations.every(
+                (c, i) =>
+                  c.stepId === expectedCorrelations[i]?.stepId &&
+                  c.correlationId === expectedCorrelations[i]?.correlationId,
+              )),
         });
       }
     });
@@ -185,19 +232,22 @@ export async function runConformance(opts: {
     await env.teardown();
   }
 
+  const isGreen = (o: VectorOutcome): boolean =>
+    o.varsMatch &&
+    o.stepsMatch &&
+    o.slaMatch &&
+    o.traceComplete &&
+    o.eventsMatch &&
+    o.correlationsMatch &&
+    o.fastForwarded;
+
   return {
     sdk: "@temporalio",
     sdkVersion: SDK_VERSION,
     vectors: outcomes,
-    vectorsGreen: outcomes.filter(
-      (o) =>
-        o.varsMatch &&
-        o.stepsMatch &&
-        o.slaMatch &&
-        o.traceComplete &&
-        o.eventsMatch &&
-        o.fastForwarded,
-    ).length,
+    vectorsGreen: outcomes.filter(isGreen).length,
+    delegationVectorsGreen: outcomes.filter((o) => o.delegation && isGreen(o)).length,
+    delegationVectorsTotal: outcomes.filter((o) => o.delegation).length,
     determinismClean: outcomes.every((o) => o.replayClean),
   };
 }

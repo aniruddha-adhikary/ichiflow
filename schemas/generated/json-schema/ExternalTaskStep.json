@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ExternalTaskStep.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "const": "external-task"
+        },
+        "requestRef": {
+            "type": "string",
+            "description": "The outbound submit Adapter / canonical request ref the delegation submits through (doc 05 §11 outbound binding)."
+        },
+        "responseSchema": {
+            "type": "string",
+            "description": "The canonical **response schema** id the correlated reply is validated against before resume (doc 05 §11.1)."
+        },
+        "in": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "description": "Blackboard variables passed, in order, as the submitted request's inputs."
+        },
+        "out": {
+            "type": "string",
+            "description": "Blackboard variable the validated response value (or escalation `onTimeout`) is written to."
+        },
+        "provider": {
+            "type": "string",
+            "description": "The target external system/provider the delegation is routed to (§2.8; static in v1)."
+        },
+        "slaMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pausable SLA budget in milliseconds (§5.7); paused intervals are excluded, exactly as for `human-task`."
+        },
+        "onTimeout": {
+            "type": "number",
+            "description": "Auto-decide fallback written to `out` when the SLA is exhausted with no correlated reply (the escalation path, §5.2)."
+        },
+        "escalationQueue": {
+            "type": "string",
+            "description": "Supervisor/alternate-provider queue the delegation escalates to on SLA expiry; defaults to `supervisor` (§5.2)."
+        }
+    },
+    "required": [
+        "type",
+        "requestRef",
+        "responseSchema",
+        "in",
+        "out",
+        "slaMs",
+        "onTimeout"
+    ],
+    "allOf": [
+        {
+            "$ref": "FlowStep.json"
+        }
+    ],
+    "description": "An `external-task` step — the **delegation** primitive (doc 04 §2.8, ADR-0028): the *machine analog\nof `human-task`*. It **submits** a schema'd request through an outbound Adapter, durably **awaits a\ncorrelated inbound response**, **validates** it against a response schema, and **resumes** — racing\nthe *same* pausable-clock SLA + escalation machinery as `human-task` (§5.7/§5.2) and the Adapter\nlayer's **Idempotent Receiver / DLQ** (doc 05 §11.1). The transport is a pluggable Adapter binding\nbeneath the one canonical step, never a fork of the step vocabulary (§11.2).\n\n- **correlation contract** (§11.1): the interpreter *injects* a deterministic correlation id\n(`case_id '/' step.id`) onto the outbound request; a reply *correlates* only when it carries that\nid, and is *deduped* on `(correlation-id, response messageId)` so a duplicated reply applies once.\n- **failure taxonomy** (§2.8): a schema-invalid (malformed) reply → **DLQ + Case surfacing**, never\na stuck flow; no correlated reply within the SLA → the **escalation** path writes `onTimeout`.\n\nProvider selection is itself a Decision (§2.8, mirroring assignment-as-Decision §5.3); v1 ships the\nstatic `provider` label and the transport/correlation contract, with routing-as-a-Decision an additive\nfollow-up on the same seam `human-task` already uses."
+}

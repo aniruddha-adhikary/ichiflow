@@ -107,7 +107,14 @@ committed flow-JSON **conformance vectors** (`schemas/flow/vectors/*.vector.json
 against the emitted canonical Flow DSL schema (authored in `schemas/flow.tsp`), and the _same_ generic
 interpreter run over each vector hits its independently-pinned oracle (result/steps/SLA + timer
 fast-forward) with clean replay determinism under time-skip (`vectors_green == total`); run
-`pnpm flow:conformance` first to produce the verdict artifact. `adapters` is the Phase 5.1 adapter gate
+`pnpm flow:conformance` first to produce the verdict artifact. Phase 5.2 extends it with the
+`external-task` **delegation** step (doc 04 §2.8): the interpreter submits through a mock outbound
+Adapter (reusing the 5.1 `packages/adapters` mapping/Idempotent-Receiver/DLQ machinery — no live
+external system), injects a deterministic correlation id (doc 05 §11.1), then awaits a correlated
+reply against the _same_ pausable SLA + escalation. The committed delegation vector family — submit /
+response / timeout (under time-skip) / dup-response (deduped once) / malformed (→ DLQ + Case
+surfacing, never a stuck flow) — pins each vector's injected correlation id and is gated as a family
+(`delegation_vectors_green == total`). `adapters` is the Phase 5.1 adapter gate
 (doc 05, doc 13 §2.d): it proves the canonical↔wire boundary **without a live external system**. Every
 committed Port/Mapping/golden/reliability fixture (`schemas/adapters/`) validates against its emitted
 canonical JSON Schema and every canonical output validates against `CanonicalEnvelope` (**contract
