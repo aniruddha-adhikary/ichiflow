@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "RelationDef.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "rewrite": {
+            "$ref": "Rewrite.json"
+        }
+    },
+    "required": [
+        "name",
+        "rewrite"
+    ],
+    "description": "One relation on a type — its name and the rewrite that computes its user set."
+}

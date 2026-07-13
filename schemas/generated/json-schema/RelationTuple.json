@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "RelationTuple.json",
+    "type": "object",
+    "properties": {
+        "object": {
+            "type": "string",
+            "description": "The object the relation is on, `type:id` (e.g. `artifact:codeset-natures`)."
+        },
+        "relation": {
+            "type": "string",
+            "description": "The relation name (e.g. `owner`, `member`, `can_view`)."
+        },
+        "user": {
+            "type": "string",
+            "description": "The subject: a concrete `user:<id>` or a userset `<type>:<id>#<relation>`."
+        }
+    },
+    "required": [
+        "object",
+        "relation",
+        "user"
+    ],
+    "description": "One relationship tuple `(object, relation, user)` — a graph edge in the OpenFGA store. `user` is a\nconcrete subject (`user:alice`) **or** a userset (`team:trade#member`); `object` is a typed id\n(`artifact:codeset-natures`). Tuple writes are write-through/CDC-driven in production (doc 06 §2.1);\nhere they are the committed graph fixtures the vectors evaluate against."
+}

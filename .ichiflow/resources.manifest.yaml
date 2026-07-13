@@ -224,3 +224,19 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/entity-api.ts
     description: Generated-BFF gate (build plan 4.2, doc 13) — committed API-contract vectors are DSL-valid, every response validates against the emitted OpenAPI response schema for its status, every non-verify operation is exercised, and the runtime boundary validator provably rejects malformed writes (≥1 422). Consumes the artifact from `pnpm api:contract`.
+  - id: authz-schema
+    kind: schema
+    path: schemas/authz.tsp
+    description: Canonical authorization (PDP) contracts (build plan 4.3, ADR-0010/0025, doc 06 Parts 2 & 4, doc 13 §2.f) — the OpenFGA-style ReBAC model (types/relations/userset rewrites), relationship tuples, allow/deny vectors tagged by enforcement surface (design-time artifact vs runtime case/entity), and the mandatory authorization decision log. TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: authz-model
+    kind: pattern
+    path: schemas/authz/model.json
+    description: The committed OpenFGA-shaped authorization model (doc 06 §4.3–4.4) — organization/team/artifact/case/association types with membership, role-as-relation (steward/approver/editor/viewer), ownership, derived can_* relations, and case associations (peer-link read access). Validated against the emitted AuthzModel schema; bound by the reference PolicyEngine.
+  - id: authz-vectors
+    kind: pattern
+    path: schemas/authz/vectors
+    description: Authz allow/deny vector corpus (build plan 4.3, harness-first) — design-time artifact-access and runtime case/entity-access checks over one relationship graph (schemas/authz/tuples.json), covering direct/nested Team membership, each role, ownership inheritance, assignee and association-reader access, and negative cross-team/cross-case cases (read-without-leak). Replayed by `pnpm authz:jvm` through the PDP.
+  - id: authz
+    kind: harness
+    path: packages/cli/src/verify/scopes/authz.ts
+    description: PDP-slice gate (build plan 4.3, doc 13 §2.f) — the model + vectors are schema-valid, every vector replays to its pinned allow/deny across the required relations (vectors_green == total), both design-time and runtime surfaces are covered by one PDP with design-time = runtime parity, and every decision emits a schema-valid decision log. Consumes the artifact from `pnpm authz:jvm`.

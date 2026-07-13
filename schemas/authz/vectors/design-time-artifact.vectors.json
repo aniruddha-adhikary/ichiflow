@@ -1,0 +1,106 @@
+[
+  {
+    "name": "steward-can-edit-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:sara",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "steward-can-approve-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:sara",
+    "relation": "can_approve",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "approver-can-approve-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:amir",
+    "relation": "can_approve",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "approver-can-edit-via-approve-union",
+    "surface": "design-time",
+    "subject": "user:amir",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "editor-can-edit-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:eve",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "editor-cannot-approve-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:eve",
+    "relation": "can_approve",
+    "object": "artifact:codeset-natures",
+    "expect": "deny"
+  },
+  {
+    "name": "viewer-can-view-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:vic",
+    "relation": "can_view",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "viewer-cannot-edit-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:vic",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "deny"
+  },
+  {
+    "name": "member-can-view-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:mel",
+    "relation": "can_view",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "member-cannot-edit-owned-artifact",
+    "surface": "design-time",
+    "subject": "user:mel",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "deny"
+  },
+  {
+    "name": "subteam-member-can-view-via-transitive-membership",
+    "surface": "design-time",
+    "subject": "user:nick",
+    "relation": "can_view",
+    "object": "artifact:codeset-natures",
+    "expect": "allow"
+  },
+  {
+    "name": "partner-member-cannot-view-other-teams-artifact",
+    "surface": "design-time",
+    "subject": "user:pat",
+    "relation": "can_view",
+    "object": "artifact:codeset-natures",
+    "expect": "deny"
+  },
+  {
+    "name": "partner-member-cannot-edit-other-teams-artifact",
+    "surface": "design-time",
+    "subject": "user:pat",
+    "relation": "can_edit",
+    "object": "artifact:codeset-natures",
+    "expect": "deny"
+  }
+]

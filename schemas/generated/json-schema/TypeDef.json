@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "TypeDef.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "description": "The object type name (the prefix before `:` in an object id, e.g. `artifact` in `artifact:x`)."
+        },
+        "relations": {
+            "type": "array",
+            "items": {
+                "$ref": "RelationDef.json"
+            }
+        }
+    },
+    "required": [
+        "type",
+        "relations"
+    ],
+    "description": "One object type in the authorization model with its relations (e.g. `team`, `artifact`, `case`)."
+}

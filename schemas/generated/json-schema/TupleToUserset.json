@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "TupleToUserset.json",
+    "type": "object",
+    "properties": {
+        "relation": {
+            "type": "string",
+            "description": "The relation to expand on each object the tupleset points at (e.g. `approver`)."
+        },
+        "tupleset": {
+            "type": "string",
+            "description": "The relation on *this* object whose target objects are followed (e.g. `owner`)."
+        }
+    },
+    "required": [
+        "relation",
+        "tupleset"
+    ],
+    "description": "Tuple-to-userset rewrite (`<relation> from <tupleset>`): expand `relation` on every object reached\nfrom this object via the `tupleset` relation. E.g. `approver from owner` — follow the artifact's\n`owner` tuples to the owning Team, then check `approver` there (doc 06 §4.3)."
+}

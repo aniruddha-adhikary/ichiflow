@@ -25,6 +25,7 @@ import { flowLayerScope } from "../src/verify/scopes/flow-layer.js";
 import { decisionRecordScope } from "../src/verify/scopes/decisionrecord.js";
 import { entityStoreScope } from "../src/verify/scopes/entity-store.js";
 import { entityApiScope } from "../src/verify/scopes/entity-api.js";
+import { authzScope } from "../src/verify/scopes/authz.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -1602,6 +1603,189 @@ describe("entity-api scope (Phase 4.2)", () => {
       const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
       const present = checks.find((c) => c.id === "entity-api.results-present")!;
       expect(present.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("authz scope (Phase 4.3 — PDP slice)", () => {
+  const model = {
+    schemaVersion: "1.1",
+    types: [
+      {
+        type: "artifact",
+        relations: [{ name: "owner", rewrite: { direct: ["team"] } }],
+      },
+    ],
+  };
+  const vectors = [
+    {
+      name: "v-view",
+      surface: "design-time",
+      subject: "user:a",
+      relation: "can_view",
+      object: "artifact:x",
+      expect: "allow",
+    },
+    {
+      name: "v-edit",
+      surface: "design-time",
+      subject: "user:a",
+      relation: "can_edit",
+      object: "artifact:x",
+      expect: "allow",
+    },
+    {
+      name: "v-approve",
+      surface: "design-time",
+      subject: "user:a",
+      relation: "can_approve",
+      object: "artifact:x",
+      expect: "deny",
+    },
+    {
+      name: "v-modify",
+      surface: "runtime",
+      subject: "user:a",
+      relation: "can_modify",
+      object: "case:y",
+      expect: "allow",
+    },
+  ];
+  const log = vectors.map((v) => ({
+    decisionId: `authz-${v.name}`,
+    principal: v.subject,
+    action: v.relation,
+    resource: v.object,
+    context: {},
+    effect: v.expect,
+    reason: "test reason",
+  }));
+  const results = {
+    vectorsGreen: 4,
+    total: 4,
+    parityPass: true,
+    designTimeCovered: 3,
+    runtimeCovered: 1,
+    decisionLogsComplete: true,
+    vectors: vectors.map((v) => ({
+      name: v.name,
+      surface: v.surface,
+      subject: v.subject,
+      relation: v.relation,
+      object: v.object,
+      expect: v.expect,
+      actual: v.expect,
+      pass: true,
+      parity: true,
+      reason: "test reason",
+    })),
+    decisionLog: log,
+  };
+  const setup = (
+    root: string,
+    opts: { vectors?: unknown[]; results?: unknown | null; model?: unknown } = {},
+  ) => {
+    const vdir = join(root, "schemas/authz/vectors");
+    mkdirSync(vdir, { recursive: true });
+    writeFileSync(join(root, "schemas/authz/model.json"), JSON.stringify(opts.model ?? model));
+    writeFileSync(join(vdir, "corpus.vectors.json"), JSON.stringify(opts.vectors ?? vectors));
+    if (opts.results !== null) {
+      const rp = join(root, "core/build/authz-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when model + vectors are schema-valid, all green, both surfaces covered with parity, logs complete", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      setup(tmp);
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "authz.vectors-green")!;
+      expect(green.value).toBe(4);
+      expect(checks.find((c) => c.id === "authz.parity")!.status).toBe("pass");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed vector via the AuthzVector schema", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      const bad = [{ name: "b", surface: "design-time", subject: "user:a", relation: "can_view" }];
+      setup(tmp, { vectors: bad });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.some((c) => c.id.startsWith("authz.dsl-valid.") && c.status === "fail")).toBe(
+        true,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when the corpus omits a required relation", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      // Only can_view — missing can_edit / can_approve / can_modify.
+      setup(tmp, { vectors: [vectors[0]] });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.find((c) => c.id === "authz.relations-covered")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the specific vector and the green gate when a decision diverges", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      const diverged = {
+        ...results,
+        vectorsGreen: 3,
+        vectors: results.vectors.map((v) =>
+          v.name === "v-approve" ? { ...v, actual: "allow", pass: false } : v,
+        ),
+      };
+      setup(tmp, { results: diverged });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("authz.decision.v-approve");
+      expect(failed).toContain("authz.vectors-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails parity when the two enforcement surfaces disagree", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      setup(tmp, { results: { ...results, parityPass: false } });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.find((c) => c.id === "authz.parity")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when a decision-log entry is incomplete or missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      setup(tmp, { results: { ...results, decisionLogsComplete: false } });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.find((c) => c.id === "authz.decision-log-complete")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-authz-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
+      expect(checks.find((c) => c.id === "authz.results-present")!.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

@@ -109,6 +109,9 @@ jobs:
       - name: Entity API — generated BFF contract vectors + runtime boundary validation vs emitted OpenAPI (chunk 4.2)
         run: pnpm api:contract
 
+      - name: Authz — PDP allow/deny vectors over the OpenFGA reference engine + design-time = runtime parity (chunk 4.3)
+        run: pnpm authz:jvm
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

@@ -66,6 +66,27 @@ class ArchitectureTest {
                 .should().dependOnClassesThat().resideInAPackage("ai.ichiflow.core.entity.store..")
                 .because("the Repository SPI contract must not depend on a concrete persistence binding"),
         ),
+        // The Policy Engine SPI contract must stay engine-neutral: the abstraction (authz.spi) may not
+        // depend on the concrete OpenFGA reference binding (authz.engine), so a real OpenFGA server or a
+        // Cedar/OPA engine (ADR-0010) binds the same SPI later without touching the contract.
+        NamedRule(
+            "authz.spi.contract-independent-of-binding",
+            noClasses()
+                .that().resideInAPackage("ai.ichiflow.core.authz.spi..")
+                .should().dependOnClassesThat().resideInAPackage("ai.ichiflow.core.authz.engine..")
+                .because("the Policy Engine SPI contract must not depend on a concrete engine binding"),
+        ),
+        // The PDP gateway and the PEPs must reach the engine only through the SPI — never the concrete
+        // binding. Only the AuthzRunner composition root may wire a specific engine. This keeps
+        // "one PDP, swappable engine" true (doc 06 §2.1).
+        NamedRule(
+            "authz.pdp-and-peps-depend-on-spi-not-binding",
+            noClasses()
+                .that().resideInAPackage("ai.ichiflow.core.authz.pep..")
+                .or().haveSimpleName("Pdp")
+                .should().dependOnClassesThat().resideInAPackage("ai.ichiflow.core.authz.engine..")
+                .because("the PDP and PEPs must talk to the engine through the SPI, not the binding"),
+        ),
         // No package cycles within the core (keeps the module graph a DAG).
         NamedRule(
             "core.no-package-cycles",
