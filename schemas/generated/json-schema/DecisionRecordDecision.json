@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionRecordDecision.json",
+    "type": "object",
+    "properties": {
+        "stepId": {
+            "type": "string",
+            "description": "The step id that fired this Decision (correlation key into the flow + trace)."
+        },
+        "decision": {
+            "type": "string",
+            "description": "The evaluated DecisionModel id."
+        },
+        "outcomeType": {
+            "type": "string",
+            "description": "The Decision's typed Outcome type."
+        },
+        "value": {
+            "type": "number",
+            "description": "The Outcome's value facet written to the blackboard."
+        }
+    },
+    "required": [
+        "stepId",
+        "decision",
+        "outcomeType",
+        "value"
+    ],
+    "description": "One fired **Decision** stitched into the chain (doc 03 §2) — the `decision-eval` steps' typed Outcomes."
+}

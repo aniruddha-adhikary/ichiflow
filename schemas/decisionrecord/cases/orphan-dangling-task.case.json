@@ -1,0 +1,23 @@
+{
+  "name": "orphan detector — a task.created with no terminal resolution is a dangling Task (chain incomplete)",
+  "result": {
+    "flowId": "orphan-dangling",
+    "caseId": "orphan-dangling-1",
+    "steps": 1,
+    "vars": {},
+    "slaMs": 0,
+    "trace": [],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.created", "stepId": "pending" },
+      { "seq": 2, "type": "task.assigned", "stepId": "pending", "assignee": "ops-queue" },
+      { "seq": 3, "type": "case.resolved" }
+    ]
+  },
+  "expect": {
+    "chainComplete": false,
+    "orphans": ["task.created for step pending has no terminal resolution"],
+    "decisions": 0,
+    "tasks": 0
+  }
+}

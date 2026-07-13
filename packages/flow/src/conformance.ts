@@ -2,21 +2,14 @@ import { createRequire } from "node:module";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import { Worker } from "@temporalio/worker";
 import { activities } from "./activities.js";
+import { assembleDecisionRecord } from "./decisionrecord.js";
 import type { FlowConformanceVector, Vars } from "./dsl.js";
+import type { CaseEvent as InterpreterCaseEvent, TraceEntry } from "./interpreter.js";
 import { ensureRuntime } from "./runtime.js";
 
 const require = createRequire(import.meta.url);
 const SDK_VERSION: string = (require("@temporalio/worker/package.json") as { version: string })
   .version;
-
-interface TraceEntry {
-  stepId: string;
-  type: string;
-}
-
-interface CaseEvent {
-  type: string;
-}
 
 export interface ReplayOutcome {
   attempt: number;
@@ -44,6 +37,9 @@ export interface VectorOutcome {
   events: string[];
   expectedEvents: string[] | null;
   eventsMatch: boolean;
+  /** DecisionRecord completeness on the current flow sources (build plan 3.4, doc 13 §2.g) — every real vector stitches with no orphan. */
+  chainComplete: boolean;
+  orphans: string[];
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
@@ -64,7 +60,7 @@ interface WorkflowReturn {
   vars: Vars;
   slaMs: number;
   trace: TraceEntry[];
-  events: CaseEvent[];
+  events: InterpreterCaseEvent[];
 }
 
 function shallowEqualVars(a: Vars, b: Vars): boolean {
@@ -143,6 +139,9 @@ export async function runConformance(opts: {
         const traceStepIds = ret.trace.map((t) => t.stepId);
         const events = ret.events.map((e) => e.type);
         const expectedEvents = vector.expect.events ?? null;
+        // Assemble the per-Case DecisionRecord from the real interpreter output and run the orphan
+        // detector — completeness on current sources (build plan 3.4 §2.c / doc 13 §2.g).
+        const record = assembleDecisionRecord(ret);
         outcomes.push({
           name: vector.name,
           flowId: vector.flow.id,
@@ -166,6 +165,8 @@ export async function runConformance(opts: {
             expectedEvents === null ||
             (events.length === expectedEvents.length &&
               events.every((t, i) => t === expectedEvents[i])),
+          chainComplete: record.chainComplete,
+          orphans: record.orphans,
           replays,
           replayClean: replays.every((r) => r.ok),
           // No scheduled wait ⇒ nothing to fast-forward (trivially satisfied); otherwise require a 1000× collapse.

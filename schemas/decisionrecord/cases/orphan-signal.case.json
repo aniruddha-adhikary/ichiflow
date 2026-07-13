@@ -1,0 +1,35 @@
+{
+  "name": "orphan detector — a task.assigned/task.resolved with no originating task.created does not stitch (chain incomplete)",
+  "result": {
+    "flowId": "orphan-signal",
+    "caseId": "orphan-signal-1",
+    "steps": 1,
+    "vars": { "approved": 5 },
+    "slaMs": 0,
+    "trace": [
+      {
+        "stepId": "ghost",
+        "type": "human-task",
+        "out": "approved",
+        "value": 5,
+        "resolution": "resolved",
+        "assignee": "ops-queue"
+      }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.assigned", "stepId": "ghost", "assignee": "ops-queue" },
+      { "seq": 2, "type": "task.resolved", "stepId": "ghost" },
+      { "seq": 3, "type": "case.resolved" }
+    ]
+  },
+  "expect": {
+    "chainComplete": false,
+    "orphans": [
+      "task.assigned@seq:1 for step ghost has no originating task.created",
+      "task.resolved@seq:2 for step ghost has no originating task.created"
+    ],
+    "decisions": 0,
+    "tasks": 1
+  }
+}

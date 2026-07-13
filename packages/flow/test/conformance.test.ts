@@ -56,6 +56,13 @@ describe("Phase 3.2–3.3 — flow-layer conformance (core step types + Case/Tas
     ]);
   });
 
+  it("assembles a complete DecisionRecord with no orphan for every real vector (3.4, doc 13 §2.g)", () => {
+    for (const v of result.vectors) {
+      expect(v.chainComplete, `${v.flowId} chain`).toBe(true);
+      expect(v.orphans, `${v.flowId} orphans`).toEqual([]);
+    }
+  });
+
   it("replays every vector's history twice with no determinism violation", () => {
     expect(result.determinismClean).toBe(true);
     for (const v of result.vectors) expect(v.replays.map((r) => r.ok)).toEqual([true, true]);

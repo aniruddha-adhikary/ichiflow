@@ -1,0 +1,28 @@
+{
+  "name": "an escalated human-task stitches with attribution to the supervisor queue (0 Decisions, 1 Task, no orphans)",
+  "result": {
+    "flowId": "case-escalation",
+    "caseId": "case-escalation-1",
+    "steps": 1,
+    "vars": { "x": 0, "approved": 42 },
+    "slaMs": 259200000,
+    "trace": [
+      {
+        "stepId": "review",
+        "type": "human-task",
+        "out": "approved",
+        "value": 42,
+        "resolution": "escalated",
+        "assignee": "supervisor-tier3"
+      }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.created", "stepId": "review" },
+      { "seq": 2, "type": "task.assigned", "stepId": "review", "assignee": "ops-queue" },
+      { "seq": 3, "type": "task.escalated", "stepId": "review", "assignee": "supervisor-tier3" },
+      { "seq": 4, "type": "case.resolved" }
+    ]
+  },
+  "expect": { "chainComplete": true, "orphans": [], "decisions": 0, "tasks": 1 }
+}

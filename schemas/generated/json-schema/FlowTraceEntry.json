@@ -1,0 +1,52 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowTraceEntry.json",
+    "type": "object",
+    "properties": {
+        "stepId": {
+            "type": "string",
+            "description": "The step id this entry records (correlation key into the flow + event history)."
+        },
+        "type": {
+            "type": "string",
+            "description": "The step type: `compute` | `decision-eval` | `human-task` | `timer`."
+        },
+        "out": {
+            "type": "string",
+            "description": "Blackboard variable written (compute/decision-eval/human-task)."
+        },
+        "value": {
+            "type": "number",
+            "description": "The numeric value written to `out`."
+        },
+        "ref": {
+            "type": "string",
+            "description": "The versioned code-activity ref (compute steps)."
+        },
+        "decision": {
+            "type": "string",
+            "description": "The evaluated DecisionModel id (decision-eval steps)."
+        },
+        "outcomeType": {
+            "type": "string",
+            "description": "The Decision's typed Outcome type (decision-eval steps)."
+        },
+        "resolution": {
+            "$ref": "TaskResolution.json",
+            "description": "How a `human-task` settled — `resolved` by signal or `escalated` on SLA exhaustion."
+        },
+        "durationMs": {
+            "type": "integer",
+            "description": "The durable wait duration (timer steps)."
+        },
+        "assignee": {
+            "type": "string",
+            "description": "The routed assignee/queue (human-task steps)."
+        }
+    },
+    "required": [
+        "stepId",
+        "type"
+    ],
+    "description": "One typed **trace entry** per executed step (doc 04 §2.6) — the audit-spine material the\nDecisionRecord stitches: `decision-eval` entries carry the fired `decision` + `outcomeType`,\n`human-task` entries carry the `resolution` + routed `assignee`."
+}

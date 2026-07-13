@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -89,8 +89,21 @@ vector — across the core step set (`compute` via a versioned code-activity ref
 signals), and an **escalation** chain, `timer`) — hits its independently-pinned oracle (final
 blackboard/steps/SLA + a complete per-step trace + the pinned Case/Task **event history** keyed by
 `case_id` + timer fast-forward) with clean replay determinism under time-skip (`vectors_green ==
-total`). The DSL check runs in-process; run `pnpm flow:conformance` before `pnpm verify` to produce
+total`). It also asserts **real-source DecisionRecord completeness** — every vector's assembled record
+stitches into a gap-free chain (orphan detector clean). The DSL check runs in-process; run
+`pnpm flow:conformance` before `pnpm verify` to produce
 `packages/flow/build/flow-conformance-results.json`.
+
+`decisionrecord` is the Phase 3.4 gate (ADR-0011, doc 08 §1, doc 13 §2.g): the per-Case
+**DecisionRecord** stitches the flow event history + fired-Decision traces + Task resolutions into one
+causal chain keyed by `case_id`, and its correctness is **completeness** (no gap). The committed case
+fixtures (`schemas/decisionrecord/cases/*.case.json`) validate against the emitted
+`DecisionRecordCase.json`, and the pure assembler run over each fixture's `FlowResult` must match the
+pinned chain-completeness + `orphans` + stitched Decision/Task counts — positive fixtures stitch clean,
+negative fixtures inject a gap (a Task-lifecycle event with no `task.created`, a dangling Task) the
+**orphan-event detector** must flag (`cases_green == total`). Assembly is pure, so run
+`pnpm decisionrecord:assemble` before `pnpm verify` to produce
+`packages/flow/build/decisionrecord-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

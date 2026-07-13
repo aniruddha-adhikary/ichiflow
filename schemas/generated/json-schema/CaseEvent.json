@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CaseEvent.json",
+    "type": "object",
+    "properties": {
+        "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Monotonic in-Case sequence number (ordering key)."
+        },
+        "type": {
+            "type": "string",
+            "description": "The event type, e.g. `task.assigned`."
+        },
+        "stepId": {
+            "type": "string",
+            "description": "The `human-task` step this event belongs to (Task-scoped events only)."
+        },
+        "assignee": {
+            "type": "string",
+            "description": "The routed assignee/queue (on `task.assigned`) or escalation queue (on `task.escalated`)."
+        }
+    },
+    "required": [
+        "seq",
+        "type"
+    ],
+    "description": "One ordered **Case/Task event** (doc 04 §5.1/§5.2) — the flow event history the DecisionRecord\nstitches by `case_id`: `case.created`, `task.created`/`task.assigned`, `sla.paused`/`sla.resumed`,\n`task.resolved`/`task.escalated`, `case.resolved`."
+}

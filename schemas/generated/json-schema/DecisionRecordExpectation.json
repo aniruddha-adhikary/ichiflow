@@ -1,0 +1,37 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionRecordExpectation.json",
+    "type": "object",
+    "properties": {
+        "chainComplete": {
+            "type": "boolean",
+            "description": "Whether the causal chain must stitch end-to-end (a complete chain has no orphan)."
+        },
+        "orphans": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The exact set of orphan-event descriptors the detector must report (order-insensitive)."
+        },
+        "decisions": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "The expected number of stitched fired-Decision traces."
+        },
+        "tasks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "The expected number of stitched Task resolutions."
+        }
+    },
+    "required": [
+        "chainComplete",
+        "orphans",
+        "decisions",
+        "tasks"
+    ],
+    "description": "The pinned expected observations of assembling a DecisionRecord case fixture."
+}

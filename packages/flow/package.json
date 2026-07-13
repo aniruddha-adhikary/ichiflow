@@ -10,7 +10,8 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test": "vitest run",
     "spike": "node dist/spike.js",
-    "conformance": "node dist/conformance-run.js"
+    "conformance": "node dist/conformance-run.js",
+    "decisionrecord": "node dist/decisionrecord-run.js"
   },
   "dependencies": {
     "@temporalio/workflow": "1.11.7"

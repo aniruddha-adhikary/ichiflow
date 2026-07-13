@@ -5,4 +5,5 @@ import "./spike.tsp";
 import "./decision-contracts.tsp";
 import "./decision-testing.tsp";
 import "./flow.tsp";
+import "./decisionrecord.tsp";
 import "./service.tsp";

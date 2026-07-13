@@ -1,0 +1,66 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionRecord.json",
+    "type": "object",
+    "properties": {
+        "caseId": {
+            "type": "string",
+            "description": "The Case's global `case_id` — the stitch key (ADR-0011)."
+        },
+        "events": {
+            "type": "array",
+            "items": {
+                "$ref": "CaseEvent.json"
+            },
+            "description": "The ordered flow **event history** the record is stitched from (doc 04 §5.1)."
+        },
+        "decisions": {
+            "type": "array",
+            "items": {
+                "$ref": "DecisionRecordDecision.json"
+            },
+            "description": "The fired **Decision** traces (doc 03 §2)."
+        },
+        "tasks": {
+            "type": "array",
+            "items": {
+                "$ref": "DecisionRecordTask.json"
+            },
+            "description": "The **Task** resolutions with attribution (doc 04 §5.2)."
+        },
+        "outcome": {
+            "$ref": "#/$defs/RecordFloat64",
+            "description": "The Case's final outcome — the terminal blackboard (variable name → value)."
+        },
+        "orphans": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Events that did **not** stitch into the chain (doc 13 §2.g). A complete chain has none."
+        },
+        "chainComplete": {
+            "type": "boolean",
+            "description": "True iff the causal chain stitches end-to-end with no orphan (the completeness verdict)."
+        }
+    },
+    "required": [
+        "caseId",
+        "events",
+        "decisions",
+        "tasks",
+        "outcome",
+        "orphans",
+        "chainComplete"
+    ],
+    "description": "The assembled DecisionRecord for one Case — the stitched causal chain plus the orphan verdict that\nproves its completeness (doc 13 §2.g: `orphans: [...]`, chain complete iff empty).",
+    "$defs": {
+        "RecordFloat64": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "number"
+            }
+        }
+    }
+}

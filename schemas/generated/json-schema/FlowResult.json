@@ -1,0 +1,58 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowResult.json",
+    "type": "object",
+    "properties": {
+        "flowId": {
+            "type": "string"
+        },
+        "caseId": {
+            "type": "string",
+            "description": "The Case's global `case_id` (doc 04 §5.1)."
+        },
+        "steps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "vars": {
+            "$ref": "#/$defs/RecordFloat64",
+            "description": "The final blackboard: variable name → value."
+        },
+        "slaMs": {
+            "type": "integer",
+            "description": "Total scheduled SLA/timer duration in milliseconds."
+        },
+        "trace": {
+            "type": "array",
+            "items": {
+                "$ref": "FlowTraceEntry.json"
+            }
+        },
+        "events": {
+            "type": "array",
+            "items": {
+                "$ref": "CaseEvent.json"
+            }
+        }
+    },
+    "required": [
+        "flowId",
+        "caseId",
+        "steps",
+        "vars",
+        "slaMs",
+        "trace",
+        "events"
+    ],
+    "description": "The interpreter's output contract (doc 04 §2/§5) — the deterministic result of walking a Flow: the\nfinal blackboard, the scheduled SLA total, the per-step `trace`, and the ordered Case/Task `events`,\nall keyed by the Case's global `caseId`. This is the source material the DecisionRecord assembles.",
+    "$defs": {
+        "RecordFloat64": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "number"
+            }
+        }
+    }
+}

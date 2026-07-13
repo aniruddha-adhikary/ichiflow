@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "TaskResolution.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "resolved"
+        },
+        {
+            "type": "string",
+            "const": "escalated"
+        }
+    ],
+    "description": "How a `human-task` Task settled (doc 04 §5.2) — resolved by signal, or escalated on SLA exhaustion."
+}
