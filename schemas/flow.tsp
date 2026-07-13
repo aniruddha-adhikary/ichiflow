@@ -21,6 +21,8 @@ using TypeSpec.JsonSchema;
  *   - `human-task` — raise a Task and block on **await-signal raced by an SLA timer** (doc 04 §5.2):
  *     resolve on signal, else escalate when the SLA fires.
  *   - `timer` — a durable SLA wait; a Temporal timer, fast-forwarded under time-skip.
+ *   - `issue-document` — allocate once, deterministically render through the rendering SPI, issue,
+ *     deliver, and optionally await offer acceptance under the pausable clock (doc 04 §2.9).
  * The remaining catalogue (`adapter-call`, `parallel`, `sub-flow`, …; doc 04 §2.3) lands additively.
  */
 @jsonSchema
@@ -131,6 +133,55 @@ model TimerStep extends FlowStep {
   durationMs: int64;
 }
 
+union DocumentAcceptanceMode {
+  none: "none",
+  offer: "offer",
+}
+
+model IssueDocumentLifecycle {
+  acceptance: DocumentAcceptanceMode;
+
+  /** Offer-acceptance SLA budget in milliseconds; required by offer vectors. */
+  @minValue(0)
+  slaMs?: int64;
+}
+
+model IssueDocumentVerification {
+  endpoint: "public";
+  hash: "sha256";
+}
+
+model PortalDelivery {
+  portal: string;
+}
+
+model NotificationDelivery {
+  notify: string;
+}
+
+/**
+ * Canonical issuance step (ADR-0029): interpreter-owned, exactly-once-memoized allocation and
+ * lifecycle, with pure rendering dispatched beneath it through the rendering SPI.
+ */
+model IssueDocumentStep extends FlowStep {
+  type: "issue-document";
+
+  @pattern("^[A-Za-z0-9._-]+@[0-9]+[.][0-9]+[.][0-9]+$")
+  template: string;
+
+  /** Snapshot field → numeric blackboard-variable name. */
+  binding: Record<string>;
+
+  @pattern("^allocation://[A-Za-z0-9._/-]+$")
+  numberAllocation: string;
+
+  lifecycle: IssueDocumentLifecycle;
+  verification: IssueDocumentVerification;
+
+  @minItems(1)
+  delivery: (PortalDelivery | NotificationDelivery)[];
+}
+
 /** The initial data a Flow is started with — a named-variable blackboard the steps read and write. */
 model FlowInput {
   /** The initial blackboard: variable name → numeric value. */
@@ -147,6 +198,12 @@ union SignalAction {
 
   /** Leave `awaiting-applicant` — resume the SLA clock (§5.7). */
   resume: "resume",
+
+  /** Accept an offer-type issued Document. */
+  accept: "accept",
+
+  /** Decline an offer-type issued Document. */
+  decline: "decline",
 }
 
 /**
@@ -162,7 +219,7 @@ model Flow {
   input: FlowInput;
 
   @minItems(1)
-  steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep)[];
+  steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep | IssueDocumentStep)[];
 }
 
 /** A scripted signal a conformance vector delivers to a `human-task` step (correlated by `stepId`, doc 04 §5.2/§5.7). */
@@ -232,6 +289,15 @@ model CaseEvent {
 
   /** The routed assignee/queue (on `task.assigned`) or escalation queue (on `task.escalated`). */
   assignee?: string;
+
+  /** Allocated Document reference for issuance lifecycle events. */
+  referenceNumber?: string;
+
+  /** Current Document status on issuance lifecycle events. */
+  documentStatus?: string;
+
+  /** Document verification identity on issuance lifecycle events. */
+  verificationHash?: string;
 }
 
 /**
@@ -269,6 +335,15 @@ model FlowTraceEntry {
 
   /** The routed assignee/queue (human-task steps). */
   assignee?: string;
+
+  /** The allocated issued-Document reference (`issue-document`). */
+  referenceNumber?: string;
+
+  /** Current issued-Document lifecycle state (`issue-document`). */
+  documentStatus?: string;
+
+  /** SHA-256 verification identity (`issue-document`). */
+  verificationHash?: string;
 }
 
 /** How a `human-task` Task settled (doc 04 §5.2) — resolved by signal, or escalated on SLA exhaustion. */

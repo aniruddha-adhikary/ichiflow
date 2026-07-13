@@ -42,6 +42,18 @@
         "assignee": {
             "type": "string",
             "description": "The routed assignee/queue (human-task steps)."
+        },
+        "referenceNumber": {
+            "type": "string",
+            "description": "The allocated issued-Document reference (`issue-document`)."
+        },
+        "documentStatus": {
+            "type": "string",
+            "description": "Current issued-Document lifecycle state (`issue-document`)."
+        },
+        "verificationHash": {
+            "type": "string",
+            "description": "SHA-256 verification identity (`issue-document`)."
         }
     },
     "required": [

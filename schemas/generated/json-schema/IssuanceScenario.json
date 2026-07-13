@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssuanceScenario.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "issue"
+        },
+        {
+            "type": "string",
+            "const": "replay"
+        },
+        {
+            "type": "string",
+            "const": "supersede"
+        },
+        {
+            "type": "string",
+            "const": "revoke"
+        },
+        {
+            "type": "string",
+            "const": "accept"
+        }
+    ]
+}

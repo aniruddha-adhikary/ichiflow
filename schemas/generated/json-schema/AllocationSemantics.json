@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AllocationSemantics.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "gapped"
+        },
+        {
+            "type": "string",
+            "const": "gap-free"
+        }
+    ]
+}

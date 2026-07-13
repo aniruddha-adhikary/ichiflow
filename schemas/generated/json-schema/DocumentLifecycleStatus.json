@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentLifecycleStatus.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "issued"
+        },
+        {
+            "type": "string",
+            "const": "superseded"
+        },
+        {
+            "type": "string",
+            "const": "revoked"
+        },
+        {
+            "type": "string",
+            "const": "accepted"
+        }
+    ]
+}

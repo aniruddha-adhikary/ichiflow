@@ -16,6 +16,16 @@
             "type": "string",
             "const": "resume",
             "description": "Leave `awaiting-applicant` — resume the SLA clock (§5.7)."
+        },
+        {
+            "type": "string",
+            "const": "accept",
+            "description": "Accept an offer-type issued Document."
+        },
+        {
+            "type": "string",
+            "const": "decline",
+            "description": "Decline an offer-type issued Document."
         }
     ],
     "description": "The action a scripted signal performs against a `human-task` step (doc 04 §5.2, §5.7)."

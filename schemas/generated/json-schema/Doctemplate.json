@@ -1,0 +1,52 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Doctemplate.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "type": "string",
+            "const": "doctemplate"
+        },
+        "schemaVersion": {
+            "$ref": "DoctemplateSchemaVersion.json"
+        },
+        "metadata": {
+            "$ref": "DoctemplateMetadata.json"
+        },
+        "engine": {
+            "$ref": "RenderingEngine.json"
+        },
+        "dataSchema": {
+            "type": "string"
+        },
+        "binds": {
+            "$ref": "#/$defs/RecordTemplateBinding"
+        },
+        "content": {
+            "type": "string"
+        },
+        "accessibility": {
+            "$ref": "DocumentAccessibility.json"
+        }
+    },
+    "required": [
+        "kind",
+        "schemaVersion",
+        "metadata",
+        "engine",
+        "dataSchema",
+        "binds",
+        "content",
+        "accessibility"
+    ],
+    "description": "Immutable, versioned designer artifact binding schema-scoped snapshot fields to a print layout.",
+    "$defs": {
+        "RecordTemplateBinding": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "$ref": "TemplateBinding.json"
+            }
+        }
+    }
+}

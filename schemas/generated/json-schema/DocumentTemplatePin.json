@@ -1,0 +1,17 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentTemplatePin.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "version": {
+            "$ref": "SemanticVersion.json"
+        }
+    },
+    "required": [
+        "id",
+        "version"
+    ]
+}

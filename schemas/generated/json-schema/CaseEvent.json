@@ -20,6 +20,18 @@
         "assignee": {
             "type": "string",
             "description": "The routed assignee/queue (on `task.assigned`) or escalation queue (on `task.escalated`)."
+        },
+        "referenceNumber": {
+            "type": "string",
+            "description": "Allocated Document reference for issuance lifecycle events."
+        },
+        "documentStatus": {
+            "type": "string",
+            "description": "Current Document status on issuance lifecycle events."
+        },
+        "verificationHash": {
+            "type": "string",
+            "description": "Document verification identity on issuance lifecycle events."
         }
     },
     "required": [

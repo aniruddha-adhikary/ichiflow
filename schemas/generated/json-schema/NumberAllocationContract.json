@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NumberAllocationContract.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "version": {
+            "$ref": "SemanticVersion.json"
+        },
+        "semantics": {
+            "$ref": "AllocationSemantics.json"
+        },
+        "prefix": {
+            "type": "string"
+        },
+        "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "startsAt": {
+            "type": "integer",
+            "minimum": 1
+        }
+    },
+    "required": [
+        "id",
+        "version",
+        "semantics",
+        "prefix",
+        "width",
+        "startsAt"
+    ]
+}

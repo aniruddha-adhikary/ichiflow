@@ -1,0 +1,67 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssueDocumentStep.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "const": "issue-document"
+        },
+        "template": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+@[0-9]+[.][0-9]+[.][0-9]+$"
+        },
+        "binding": {
+            "$ref": "#/$defs/RecordString",
+            "description": "Snapshot field → numeric blackboard-variable name."
+        },
+        "numberAllocation": {
+            "type": "string",
+            "pattern": "^allocation://[A-Za-z0-9._/-]+$"
+        },
+        "lifecycle": {
+            "$ref": "IssueDocumentLifecycle.json"
+        },
+        "verification": {
+            "$ref": "IssueDocumentVerification.json"
+        },
+        "delivery": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "$ref": "PortalDelivery.json"
+                    },
+                    {
+                        "$ref": "NotificationDelivery.json"
+                    }
+                ]
+            },
+            "minItems": 1
+        }
+    },
+    "required": [
+        "type",
+        "template",
+        "binding",
+        "numberAllocation",
+        "lifecycle",
+        "verification",
+        "delivery"
+    ],
+    "allOf": [
+        {
+            "$ref": "FlowStep.json"
+        }
+    ],
+    "description": "Canonical issuance step (ADR-0029): interpreter-owned, exactly-once-memoized allocation and\nlifecycle, with pure rendering dispatched beneath it through the rendering SPI.",
+    "$defs": {
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        }
+    }
+}

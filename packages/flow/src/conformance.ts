@@ -111,11 +111,18 @@ export async function runConformance(opts: {
             await env.sleep(sig.afterMs - clock);
             clock = sig.afterMs;
           }
-          await handle.signal("taskSignal", {
-            stepId: sig.stepId,
-            action: sig.action ?? "resolve",
-            value: sig.value,
-          });
+          if (sig.action === "accept" || sig.action === "decline") {
+            await handle.signal("documentSignal", {
+              stepId: sig.stepId,
+              action: sig.action,
+            });
+          } else {
+            await handle.signal("taskSignal", {
+              stepId: sig.stepId,
+              action: sig.action ?? "resolve",
+              value: sig.value,
+            });
+          }
         }
 
         const ret = (await handle.result()) as WorkflowReturn;

@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssueDocumentLifecycle.json",
+    "type": "object",
+    "properties": {
+        "acceptance": {
+            "$ref": "DocumentAcceptanceMode.json"
+        },
+        "slaMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Offer-acceptance SLA budget in milliseconds; required by offer vectors."
+        }
+    },
+    "required": [
+        "acceptance"
+    ]
+}

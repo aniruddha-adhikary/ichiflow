@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentAccessibility.json",
+    "type": "object",
+    "properties": {
+        "pdfua": {
+            "type": "boolean"
+        },
+        "textContrast": {
+            "type": "number",
+            "minimum": 4.5
+        },
+        "uiContrast": {
+            "type": "number",
+            "minimum": 3
+        }
+    },
+    "required": [
+        "pdfua",
+        "textContrast",
+        "uiContrast"
+    ]
+}

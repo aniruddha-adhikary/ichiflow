@@ -1,0 +1,23 @@
+{
+  "kind": "doctemplate",
+  "schemaVersion": "doctemplate/v1",
+  "metadata": {
+    "id": "customs-permit",
+    "version": "1.0.0",
+    "governanceState": "released",
+    "ownerTeam": "trade-policy"
+  },
+  "engine": "typst",
+  "dataSchema": "schema://issuance/customs-permit-snapshot/1",
+  "binds": {
+    "holder": "${snapshot.applicant.fullName}",
+    "amount": "${snapshot.outcome.amount}",
+    "permitNo": "${snapshot.issue.referenceNumber}"
+  },
+  "content": "Permit ${permitNo}\nHolder: ${holder}\nAmount: ${amount}",
+  "accessibility": {
+    "pdfua": true,
+    "textContrast": 7,
+    "uiContrast": 4.5
+  }
+}

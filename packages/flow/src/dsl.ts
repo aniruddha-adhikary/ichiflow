@@ -47,7 +47,24 @@ export interface TimerStep {
   durationMs: number;
 }
 
-export type FlowStep = ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep;
+export interface IssueDocumentStep {
+  id: string;
+  type: "issue-document";
+  template: string;
+  /** Snapshot field → blackboard variable name. */
+  binding: Record<string, string>;
+  numberAllocation: string;
+  lifecycle: { acceptance: "none" | "offer"; slaMs?: number };
+  verification: { endpoint: "public"; hash: "sha256" };
+  delivery: Array<{ portal: string } | { notify: string }>;
+}
+
+export type FlowStep =
+  | ComputeStep
+  | DecisionEvalStep
+  | HumanTaskStep
+  | TimerStep
+  | IssueDocumentStep;
 
 export interface Flow {
   id: string;
@@ -57,7 +74,7 @@ export interface Flow {
 }
 
 /** What a scripted signal does to a `human-task` step (doc 04 §5.2/§5.7). */
-export type SignalAction = "resolve" | "pause" | "resume";
+export type SignalAction = "resolve" | "pause" | "resume" | "accept" | "decline";
 
 /** A scripted signal delivered to a `human-task` step during interpretation (correlated by `stepId`). */
 export interface FlowSignal {

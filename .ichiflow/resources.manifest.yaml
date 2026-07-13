@@ -288,3 +288,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/adapters.ts
     description: Adapter-layer gate (build plan 5.1, doc 05, doc 13 §2.d) — every committed Port/Mapping/golden/reliability fixture is schema-valid and every canonical output validates against CanonicalEnvelope (contract tests); each pure Message-Translator mapping reproduces its golden and every v1 binding (REST/broker/webhook) round-trips decode ∘ translate to the same canonical event (mapping goldens); and the reliability vectors hold — dedup passes, dlq passes, redelivery applies once — all against mocks (no live external system). Consumes the artifact from `pnpm adapters:preview`.
+  - id: document-schema
+    kind: schema
+    path: schemas/document.tsp
+    description: Canonical Document-issuance contracts (build plan 5.3, ADR-0029, doc 04 §2.9, doc 07 §15) — immutable/versioned Document + doctemplate, pinned snapshot/template/reference/hash, issued/superseded/revoked/accepted lifecycle, allocation contract, and issuance/public-verification vector DSLs. TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: issuance-fixtures
+    kind: pattern
+    path: schemas/issuance
+    description: Committed doctemplate, issued-Document, lifecycle/replay, and public-verification fixtures (build plan 5.3, harness-first, doc 13 §2.c/§2.k) — deterministic render, one allocation/issued event on replay, supersede/revoke/offer-accept, genuine/tampered/unknown verification, binding-scope, accessibility, and gap-free/gapped allocation coverage. Replayed by `pnpm issuance:preview`.
+  - id: issuance
+    kind: harness
+    path: packages/cli/src/verify/scopes/issuance.ts
+    description: Document-issuance gate (build plan 5.3, doc 13 §2.k) — fixtures validate against emitted contracts; the self-contained Typst-default SPI renders normalized-identical bytes and passes binding-scope/PDF-UA/contrast checks; numbering is exactly-once-memoized by (case_id, step.id); lifecycle transitions are audited; replay never double-consumes or double-issues; and public verification is status/hash-correct and data-minimal. Consumes the artifact from `pnpm issuance:preview`.

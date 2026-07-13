@@ -9,7 +9,9 @@ import {
 import type { Flow, Vars } from "./dsl.js";
 import type { activities } from "./activities.js";
 
-const { compute, decisionEval, createTask } = proxyActivities<typeof activities>({
+const { compute, decisionEval, createTask, issueDocument, acceptDocument } = proxyActivities<
+  typeof activities
+>({
   startToCloseTimeout: "1 minute",
 });
 
@@ -24,6 +26,12 @@ export const taskSignal =
     "taskSignal",
   );
 
+/** Accept/decline (or pause/resume) an offer-type `issue-document`, correlated by step id. */
+export const documentSignal =
+  defineSignal<[{ stepId: string; action: "accept" | "decline" | "pause" | "resume" }]>(
+    "documentSignal",
+  );
+
 /** A typed trace entry per executed step — the audit-spine material the DecisionRecord stitches (doc 04 §2.6). */
 export interface TraceEntry {
   stepId: string;
@@ -36,6 +44,9 @@ export interface TraceEntry {
   resolution?: "resolved" | "escalated";
   durationMs?: number;
   assignee?: string;
+  referenceNumber?: string;
+  documentStatus?: "issued" | "accepted" | "declined";
+  verificationHash?: string;
 }
 
 /** A Case/Task event-history entry (doc 04 §5.1/§5.2) — the ordered facts the DecisionRecord will key by `case_id`. */
@@ -44,6 +55,9 @@ export interface CaseEvent {
   type: string;
   stepId?: string;
   assignee?: string;
+  referenceNumber?: string;
+  documentStatus?: string;
+  verificationHash?: string;
 }
 
 export interface FlowResult {
@@ -79,17 +93,32 @@ export async function interpret(flow: Flow): Promise<FlowResult> {
   const caseId = workflowInfo().workflowId;
   let slaMs = 0;
   let seq = 0;
-  const emit = (type: string, extra?: { stepId?: string; assignee?: string }): void => {
+  const emit = (
+    type: string,
+    extra?: {
+      stepId?: string;
+      assignee?: string;
+      referenceNumber?: string;
+      documentStatus?: string;
+      verificationHash?: string;
+    },
+  ): void => {
     events.push({ seq: seq++, type, ...extra });
   };
 
   // Buffer task signals by step id so early/late/duplicate deliveries correlate deterministically on replay.
   const resolved = new Map<string, number>();
   const paused = new Set<string>();
+  const documentResolutions = new Map<string, "accept" | "decline">();
   setHandler(taskSignal, ({ stepId, action = "resolve", value }) => {
     if (action === "pause") paused.add(stepId);
     else if (action === "resume") paused.delete(stepId);
     else resolved.set(stepId, value ?? 0);
+  });
+  setHandler(documentSignal, ({ stepId, action }) => {
+    if (action === "pause") paused.add(stepId);
+    else if (action === "resume") paused.delete(stepId);
+    else documentResolutions.set(stepId, action);
   });
 
   const read = (names: string[]): number[] => names.map((n) => vars[n]!);
@@ -193,6 +222,83 @@ export async function interpret(flow: Flow): Promise<FlowResult> {
         await sleep(step.durationMs);
         slaMs += step.durationMs;
         trace.push({ stepId: step.id, type: step.type, durationMs: step.durationMs });
+        break;
+      }
+      case "issue-document": {
+        const snapshot = Object.fromEntries(
+          Object.entries(step.binding).map(([field, variable]) => [field, vars[variable]!]),
+        );
+        const issued = await issueDocument({
+          caseId,
+          stepId: step.id,
+          template: step.template,
+          snapshot,
+          numberAllocation: step.numberAllocation,
+          acceptance: step.lifecycle.acceptance,
+          delivery: step.delivery,
+          issuedAt: new Date(Date.now()).toISOString(),
+        });
+        for (const type of issued.events) {
+          emit(type, {
+            stepId: step.id,
+            referenceNumber: issued.referenceNumber,
+            documentStatus: issued.status,
+            verificationHash: issued.verificationHash,
+          });
+        }
+
+        let documentStatus: "issued" | "accepted" | "declined" = "issued";
+        if (step.lifecycle.acceptance === "offer") {
+          const budget = step.lifecycle.slaMs ?? 0;
+          let remaining = budget;
+          slaMs += budget;
+          for (;;) {
+            if (documentResolutions.has(step.id)) break;
+            if (paused.has(step.id)) {
+              emit("sla.paused", { stepId: step.id });
+              await condition(() => !paused.has(step.id) || documentResolutions.has(step.id));
+              if (!documentResolutions.has(step.id)) emit("sla.resumed", { stepId: step.id });
+              continue;
+            }
+            const startedAt = Date.now();
+            const met = await condition(
+              () => documentResolutions.has(step.id) || paused.has(step.id),
+              remaining,
+            );
+            remaining = Math.max(0, remaining - (Date.now() - startedAt));
+            if (!met) {
+              documentResolutions.set(step.id, "decline");
+              break;
+            }
+          }
+          const resolution = documentResolutions.get(step.id)!;
+          if (resolution === "accept") {
+            await acceptDocument({ referenceNumber: issued.referenceNumber });
+            documentStatus = "accepted";
+            emit("document.accepted", {
+              stepId: step.id,
+              referenceNumber: issued.referenceNumber,
+              documentStatus,
+              verificationHash: issued.verificationHash,
+            });
+          } else {
+            documentStatus = "declined";
+            emit("document.declined", {
+              stepId: step.id,
+              referenceNumber: issued.referenceNumber,
+              documentStatus,
+              verificationHash: issued.verificationHash,
+            });
+          }
+        }
+
+        trace.push({
+          stepId: step.id,
+          type: step.type,
+          referenceNumber: issued.referenceNumber,
+          documentStatus,
+          verificationHash: issued.verificationHash,
+        });
         break;
       }
     }

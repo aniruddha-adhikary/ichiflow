@@ -1,0 +1,32 @@
+{
+  "name": "issue-document allocates, renders, issues, and delivers",
+  "flow": {
+    "id": "issue-document",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "amount": 1250 } },
+    "steps": [
+      {
+        "id": "issue-permit",
+        "type": "issue-document",
+        "template": "customs-permit@1.0.0",
+        "binding": { "amount": "amount" },
+        "numberAllocation": "allocation://customs/clearance-permit",
+        "lifecycle": { "acceptance": "none" },
+        "verification": { "endpoint": "public", "hash": "sha256" },
+        "delivery": [{ "portal": "customer" }]
+      }
+    ]
+  },
+  "expect": {
+    "vars": { "amount": 1250 },
+    "steps": 1,
+    "slaMs": 0,
+    "events": [
+      "case.created",
+      "document.allocated",
+      "document.issued",
+      "document.delivered",
+      "case.resolved"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssueDocumentVerification.json",
+    "type": "object",
+    "properties": {
+        "endpoint": {
+            "type": "string",
+            "const": "public"
+        },
+        "hash": {
+            "type": "string",
+            "const": "sha256"
+        }
+    },
+    "required": [
+        "endpoint",
+        "hash"
+    ]
+}

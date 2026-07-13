@@ -1,0 +1,88 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Document.json",
+    "type": "object",
+    "properties": {
+        "schemaVersion": {
+            "$ref": "DocumentSchemaVersion.json"
+        },
+        "id": {
+            "type": "string"
+        },
+        "caseId": {
+            "type": "string"
+        },
+        "stepId": {
+            "type": "string"
+        },
+        "documentType": {
+            "type": "string"
+        },
+        "version": {
+            "$ref": "SemanticVersion.json"
+        },
+        "snapshot": {
+            "$ref": "#/$defs/RecordUnknown"
+        },
+        "snapshotRef": {
+            "$ref": "Sha256Hash.json"
+        },
+        "template": {
+            "$ref": "DocumentTemplatePin.json"
+        },
+        "referenceNumber": {
+            "type": "string"
+        },
+        "numberAllocation": {
+            "type": "string"
+        },
+        "status": {
+            "$ref": "DocumentLifecycleStatus.json"
+        },
+        "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "verificationHash": {
+            "$ref": "Sha256Hash.json"
+        },
+        "renderHash": {
+            "$ref": "Sha256Hash.json"
+        },
+        "supersedes": {
+            "type": "string"
+        },
+        "deliveries": {
+            "type": "array",
+            "items": {
+                "$ref": "DocumentDelivery.json"
+            }
+        }
+    },
+    "required": [
+        "schemaVersion",
+        "id",
+        "caseId",
+        "stepId",
+        "documentType",
+        "version",
+        "snapshot",
+        "snapshotRef",
+        "template",
+        "referenceNumber",
+        "numberAllocation",
+        "status",
+        "issuedAt",
+        "verificationHash",
+        "renderHash",
+        "deliveries"
+    ],
+    "description": "Immutable, versioned issued instrument. Lifecycle transitions replace registry metadata and append\naudit events; the pinned snapshot/template identity and rendered hash never mutate.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

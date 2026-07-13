@@ -1,0 +1,31 @@
+{
+  "name": "offer document awaits and records acceptance",
+  "scenario": "accept",
+  "caseId": "case-accept",
+  "stepId": "issue-offer",
+  "documentType": "grant-offer",
+  "issuedAt": "2030-01-01T00:00:00Z",
+  "template": "customs-permit@1.0.0",
+  "snapshot": {
+    "applicant": { "fullName": "Offer Holder" },
+    "outcome": { "amount": 5000 },
+    "issue": { "referenceNumber": "OFR-000001" }
+  },
+  "allocation": {
+    "id": "allocation://grants/offer",
+    "version": "1.0.0",
+    "semantics": "gap-free",
+    "prefix": "OFR-",
+    "width": 6,
+    "startsAt": 1
+  },
+  "acceptance": "offer",
+  "delivery": [{ "portal": "applicant" }],
+  "expect": {
+    "documents": 1,
+    "allocations": 1,
+    "issuedEvents": 1,
+    "deliveredEvents": 1,
+    "status": "accepted"
+  }
+}

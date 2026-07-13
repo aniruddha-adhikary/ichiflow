@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `issuance`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -182,3 +182,15 @@ event; and **idempotency/DLQ vectors** — a duplicate `messageId` is deduped on
 a poison message lands in the DLQ after bounded attempts, and a crash redelivery applies once
 (`dedup: pass`, `dlq: pass`). Deterministic (committed fixtures, no wall-clock/RNG), so run
 `pnpm adapters:preview` before `pnpm verify` to produce `packages/adapters/build/adapters-results.json`.
+
+`issuance` is the Phase 5.3 gate (ADR-0029, doc 04 §2.9, doc 07 §15, doc 13 §2.c/§2.k):
+the canonical immutable/versioned `Document` + `doctemplate` contracts and committed issuance/public-
+verification fixtures (`schemas/issuance/`) validate against emitted JSON Schema; the rendering SPI's
+self-contained Typst-default binding emits normalized-identical bytes across two runs and passes
+binding-scope + PDF/UA/contrast checks; number allocation is exactly-once-memoized by
+`(case_id, step.id)` with gap-free/gapped vector coverage; issued→superseded/revoked/accepted
+transitions emit audit events; replay cannot allocate or emit `issued` twice; and genuine,
+tampered-hash, and unknown-reference verification vectors return a data-minimal status/hash verdict
+without Case data. The flow-layer vectors also prove `issue-document` allocate→render→issue→deliver
+and offer acceptance under Temporal time-skip. Run `pnpm issuance:preview` before `pnpm verify` to
+produce `packages/issuance/build/issuance-results.json`.
