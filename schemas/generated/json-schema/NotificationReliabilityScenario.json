@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationReliabilityScenario.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "duplicate",
+            "description": "A duplicate `notificationId` must be deduped once (delivered exactly once)."
+        },
+        {
+            "type": "string",
+            "const": "poison",
+            "description": "A provider that keeps failing must land the message in the DLQ after bounded attempts."
+        },
+        {
+            "type": "string",
+            "const": "redelivery",
+            "description": "A crash-redelivered message with a seen `notificationId` must apply exactly once."
+        }
+    ],
+    "description": "The reliability scenario a notification vector exercises (doc 05 §reliability) — mirrors the adapter set."
+}

@@ -42,6 +42,7 @@
     "portal:preview": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/portal build && pnpm --filter @ichiflow/portal preview",
     "adapters:preview": "pnpm --filter @ichiflow/adapters build && pnpm --filter @ichiflow/adapters preview",
     "issuance:preview": "pnpm --filter @ichiflow/issuance build && pnpm --filter @ichiflow/issuance preview",
+    "notifications:preview": "pnpm --filter @ichiflow/notifications build && pnpm --filter @ichiflow/notifications preview",
     "quality:jvm": "cd core && ./gradlew -q detekt test",
     "verify": "node packages/cli/dist/cli.js verify"
   },

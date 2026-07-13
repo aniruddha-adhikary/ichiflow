@@ -1,0 +1,56 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationTemplate.json",
+    "type": "object",
+    "properties": {
+        "schemaVersion": {
+            "$ref": "NotificationSchemaVersion.json"
+        },
+        "id": {
+            "type": "string",
+            "description": "Stable template id (e.g. `permit-issued`)."
+        },
+        "version": {
+            "type": "string",
+            "description": "Semantic version of the template content (a text change bumps this)."
+        },
+        "channel": {
+            "$ref": "NotificationChannel.json",
+            "description": "The channel this template's text is authored for."
+        },
+        "codeSet": {
+            "type": "string",
+            "description": "The governed CodeSet ref providing the template's coded content / per-audience text (doc 02 §9)."
+        },
+        "text": {
+            "$ref": "#/$defs/RecordNotificationText",
+            "description": "The per-locale plain-language text (BCP-47 key → text), rendered by pure param substitution."
+        },
+        "params": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The substitution parameters a request must supply (every `{{param}}` in the text)."
+        }
+    },
+    "required": [
+        "schemaVersion",
+        "id",
+        "version",
+        "channel",
+        "codeSet",
+        "text",
+        "params"
+    ],
+    "description": "A governed **notification template** (doc 05 §4.2). Content is templated and references a governed\nCodeSet (`codeSet`) for its coded content; `text` is the per-locale plain-language i18n map keyed by\nBCP-47 locale. `params` declares the substitution parameters a request must supply — a request whose\nparams do not cover the template's declared set is a render error, so the goldens stay total.",
+    "$defs": {
+        "RecordNotificationText": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "$ref": "NotificationText.json"
+            }
+        }
+    }
+}

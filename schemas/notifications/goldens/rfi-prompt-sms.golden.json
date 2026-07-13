@@ -1,0 +1,24 @@
+{
+  "name": "rfi-prompt SMS renders body-only (no subject) with params substituted",
+  "templateId": "rfi-prompt@1.0.0",
+  "request": {
+    "schemaVersion": "notification/v1",
+    "notificationId": "notif-rfi-case-77",
+    "correlationId": "case-77/rfi",
+    "caseId": "case-77",
+    "stepId": "rfi",
+    "template": "rfi-prompt@1.0.0",
+    "locale": "en",
+    "recipient": "+15551234567",
+    "params": {
+      "caseRef": "CASE-77",
+      "dueDate": "2026-07-20"
+    }
+  },
+  "expected": {
+    "channel": "sms",
+    "locale": "en",
+    "recipient": "+15551234567",
+    "body": "Case CASE-77: we need more information by 2026-07-20. Reply or visit the portal."
+  }
+}

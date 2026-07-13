@@ -1,0 +1,22 @@
+{
+  "name": "orphan detector — a notify.sent delivery with no originating notify.requested does not stitch (adapter-call gap, chain incomplete)",
+  "result": {
+    "flowId": "orphan-notify",
+    "caseId": "orphan-notify-1",
+    "steps": 1,
+    "vars": {},
+    "slaMs": 0,
+    "trace": [],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "notify.sent", "stepId": "ghost-notify" },
+      { "seq": 2, "type": "case.resolved" }
+    ]
+  },
+  "expect": {
+    "chainComplete": false,
+    "orphans": ["notify.sent@seq:1 for step ghost-notify has no originating notify.requested"],
+    "decisions": 0,
+    "tasks": 0
+  }
+}

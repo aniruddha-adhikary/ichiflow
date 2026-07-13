@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationGolden.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Human-readable golden name; doubles as intent documentation."
+        },
+        "templateId": {
+            "type": "string",
+            "description": "The template id (`id@version`) the request renders against."
+        },
+        "request": {
+            "$ref": "NotificationRequest.json",
+            "description": "The notification request to render."
+        },
+        "expected": {
+            "$ref": "RenderedMessage.json",
+            "description": "The pinned rendered message the pure renderer must reproduce."
+        }
+    },
+    "required": [
+        "name",
+        "templateId",
+        "request",
+        "expected"
+    ],
+    "description": "A committed **render golden** (build plan 5.4, harness-first): a request + the exact `RenderedMessage` the pure renderer must produce."
+}

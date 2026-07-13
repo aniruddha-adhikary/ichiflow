@@ -1,0 +1,25 @@
+{
+  "name": "@ichiflow/notifications",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 5.4 notifications layer — email/SMS as ordinary outbound Adapter port types (doc 05 §4.2): a governed per-locale template renderer (pure) + a provider delivery SPI selected by channel + the Idempotent Receiver / DLQ reliability machinery, all against mocks (no live provider).",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run",
+    "preview": "node dist/preview.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.15.0",
+    "@types/node": "20.17.6",
+    "eslint": "9.15.0",
+    "typescript": "5.6.3",
+    "typescript-eslint": "8.18.0",
+    "vitest": "2.1.5"
+  }
+}

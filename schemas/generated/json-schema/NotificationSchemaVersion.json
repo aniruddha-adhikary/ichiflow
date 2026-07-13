@@ -1,0 +1,11 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationSchemaVersion.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "notification/v1"
+        }
+    ],
+    "description": "The pinned notification-artifact schema version a Template/Request declares (doc 05 §9, contract versioning)."
+}

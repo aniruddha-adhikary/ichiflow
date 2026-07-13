@@ -1,0 +1,11 @@
+{
+  "name": "a provider that keeps failing lands the notification in the DLQ after bounded attempts; healthy deliveries still send",
+  "scenario": "poison",
+  "maxAttempts": 3,
+  "deliveries": [
+    { "notificationId": "n-ok-1" },
+    { "notificationId": "n-poison", "poison": true },
+    { "notificationId": "n-ok-2" }
+  ],
+  "expect": { "sent": 2, "deduped": 0, "dlq": 1 }
+}

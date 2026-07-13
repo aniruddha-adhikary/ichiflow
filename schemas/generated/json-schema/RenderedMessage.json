@@ -1,0 +1,33 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "RenderedMessage.json",
+    "type": "object",
+    "properties": {
+        "channel": {
+            "$ref": "NotificationChannel.json"
+        },
+        "locale": {
+            "type": "string",
+            "description": "The BCP-47 locale rendered."
+        },
+        "recipient": {
+            "type": "string",
+            "description": "The delivery address."
+        },
+        "subject": {
+            "type": "string",
+            "description": "Rendered subject line (email only)."
+        },
+        "body": {
+            "type": "string",
+            "description": "Rendered message body."
+        }
+    },
+    "required": [
+        "channel",
+        "locale",
+        "recipient",
+        "body"
+    ],
+    "description": "A **rendered message** — the pure output of applying a `NotificationRequest` to its template's\nlocale text. The provider driver delivers exactly this; its bytes are stable, so a template or param\nchange is a visible golden diff (doc 13 §2.d)."
+}

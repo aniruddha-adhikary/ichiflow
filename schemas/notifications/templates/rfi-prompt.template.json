@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "notification/v1",
+  "id": "rfi-prompt",
+  "version": "1.0.0",
+  "channel": "sms",
+  "codeSet": "codeset://notifications/case-comms@1.0.0",
+  "text": {
+    "en": {
+      "body": "Case {{caseRef}}: we need more information by {{dueDate}}. Reply or visit the portal."
+    }
+  },
+  "params": ["caseRef", "dueDate"]
+}

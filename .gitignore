@@ -159,6 +159,8 @@ packages/portal/build/
 packages/adapters/build/
 # Document-issuance harness results — derived state produced by `pnpm issuance:preview` (chunk 5.3).
 packages/issuance/build/
+# Notifications harness results — derived state produced by `pnpm notifications:preview` (chunk 5.4).
+packages/notifications/build/
 
 # Gradle / Kotlin core
 core/.gradle/

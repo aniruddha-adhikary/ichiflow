@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationText.json",
+    "type": "object",
+    "properties": {
+        "subject": {
+            "type": "string",
+            "description": "Subject line (email channel); rendered with the same `{{param}}` substitution as `body`."
+        },
+        "body": {
+            "type": "string",
+            "description": "Message body — the plain-language text for this locale."
+        }
+    },
+    "required": [
+        "body"
+    ],
+    "description": "The per-locale text a `NotificationTemplate` renders from (doc 02 §9.2 plain-language map). `body` is\nrequired; `subject` applies to `email` only. Both may carry `{{param}}` placeholders substituted from\nthe request's declared `params` — rendering is a **pure** function of (template, locale, params)."
+}

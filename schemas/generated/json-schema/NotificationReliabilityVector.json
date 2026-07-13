@@ -1,0 +1,39 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "NotificationReliabilityVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Human-readable vector name."
+        },
+        "scenario": {
+            "$ref": "NotificationReliabilityScenario.json"
+        },
+        "maxAttempts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Bounded retry attempts before a failing delivery is quarantined in the DLQ."
+        },
+        "deliveries": {
+            "type": "array",
+            "items": {
+                "$ref": "NotificationDeliveryAttempt.json"
+            },
+            "description": "The ordered delivery attempts to drive."
+        },
+        "expect": {
+            "$ref": "NotificationDispositionCounts.json",
+            "description": "The pinned disposition counts."
+        }
+    },
+    "required": [
+        "name",
+        "scenario",
+        "maxAttempts",
+        "deliveries",
+        "expect"
+    ],
+    "description": "A committed **idempotency/DLQ vector** (build plan 5.4, harness-first). Drives a sequence of delivery\nattempts through the Idempotent Receiver + bounded-retry DLQ machinery and pins the disposition\ncounts, so `dedup`/`dlq`/`redelivery` are proven, not assumed."
+}

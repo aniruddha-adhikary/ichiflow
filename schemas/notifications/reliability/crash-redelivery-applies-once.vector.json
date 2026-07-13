@@ -1,0 +1,7 @@
+{
+  "name": "crash redelivery of a seen notificationId sends exactly once (replay does not double-send)",
+  "scenario": "redelivery",
+  "maxAttempts": 3,
+  "deliveries": [{ "notificationId": "n-crash" }, { "notificationId": "n-crash" }],
+  "expect": { "sent": 1, "deduped": 1, "dlq": 0 }
+}
