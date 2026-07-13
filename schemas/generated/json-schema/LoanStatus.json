@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "LoanStatus.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "draft"
+        },
+        {
+            "type": "string",
+            "const": "submitted"
+        },
+        {
+            "type": "string",
+            "const": "approved"
+        },
+        {
+            "type": "string",
+            "const": "declined"
+        }
+    ],
+    "description": "Lifecycle status of the v1 reference entity (a permit/benefit-style application record)."
+}

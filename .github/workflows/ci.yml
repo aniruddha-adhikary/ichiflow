@@ -103,6 +103,9 @@ jobs:
       - name: Flow layer — DecisionRecord assembly + orphan-event detector on committed case fixtures (chunk 3.4)
         run: pnpm decisionrecord:assemble
 
+      - name: Entity store — CRUD + audit-log + transactional-outbox conformance vectors on the Repository SPI (chunk 4.1)
+        run: pnpm entity:jvm
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

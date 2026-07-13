@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityStoreVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "entityType": {
+            "type": "string"
+        },
+        "ops": {
+            "type": "array",
+            "items": {
+                "$ref": "EntityStoreOp.json"
+            }
+        },
+        "expect": {
+            "$ref": "EntityStoreExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "entityType",
+        "ops",
+        "expect"
+    ],
+    "description": "One committed **entity-store conformance vector** (build plan 4.1): a named sequence of CRUD/query\nops over the reference entity paired with the pinned audit-log + outbox oracle. Proves generated-repo\nround-trip, query/pagination/search, versioning, soft-delete, and transactional-outbox delivery."
+}

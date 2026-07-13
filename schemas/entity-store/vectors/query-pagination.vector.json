@@ -1,0 +1,91 @@
+{
+  "name": "query-pagination-search",
+  "entityType": "LoanApplication",
+  "ops": [
+    {
+      "operation": "create",
+      "id": "app-1",
+      "caseId": "case-1",
+      "data": {
+        "applicant": "Alice Tan",
+        "amount": 1000,
+        "productCode": "PERMIT-A",
+        "status": "submitted"
+      }
+    },
+    {
+      "operation": "create",
+      "id": "app-2",
+      "caseId": "case-2",
+      "data": {
+        "applicant": "Bob Lim",
+        "amount": 2000,
+        "productCode": "PERMIT-B",
+        "status": "draft"
+      }
+    },
+    {
+      "operation": "create",
+      "id": "app-3",
+      "caseId": "case-3",
+      "data": {
+        "applicant": "Carol Ng",
+        "amount": 1500,
+        "productCode": "PERMIT-A",
+        "status": "approved"
+      }
+    },
+    {
+      "operation": "list",
+      "query": { "entityType": "LoanApplication", "sort": "amount", "page": 0, "size": 2 },
+      "expectTotal": 3,
+      "expectIds": ["app-1", "app-3"]
+    },
+    {
+      "operation": "list",
+      "query": { "entityType": "LoanApplication", "sort": "amount", "page": 1, "size": 2 },
+      "expectTotal": 3,
+      "expectIds": ["app-2"]
+    },
+    {
+      "operation": "list",
+      "query": {
+        "entityType": "LoanApplication",
+        "filter": { "productCode": "PERMIT-A" },
+        "sort": "amount",
+        "page": 0,
+        "size": 10
+      },
+      "expectTotal": 2,
+      "expectIds": ["app-1", "app-3"]
+    },
+    {
+      "operation": "list",
+      "query": { "entityType": "LoanApplication", "search": "bob", "page": 0, "size": 10 },
+      "expectTotal": 1,
+      "expectIds": ["app-2"]
+    },
+    { "operation": "delete", "id": "app-2" },
+    {
+      "operation": "list",
+      "query": { "entityType": "LoanApplication", "sort": "amount", "page": 0, "size": 10 },
+      "expectTotal": 2,
+      "expectIds": ["app-1", "app-3"]
+    }
+  ],
+  "expect": {
+    "audit": [
+      { "operation": "create", "id": "app-1", "version": 1 },
+      { "operation": "create", "id": "app-2", "version": 1 },
+      { "operation": "create", "id": "app-3", "version": 1 },
+      { "operation": "delete", "id": "app-2", "version": 2 }
+    ],
+    "outbox": [
+      { "operation": "create", "id": "app-1" },
+      { "operation": "create", "id": "app-2" },
+      { "operation": "create", "id": "app-3" },
+      { "operation": "delete", "id": "app-2" }
+    ],
+    "outboxDeliveredAll": true
+  }
+}

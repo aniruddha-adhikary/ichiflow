@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityAuditExpectation.json",
+    "type": "object",
+    "properties": {
+        "operation": {
+            "$ref": "EntityOp.json"
+        },
+        "id": {
+            "type": "string"
+        },
+        "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        }
+    },
+    "required": [
+        "operation",
+        "id",
+        "version"
+    ],
+    "description": "The pinned audit-log shape a vector must produce (seq is assigned by the store, so omitted here)."
+}

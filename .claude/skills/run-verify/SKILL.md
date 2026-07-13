@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -104,6 +104,17 @@ negative fixtures inject a gap (a Task-lifecycle event with no `task.created`, a
 **orphan-event detector** must flag (`cases_green == total`). Assembly is pure, so run
 `pnpm decisionrecord:assemble` before `pnpm verify` to produce
 `packages/flow/build/decisionrecord-results.json`.
+
+`entity-store` is the Phase 4.1 gate (ADR-0018/0012, doc 13): the domain **entity store** is CRUD +
+append-only audit log + **transactional outbox** (not event-sourced) for ordinary business records
+(the reference `LoanApplication`). The committed vectors (`schemas/entity-store/vectors/*.vector.json`)
+validate against the emitted `EntityStoreVector.json`, every persisted payload validates against the
+schema-defined entity (`LoanApplication.json`) at the boundary, and replaying each vector's CRUD/query
+ops against a fresh deterministic Repository SPI reference binding must reproduce the pinned audit-log +
+outbox oracle in order, with the relay marking every outbox record delivered
+(`vectors_green == total`, `outbox_delivered == outbox_total`). The binding uses monotonic sequence
+stamps (no wall-clock/RNG), so run `pnpm entity:jvm` before `pnpm verify` to produce
+`core/build/entity-store-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

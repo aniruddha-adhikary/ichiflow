@@ -1,0 +1,48 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityMeta.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Stable store id (unique per entity type)."
+        },
+        "caseId": {
+            "type": "string",
+            "description": "The correlating global `case_id` (ADR-0012); absent for entities not yet bound to a Case."
+        },
+        "entityType": {
+            "type": "string",
+            "description": "The entity type discriminator, e.g. `LoanApplication`."
+        },
+        "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Optimistic-concurrency version — 1 on create, incremented on each update."
+        },
+        "createdSeq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic sequence stamp at create time."
+        },
+        "updatedSeq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic sequence stamp at the last mutation."
+        },
+        "deleted": {
+            "type": "boolean",
+            "description": "Soft-delete tombstone — a deleted record is retained (for audit) but excluded from queries."
+        }
+    },
+    "required": [
+        "id",
+        "entityType",
+        "version",
+        "createdSeq",
+        "updatedSeq",
+        "deleted"
+    ],
+    "description": "Store-owned metadata stamped on every persisted record (ADR-0018/0012): stable id, the correlating\nglobal `case_id`, the entity type, an optimistic-concurrency `version`, monotonic create/update\nsequence stamps (the deterministic stand-in for wall-clock timestamps in the harness), and the\nsoft-delete tombstone."
+}

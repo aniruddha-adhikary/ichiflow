@@ -56,6 +56,16 @@ class ArchitectureTest {
                 .should().dependOnClassesThat().resideInAnyPackage("org.kie..", "org.drools..", "ai.ichiflow.core.decision.spi..")
                 .because("decision-source projection compiles to DMN text and must stay engine-free"),
         ),
+        // The entity-store Repository SPI contract must stay persistence-neutral: the abstraction
+        // (interfaces + DTOs in entity.spi) may not depend on any concrete binding in entity.store,
+        // so the deferred PostgreSQL/jOOQ/Exposed pick (ADR-0018) slots in without touching callers.
+        NamedRule(
+            "entity.spi.contract-independent-of-binding",
+            noClasses()
+                .that().resideInAPackage("ai.ichiflow.core.entity.spi..")
+                .should().dependOnClassesThat().resideInAPackage("ai.ichiflow.core.entity.store..")
+                .because("the Repository SPI contract must not depend on a concrete persistence binding"),
+        ),
         // No package cycles within the core (keeps the module graph a DAG).
         NamedRule(
             "core.no-package-cycles",

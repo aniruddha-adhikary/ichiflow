@@ -1,0 +1,49 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityQuery.json",
+    "type": "object",
+    "properties": {
+        "entityType": {
+            "type": "string"
+        },
+        "filter": {
+            "$ref": "#/$defs/RecordString",
+            "description": "Exact-match field filters (field name → expected stringified value)."
+        },
+        "search": {
+            "type": "string",
+            "description": "Free-text search term (matched against the entity's searchable text)."
+        },
+        "sort": {
+            "type": "string",
+            "description": "Sort field; results are additionally ordered by `id` for a total, deterministic order."
+        },
+        "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Zero-based page index."
+        },
+        "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Page size (max rows returned)."
+        }
+    },
+    "required": [
+        "entityType",
+        "page",
+        "size"
+    ],
+    "description": "The **query / pagination / search** request (ADR-0018) the generated list/detail screens and Flows\nissue. `filter` is exact-match on scalar fields; `search` is free-text (Postgres FTS by default);\nresults are a stable, sorted, paginated `EntityPage`.",
+    "$defs": {
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        }
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityOp.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "create"
+        },
+        {
+            "type": "string",
+            "const": "update"
+        },
+        {
+            "type": "string",
+            "const": "delete"
+        }
+    ],
+    "description": "The mutation kind recorded on the audit log and emitted to the outbox."
+}

@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "OutboxRecord.json",
+    "type": "object",
+    "properties": {
+        "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic outbox sequence number."
+        },
+        "id": {
+            "type": "string"
+        },
+        "entityType": {
+            "type": "string"
+        },
+        "operation": {
+            "$ref": "EntityOp.json"
+        },
+        "caseId": {
+            "type": "string"
+        },
+        "delivered": {
+            "type": "boolean",
+            "description": "True once the relay has dispatched this record to consumers."
+        }
+    },
+    "required": [
+        "seq",
+        "id",
+        "entityType",
+        "operation",
+        "delivered"
+    ],
+    "description": "One **transactional-outbox** record (ADR-0018/0012). Written in the *same* transaction as the entity\nmutation (atomicity is the whole point — no dual-write), then relayed to downstream consumers and\nmarked `delivered`. Feeds adapters (Phase 5) and read-model projections."
+}
