@@ -116,6 +116,16 @@ tasks.register<JavaExec>("runDecisionTck") {
     mainClass.set("ai.ichiflow.core.decision.tck.DecisionTckRunner")
 }
 
+// Compile every construct in the DMN feature matrix (build plan 2.2) one-way to DMN 1.6 and execute
+// the projection on the SPI reference engine. Writes core/build/projection-coverage-results.json,
+// consumed by the TS `decision-layer` scope for the constructs_covered/total assertion.
+tasks.register<JavaExec>("runProjectionCoverage") {
+    group = "verification"
+    description = "Project the decision-source feature matrix to DMN 1.6, execute on the SPI engine, and write core/build/projection-coverage-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.projection.ProjectionCoverageRunner")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

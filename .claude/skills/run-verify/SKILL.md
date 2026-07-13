@@ -59,7 +59,11 @@ deliberate contract change.
 
 `decision-layer` runs the curated DMN-TCK subset through the Decision Engine SPI reference engine
 (Drools) and asserts `tck_cases_green == total` plus the capability descriptor; run
-`pnpm decision-tck:jvm` before `pnpm verify` to produce `core/build/decision-tck-results.json`.
+`pnpm decision-tck:jvm` before `pnpm verify` to produce `core/build/decision-tck-results.json`. It
+also asserts **projection coverage** — every construct in the DMN feature matrix
+(`schemas/decision-source/projection/matrix.json`) projects from `decision-source` to DMN 1.6 and
+executes correctly on the SPI engine (`constructs_covered == total`); run `pnpm projection:jvm` first
+to produce `core/build/projection-coverage-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

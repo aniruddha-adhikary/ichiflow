@@ -30,6 +30,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                  |
 | `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.           |
 | `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).            |
+| `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.  |
 | `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.               |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
@@ -63,7 +64,11 @@ OpenAPI, then commit the updated baseline — that commit is the record of the a
 built-in functions, BKM + invocation + boxed context) through the **Decision Engine SPI** reference
 engine (Drools) and asserts `tck_cases_green == total` plus the engine's **capability descriptor** —
 the Phase 2.1 proof that a capability-declared, engine-neutral SPI executes canonical DMN 1.6; run
-`pnpm decision-tck:jvm` first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
+`pnpm decision-tck:jvm` first. It also asserts **projection coverage** (build plan 2.2): every
+construct in the DMN feature matrix (`schemas/decision-source/projection/matrix.json` — literal, decision
+tables w/ UNIQUE/FIRST/COLLECT, BKM, invocation, context, information-requirement graph, list,
+relation) compiles one-way from `decision-source` to DMN 1.6 and executes correctly on the SPI engine
+(`constructs_covered == total`); run `pnpm projection:jvm` first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
 **detekt** (zero findings, from SARIF) and **ArchUnit** rule results (notably the SPI boundary — only
 `…decision.spi` may depend on `org.kie..`), both of which also fail `./gradlew check`/`test`; run
 `pnpm quality:jvm` first.
