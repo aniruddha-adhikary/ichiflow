@@ -16,6 +16,10 @@ const COVERAGE_COMMAND = "cd core && ./gradlew runProjectionCoverage";
 const TRACE_REL = "core/build/decision-trace-results.json";
 const TRACE_COMMAND = "cd core && ./gradlew runDecisionTrace";
 const TRACE_SCHEMA = "DecisionTrace.json";
+const SCENARIO_REL = "core/build/scenario-coverage-results.json";
+const SCENARIO_COMMAND = "cd core && ./gradlew runScenarioCoverage";
+const FEEL_REL = "core/build/feel-vector-results.json";
+const FEEL_COMMAND = "cd core && ./gradlew runFeelVectors";
 
 interface Capabilities {
   engineId: string;
@@ -78,6 +82,35 @@ interface TraceResults {
   engine: string;
   engineVersion: string;
   traces: TraceEntry[];
+}
+
+interface ScenarioCase {
+  scenario: string;
+  name: string;
+  pass: boolean;
+  detail: string;
+}
+
+interface ScenarioResults {
+  decisionModel: string;
+  coverageThreshold: number;
+  coverage: number;
+  coveredRows: number;
+  totalRows: number;
+  cases: ScenarioCase[];
+}
+
+interface FeelVectorResult {
+  id: string;
+  expect: string;
+  actual: string | null;
+  green: boolean;
+}
+
+interface FeelResults {
+  engine: string;
+  engineVersion: string;
+  vectors: FeelVectorResult[];
 }
 
 /** Numeric-tolerant equality for `kind: "number"` cases so FEEL scale (`80` vs `80.0`) is not a mismatch. */
@@ -173,10 +206,109 @@ export const decisionLayerScope: Scope = {
 
     checks.push(...coverageChecks(repoRoot));
     checks.push(...traceShapeChecks(repoRoot));
+    checks.push(...scenarioChecks(repoRoot));
+    checks.push(...feelVectorChecks(repoRoot));
 
     return checks;
   },
 };
+
+/**
+ * Scenario-suite + rule/row coverage (build plan 2.4, doc 03 §6). Runs the DecisionModel's governed
+ * `Harness` on the reference engine: every business-readable case must produce its full typed
+ * `Outcome` (`scenarios_pass == total`), and the suite must meet the model's declared rule/row
+ * coverage threshold (`coverage_met`) — the governance signal a released model must satisfy.
+ */
+function scenarioChecks(repoRoot: string): CheckResult[] {
+  const scenarioPath = join(repoRoot, SCENARIO_REL);
+  if (!existsSync(scenarioPath)) {
+    return [
+      fail("decision-layer.scenarios-present", {
+        diff: `missing ${SCENARIO_REL}; run \`${SCENARIO_COMMAND}\` to run the scenario suite on the SPI engine`,
+      }),
+    ];
+  }
+
+  const results = JSON.parse(readFileSync(scenarioPath, "utf8")) as ScenarioResults;
+  const checks: CheckResult[] = [];
+  let pass = 0;
+  for (const c of results.cases) {
+    if (c.pass) pass += 1;
+    checks.push(
+      assert(`decision-layer.scenario.${slug(c.scenario)}.${slug(c.name)}`, c.pass, {
+        expected: "case produces its expected typed Outcome",
+        actual: c.detail,
+      }),
+    );
+  }
+
+  checks.push({
+    id: "decision-layer.scenarios-pass",
+    status: pass === results.cases.length ? "pass" : "fail",
+    metric: "scenarios_pass",
+    value: pass,
+    threshold: results.cases.length,
+  });
+
+  const coveragePct = Math.round(results.coverage * 100);
+  const thresholdPct = Math.round(results.coverageThreshold * 100);
+  checks.push({
+    id: "decision-layer.coverage-met",
+    status: results.coverage >= results.coverageThreshold ? "pass" : "fail",
+    metric: "rule_row_coverage_pct",
+    value: coveragePct,
+    threshold: thresholdPct,
+  });
+
+  return checks;
+}
+
+/**
+ * FEEL semantics-vector conformance (build plan 2.4; doc 13 §2.b). Each frozen interchange-ambiguity
+ * vector must still evaluate to its pinned result on the reference engine (`feel_vectors_green ==
+ * total`) — a KIE bump that silently shifts list-sort ordering or decimal rounding fails here.
+ */
+function feelVectorChecks(repoRoot: string): CheckResult[] {
+  const feelPath = join(repoRoot, FEEL_REL);
+  if (!existsSync(feelPath)) {
+    return [
+      fail("decision-layer.feel-vectors-present", {
+        diff: `missing ${FEEL_REL}; run \`${FEEL_COMMAND}\` to evaluate the FEEL semantics vectors`,
+      }),
+    ];
+  }
+
+  const results = JSON.parse(readFileSync(feelPath, "utf8")) as FeelResults;
+  const checks: CheckResult[] = [];
+  let green = 0;
+  for (const v of results.vectors) {
+    if (v.green) green += 1;
+    checks.push(
+      assert(`decision-layer.feel.${v.id}`, v.green, {
+        expected: v.expect,
+        actual: v.actual ?? "(none)",
+      }),
+    );
+  }
+
+  checks.push({
+    id: "decision-layer.feel-vectors-green",
+    status: green === results.vectors.length ? "pass" : "fail",
+    metric: "feel_vectors_green",
+    value: green,
+    threshold: results.vectors.length,
+  });
+
+  return checks;
+}
+
+/** Stable check-id token from a human-readable name. */
+function slug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function buildAjv(): Ajv2020 {
   const ajv = new Ajv2020({ allErrors: true, strict: false, validateFormats: true });

@@ -1,0 +1,32 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ScenarioCase.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Human-readable case name; doubles as documentation of intent."
+        },
+        "given": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "Named inputs the DecisionModel is evaluated against."
+        },
+        "expect": {
+            "$ref": "ExpectedOutcome.json",
+            "description": "The full typed Outcome this case must produce."
+        }
+    },
+    "required": [
+        "name",
+        "given",
+        "expect"
+    ],
+    "description": "One business-readable given/expect case (doc 03 §6.1).",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

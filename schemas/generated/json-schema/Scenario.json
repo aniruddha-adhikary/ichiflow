@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Scenario.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "cases": {
+            "type": "array",
+            "items": {
+                "$ref": "ScenarioCase.json"
+            }
+        }
+    },
+    "required": [
+        "name",
+        "cases"
+    ],
+    "description": "A named scenario — a group of given/expect cases (doc 03 §6.1)."
+}

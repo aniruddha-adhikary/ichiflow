@@ -1,0 +1,28 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ExpectedOutcome.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "$ref": "OutcomeType.json"
+        },
+        "reasons": {
+            "type": "array",
+            "items": {
+                "$ref": "CodeRef.json"
+            },
+            "description": "Expected machine-readable reasons (governed CodeSet rows)."
+        },
+        "conditions": {
+            "type": "array",
+            "items": {
+                "$ref": "ExpectedCondition.json"
+            },
+            "description": "Expected attached conditions, each with its expected kind + state."
+        }
+    },
+    "required": [
+        "type"
+    ],
+    "description": "The expected typed `Outcome` for a scenario case (doc 02 §9.3, doc 03 §6.1). `reasons`/`conditions`\nare asserted when relevant; a plain approve/deny case asserts only `type` (+ reasons)."
+}

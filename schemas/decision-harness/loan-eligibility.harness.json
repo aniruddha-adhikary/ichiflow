@@ -1,0 +1,48 @@
+{
+  "kind": "Harness",
+  "decisionModel": "loan-eligibility@3.2.0",
+  "coverageThreshold": 0.8,
+  "scenarios": [
+    {
+      "name": "High DTI is declined unless a strong co-signer, then conditionally approved",
+      "cases": [
+        {
+          "name": "DTI 45% no co-signer -> DECLINE",
+          "given": { "dti": 0.45 },
+          "expect": {
+            "type": "deny",
+            "reasons": [{ "code": "DTI_OVER_LIMIT", "codeSet": "credit-reasons@2.1.0" }]
+          }
+        },
+        {
+          "name": "DTI 45% strong co-signer -> conditional-approve with records-retention obligation",
+          "given": { "dti": 0.45, "coSignerFico": 760 },
+          "expect": {
+            "type": "conditional-approve",
+            "reasons": [{ "code": "DTI_OVER_LIMIT", "codeSet": "credit-reasons@2.1.0" }],
+            "conditions": [
+              {
+                "code": { "code": "RETAIN_RECORDS", "codeSet": "obligations@4.3.0" },
+                "kind": "post-approval-obligation",
+                "state": "pending"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Low DTI is approved",
+      "cases": [
+        {
+          "name": "DTI 30% -> APPROVE",
+          "given": { "dti": 0.3 },
+          "expect": {
+            "type": "approve",
+            "reasons": [{ "code": "OK", "codeSet": "credit-reasons@2.1.0" }]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,8 @@ import org.kie.api.io.ResourceType
 import org.kie.dmn.api.core.DMNMessage
 import org.kie.dmn.api.core.DMNModel
 import org.kie.dmn.api.core.DMNRuntime
+import org.kie.dmn.api.core.event.AfterEvaluateDecisionTableEvent
+import org.kie.dmn.api.core.event.DMNRuntimeEventListener
 import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder
 import org.kie.internal.io.ResourceFactory
 
@@ -46,28 +48,49 @@ class DroolsDecisionEngine : DecisionEngine {
         return DroolsModel(runtime, model)
     }
 
+    /**
+     * Captures the hit-policy-*selected* decision-table rule indexes per owning decision, for rule/row
+     * coverage (§6.2). Kept a `Drools`-named type so it stays inside the engine adapter's KIE-allowed
+     * boundary (ArchUnit `spi.contract.engine-neutral`).
+     */
+    private class DroolsRuleFiringListener : DMNRuntimeEventListener {
+        val fired: MutableMap<String, MutableList<Int>> = mutableMapOf()
+
+        override fun afterEvaluateDecisionTable(event: AfterEvaluateDecisionTableEvent) {
+            val key = event.decisionName ?: event.decisionTableName ?: return
+            fired.getOrPut(key) { mutableListOf() }.addAll(event.selected ?: emptyList())
+        }
+    }
+
     override fun evaluate(model: LoadedModel, inputs: Map<String, Any?>): DecisionEvaluation {
         val m = model as DroolsModel
-        val ctx = m.runtime.newContext()
-        for ((k, v) in inputs) ctx.set(k, coerce(v))
-        val result = m.runtime.evaluateAll(m.model, ctx)
+        val listener = DroolsRuleFiringListener()
+        m.runtime.addListener(listener)
+        try {
+            val ctx = m.runtime.newContext()
+            for ((k, v) in inputs) ctx.set(k, coerce(v))
+            val result = m.runtime.evaluateAll(m.model, ctx)
 
-        val trace = result.decisionResults.map { dr ->
-            DecisionTraceEntry(
-                decisionId = dr.decisionId,
-                decisionName = dr.decisionName,
-                result = dr.result,
-                succeeded = dr.evaluationStatus.name == "SUCCEEDED",
+            val trace = result.decisionResults.map { dr ->
+                DecisionTraceEntry(
+                    decisionId = dr.decisionId,
+                    decisionName = dr.decisionName,
+                    result = dr.result,
+                    succeeded = dr.evaluationStatus.name == "SUCCEEDED",
+                )
+            }
+            val results = trace.associate { it.decisionName to it.result }
+            val errors = result.messages.filter { it.severity == DMNMessage.Severity.ERROR }
+            return DecisionEvaluation(
+                results = results,
+                trace = trace,
+                hasErrors = errors.isNotEmpty(),
+                messages = errors.map { it.message },
+                firedRules = listener.fired.mapValues { it.value.toList() },
             )
+        } finally {
+            m.runtime.removeListener(listener)
         }
-        val results = trace.associate { it.decisionName to it.result }
-        val errors = result.messages.filter { it.severity == DMNMessage.Severity.ERROR }
-        return DecisionEvaluation(
-            results = results,
-            trace = trace,
-            hasErrors = errors.isNotEmpty(),
-            messages = errors.map { it.message },
-        )
     }
 
     private companion object {
