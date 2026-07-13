@@ -115,6 +115,9 @@ jobs:
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 
+      - name: Portal — PDP-filtered SLA-ordered inbox + Case/review view harness (action form signals the Flow, chunk 4.4)
+        run: pnpm portal:preview
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

@@ -1,0 +1,41 @@
+{
+  "case:c-100": {
+    "flowId": "trade-permit-c100",
+    "caseId": "case:c-100",
+    "steps": 3,
+    "vars": { "score": 60, "gate": 1, "decision": 1 },
+    "slaMs": 604800000,
+    "trace": [
+      {
+        "stepId": "s1",
+        "type": "decision-eval",
+        "decision": "threshold-approval",
+        "out": "gate",
+        "value": 1,
+        "outcomeType": "APPROVE"
+      },
+      {
+        "stepId": "review",
+        "type": "human-task",
+        "out": "decision",
+        "value": 1,
+        "resolution": "resolved",
+        "assignee": "user:dan"
+      },
+      {
+        "stepId": "s3",
+        "type": "compute",
+        "ref": "ts://flow-kit/Finalize@1.0.0",
+        "out": "decision",
+        "value": 1
+      }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.created", "stepId": "review" },
+      { "seq": 2, "type": "task.assigned", "stepId": "review", "assignee": "user:dan" },
+      { "seq": 3, "type": "task.resolved", "stepId": "review" },
+      { "seq": 4, "type": "case.resolved" }
+    ]
+  }
+}
