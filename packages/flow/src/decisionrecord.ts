@@ -82,7 +82,9 @@ export function assembleDecisionRecord(result: FlowResult): DecisionRecord {
 
   for (const e of result.events) {
     if (TASK_LIFECYCLE.has(e.type) && (e.stepId === undefined || !createdSteps.has(e.stepId))) {
-      orphans.push(`${e.type}@seq:${e.seq} for step ${e.stepId ?? "?"} has no originating task.created`);
+      orphans.push(
+        `${e.type}@seq:${e.seq} for step ${e.stepId ?? "?"} has no originating task.created`,
+      );
     }
   }
   for (const stepId of createdSteps) {

@@ -24,7 +24,13 @@
         "resolution": "resolved",
         "assignee": "ops-queue"
       },
-      { "stepId": "s4", "type": "compute", "ref": "ts://flow-kit/Sum@1.0.0", "out": "total", "value": 16 }
+      {
+        "stepId": "s4",
+        "type": "compute",
+        "ref": "ts://flow-kit/Sum@1.0.0",
+        "out": "total",
+        "value": 16
+      }
     ],
     "events": [
       { "seq": 0, "type": "case.created" },
