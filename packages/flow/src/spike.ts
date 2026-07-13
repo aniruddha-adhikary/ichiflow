@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { toy3Step } from "./flows/toy-3step.js";
+import { toy3Step, TOY_RESULT_VAR } from "./flows/toy-3step.js";
 import { runInterpreterSpike } from "./harness.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,7 @@ async function main(): Promise<void> {
   const result = await runInterpreterSpike({
     workflowsPath: join(here, "interpreter.js"),
     flow: toy3Step,
+    resultVar: TOY_RESULT_VAR,
   });
   const outPath = join(here, "..", "build", "interpreter-spike-results.json");
   mkdirSync(dirname(outPath), { recursive: true });

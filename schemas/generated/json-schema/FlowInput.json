@@ -3,12 +3,22 @@
     "$id": "FlowInput.json",
     "type": "object",
     "properties": {
-        "value": {
-            "type": "number"
+        "vars": {
+            "$ref": "#/$defs/RecordFloat64",
+            "description": "The initial blackboard: variable name → numeric value."
         }
     },
     "required": [
-        "value"
+        "vars"
     ],
-    "description": "The initial data a Flow is started with. Skeleton flows carry a single numeric accumulator the compute steps fold over."
+    "description": "The initial data a Flow is started with — a named-variable blackboard the steps read and write.",
+    "$defs": {
+        "RecordFloat64": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "number"
+            }
+        }
+    }
 }

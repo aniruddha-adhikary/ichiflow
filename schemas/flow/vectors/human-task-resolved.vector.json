@@ -1,0 +1,27 @@
+{
+  "name": "human-task resolved by signal before its 30-day SLA, then compute on the resolution",
+  "flow": {
+    "id": "human-task-resolved",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "x": 0 } },
+    "steps": [
+      {
+        "id": "review",
+        "type": "human-task",
+        "assignee": "ops-queue",
+        "slaMs": 2592000000,
+        "out": "approved",
+        "onTimeout": -1
+      },
+      {
+        "id": "s2",
+        "type": "compute",
+        "ref": "ts://flow-kit/Increment@1.0.0",
+        "in": ["approved"],
+        "out": "approved"
+      }
+    ]
+  },
+  "signals": [{ "afterMs": 1000, "stepId": "review", "value": 7 }],
+  "expect": { "vars": { "x": 0, "approved": 8 }, "steps": 2, "slaMs": 0 }
+}

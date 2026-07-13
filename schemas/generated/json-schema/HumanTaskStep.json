@@ -1,0 +1,40 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "HumanTaskStep.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "const": "human-task"
+        },
+        "assignee": {
+            "type": "string",
+            "description": "Optional assignee/queue hint (assignment-as-Decision is Phase 3.3; here it is a passthrough label)."
+        },
+        "slaMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "SLA in milliseconds; when it elapses before a resolution signal, the task escalates."
+        },
+        "out": {
+            "type": "string",
+            "description": "Blackboard variable the resolution (or `onTimeout`) value is written to."
+        },
+        "onTimeout": {
+            "type": "number",
+            "description": "Value written to `out` when the SLA fires before a resolution signal (the escalation path)."
+        }
+    },
+    "required": [
+        "type",
+        "slaMs",
+        "out",
+        "onTimeout"
+    ],
+    "allOf": [
+        {
+            "$ref": "FlowStep.json"
+        }
+    ],
+    "description": "A `human-task` step — raise a Task and block until resolved (doc 04 §5.2). Modelled as a `createTask`\nactivity plus an **await-signal raced by an SLA timer**: a resolution signal writes its value to `out`;\nif the SLA fires first the task **escalates** and `onTimeout` is written instead. Time-skip makes a\nmonth-long SLA verify in milliseconds."
+}
