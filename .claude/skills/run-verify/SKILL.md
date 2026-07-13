@@ -66,7 +66,13 @@ executes correctly on the SPI engine (`constructs_covered == total`); run `pnpm 
 to produce `core/build/projection-coverage-results.json`. It also asserts **trace-shape conformance**
 — every `evaluate` emits a typed `DecisionTrace` (doc 03 §7) that must validate against the frozen
 `DecisionTrace` JSON Schema (`traces_valid == total`); run `pnpm trace:jvm` first to produce
-`core/build/decision-trace-results.json`.
+`core/build/decision-trace-results.json`. It also runs a DecisionModel's governed **`Harness`** (doc
+03 §6): the scenario suite must produce each case's full typed `Outcome` (`scenarios_pass == total`)
+and meet the declared rule/row **coverage** threshold (`rule_row_coverage_pct >= threshold`); run
+`pnpm scenario:jvm` first to produce `core/build/scenario-coverage-results.json`. And it asserts the
+frozen **FEEL semantics vectors** (doc 13 §2.b) still evaluate to their pinned results on the
+reference engine (`feel_vectors_green == total`); run `pnpm feel:jvm` first to produce
+`core/build/feel-vector-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

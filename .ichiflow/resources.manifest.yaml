@@ -129,6 +129,18 @@ resources:
     kind: pattern
     path: schemas/decision-contracts.tsp
     description: Canonical typed decision contracts (build plan 2.3) — Outcome/CompositeOutcome/Condition + the frozen DecisionTrace shape (doc 02 §9.3, doc 03 §7). TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: decision-testing-contracts
+    kind: pattern
+    path: schemas/decision-testing.tsp
+    description: Canonical decision-testing contracts (build plan 2.4) — the governed Harness (scenario suite + coverage gate) and FeelVector shapes (doc 03 §6). TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: decision-harness-fixture
+    kind: pattern
+    path: schemas/decision-harness
+    description: A DecisionModel's governed Harness (loan-eligibility) — scenario suite + coverage threshold + the decision-source model under test; run by runScenarioCoverage for scenarios_pass/total + the coverage gate (doc 03 §6.1/§6.2).
+  - id: feel-semantics-vectors
+    kind: pattern
+    path: schemas/decision-feel/vectors.json
+    description: Frozen FEEL semantics vectors (build plan 2.4, doc 13 §2.b) — interchange-ambiguous expressions pinned to the reference engine's chosen result; run by runFeelVectors for feel_vectors_green/total.
   - id: code-quality
     kind: harness
     path: packages/cli/src/verify/scopes/code-quality.ts

@@ -136,6 +136,25 @@ tasks.register<JavaExec>("runDecisionTrace") {
     mainClass.set("ai.ichiflow.core.decision.trace.DecisionTraceRunner")
 }
 
+// Run a DecisionModel's governed Harness (scenario suite) on the SPI engine, asserting the full typed
+// Outcome per case and computing rule/row coverage (build plan 2.4, doc 03 §6). Writes
+// core/build/scenario-coverage-results.json for the `decision-layer` scenarios_pass/coverage gate.
+tasks.register<JavaExec>("runScenarioCoverage") {
+    group = "verification"
+    description = "Run the DecisionModel scenario suite + rule/row coverage and write core/build/scenario-coverage-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.scenario.ScenarioCoverageRunner")
+}
+
+// Evaluate the frozen FEEL semantics vectors on the reference engine (build plan 2.4, doc 13 §2.b).
+// Writes core/build/feel-vector-results.json for the `decision-layer` feel_vectors_green gate.
+tasks.register<JavaExec>("runFeelVectors") {
+    group = "verification"
+    description = "Evaluate the FEEL semantics vectors and write core/build/feel-vector-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.feel.FeelVectorRunner")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

@@ -1,0 +1,58 @@
+{
+  "namespace": "https://ichiflow.ai/dmn/loan-eligibility",
+  "name": "loan-eligibility",
+  "inputs": [
+    { "name": "dti", "type": "number" },
+    { "name": "coSignerFico", "type": "number" }
+  ],
+  "decisions": [
+    {
+      "name": "OutcomeTypeCol",
+      "type": "string",
+      "requires": ["dti", "coSignerFico"],
+      "decisionTable": {
+        "hitPolicy": "FIRST",
+        "inputs": [
+          { "expr": "dti", "type": "number" },
+          { "expr": "coSignerFico", "type": "number" }
+        ],
+        "output": { "type": "string" },
+        "rules": [
+          { "whenTests": [">= 0.45", ">= 750"], "then": "\"conditional-approve\"" },
+          { "whenTests": [">= 0.45", "-"], "then": "\"deny\"" },
+          { "whenTests": ["-", "-"], "then": "\"approve\"" }
+        ]
+      }
+    },
+    {
+      "name": "ReasonCol",
+      "type": "string",
+      "requires": ["dti"],
+      "decisionTable": {
+        "hitPolicy": "FIRST",
+        "inputs": [{ "expr": "dti", "type": "number" }],
+        "output": { "type": "string" },
+        "rules": [
+          { "whenTests": [">= 0.45"], "then": "\"DTI_OVER_LIMIT\"" },
+          { "whenTests": ["-"], "then": "\"OK\"" }
+        ]
+      }
+    },
+    {
+      "name": "Assessment",
+      "type": "Any",
+      "requiresDecisions": ["OutcomeTypeCol", "ReasonCol"],
+      "context": [
+        { "name": "type", "type": "string", "expr": "OutcomeTypeCol" },
+        {
+          "name": "reasons",
+          "expr": "[ { code: ReasonCol, codeSet: \"credit-reasons@2.1.0\" } ]"
+        },
+        {
+          "name": "conditions",
+          "expr": "if OutcomeTypeCol = \"conditional-approve\" then [ { code: \"RETAIN_RECORDS\", codeSet: \"obligations@4.3.0\", kind: \"post-approval-obligation\", state: \"pending\" } ] else []"
+        }
+      ]
+    }
+  ]
+}

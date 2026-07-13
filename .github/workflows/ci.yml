@@ -88,6 +88,12 @@ jobs:
       - name: Decision layer — emit DecisionTrace objects (trace-shape conformance)
         run: pnpm trace:jvm
 
+      - name: Decision layer — scenario suite + rule/row coverage
+        run: pnpm scenario:jvm
+
+      - name: Decision layer — FEEL semantics vectors
+        run: pnpm feel:jvm
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

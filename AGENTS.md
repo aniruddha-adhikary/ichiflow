@@ -32,6 +32,8 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).            |
 | `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.  |
 | `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).     |
+| `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).  |
+| `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).              |
 | `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.               |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
@@ -73,7 +75,15 @@ relation) compiles one-way from `decision-source` to DMN 1.6 and executes correc
 conformance** (build plan 2.3, doc 03 §7): every `evaluate` emits a typed **`DecisionTrace`** (model
 identity, input snapshot, fired decisions, outputs) that must validate against the frozen
 `DecisionTrace` JSON Schema (`traces_valid == total`); run `pnpm trace:jvm` first to write
-`core/build/decision-trace-results.json`. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
+`core/build/decision-trace-results.json`. It also runs a DecisionModel's governed **`Harness`**
+(build plan 2.4, doc 03 §6): the scenario suite (`schemas/decision-harness/*.harness.json`) must
+produce each case's full typed **`Outcome`** (`scenarios_pass == total`) and meet the model's declared
+rule/row **coverage** threshold (`rule_row_coverage_pct >= threshold`, computed from the engine's
+fired decision-table rows); run `pnpm scenario:jvm` first. And it asserts **FEEL semantics vectors**
+(doc 13 §2.b): the frozen interchange-ambiguity expressions (`schemas/decision-feel/vectors.json`)
+must still evaluate to their pinned results on the reference engine (`feel_vectors_green == total`) —
+a KIE bump that silently shifts list-sort ordering or decimal rounding fails here; run `pnpm feel:jvm`
+first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
 **detekt** (zero findings, from SARIF) and **ArchUnit** rule results (notably the SPI boundary — only
 `…decision.spi` may depend on `org.kie..`), both of which also fail `./gradlew check`/`test`; run
 `pnpm quality:jvm` first.

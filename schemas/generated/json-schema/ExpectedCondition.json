@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ExpectedCondition.json",
+    "type": "object",
+    "properties": {
+        "code": {
+            "$ref": "CodeRef.json",
+            "description": "The governed condition code (into a `conditions`/`obligations` CodeSet)."
+        },
+        "kind": {
+            "$ref": "ConditionKind.json"
+        },
+        "state": {
+            "$ref": "ConditionState.json"
+        }
+    },
+    "required": [
+        "code",
+        "kind",
+        "state"
+    ],
+    "description": "The asserted lifecycle state of one expected Condition (doc 03 §6.1)."
+}

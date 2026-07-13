@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FeelVector.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Stable vector id."
+        },
+        "expr": {
+            "type": "string",
+            "description": "The FEEL expression evaluated on the reference engine."
+        },
+        "expect": {
+            "type": "string",
+            "description": "The pinned, published result as its FEEL string form."
+        },
+        "note": {
+            "type": "string",
+            "description": "Why this case is interchange-ambiguous (documentation of the pinned resolution)."
+        }
+    },
+    "required": [
+        "id",
+        "expr",
+        "expect"
+    ],
+    "description": "A frozen **FEEL semantics vector** (build plan 2.4; doc 13 §2.b, doc 03 open-q4). The known\nDMN/FEEL interchange-ambiguity cases — under-specified built-ins conformant engines resolve\ndifferently (list `sort` ordering, string built-ins, date arithmetic; research 01 §7) — pinned to\nthe reference engine's *chosen, published* result. A KIE bump that silently shifts one fails loudly."
+}

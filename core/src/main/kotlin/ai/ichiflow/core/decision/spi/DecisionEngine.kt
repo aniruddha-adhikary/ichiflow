@@ -72,6 +72,11 @@ data class DecisionEvaluation(
     val trace: List<DecisionTraceEntry>,
     val hasErrors: Boolean,
     val messages: List<String>,
+    /**
+     * Per-decision matched decision-table rule indexes (1-based), for rule/row coverage (build plan
+     * 2.4, doc 03 §6.2). Keyed by the owning decision name; empty for engines that do not surface it.
+     */
+    val firedRules: Map<String, List<Int>> = emptyMap(),
 ) {
     fun resultOf(decisionName: String): Any? = results[decisionName]
 }

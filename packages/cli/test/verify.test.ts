@@ -276,6 +276,16 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, JSON.stringify(body));
   };
+  const writeScenario = (root: string, body: unknown) => {
+    const p = join(root, "core/build/scenario-coverage-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
+  const writeFeel = (root: string, body: unknown) => {
+    const p = join(root, "core/build/feel-vector-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
   const validTrace = {
     model: {
       id: "literal",
@@ -298,6 +308,25 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
     engine: "drools",
     engineVersion: "10.2.0",
     traces: [{ construct: "literalExpression", trace: validTrace }],
+  };
+  const goodScenario = {
+    decisionModel: "loan-eligibility@3.2.0",
+    coverageThreshold: 0.8,
+    coverage: 1.0,
+    coveredRows: 5,
+    totalRows: 5,
+    cases: [
+      { scenario: "S", name: "low DTI -> approve", pass: true, detail: "ok" },
+      { scenario: "S", name: "high DTI -> deny", pass: true, detail: "ok" },
+    ],
+  };
+  const goodFeel = {
+    engine: "drools",
+    engineVersion: "10.2.0",
+    vectors: [
+      { id: "sort-ascending", expect: "[1, 2, 3]", actual: "[1, 2, 3]", green: true },
+      { id: "decimal-half-even", expect: "0.12", actual: "0.12", green: true },
+    ],
   };
   const goodCoverage = {
     engine: "drools",
@@ -356,6 +385,8 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
       });
       writeCoverage(tmp, goodCoverage);
       writeTrace(tmp, goodTrace);
+      writeScenario(tmp, goodScenario);
+      writeFeel(tmp, goodFeel);
       const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
       expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
       const green = checks.find((c) => c.id === "decision-layer.tck-cases-green")!;
@@ -367,6 +398,15 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
       const traces = checks.find((c) => c.id === "decision-layer.traces-valid")!;
       expect(traces.value).toBe(1);
       expect(traces.threshold).toBe(1);
+      const scenarios = checks.find((c) => c.id === "decision-layer.scenarios-pass")!;
+      expect(scenarios.value).toBe(2);
+      expect(scenarios.threshold).toBe(2);
+      const coverageMet = checks.find((c) => c.id === "decision-layer.coverage-met")!;
+      expect(coverageMet.value).toBe(100);
+      expect(coverageMet.threshold).toBe(80);
+      const feel = checks.find((c) => c.id === "decision-layer.feel-vectors-green")!;
+      expect(feel.value).toBe(2);
+      expect(feel.threshold).toBe(2);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -553,6 +593,121 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
       const present = checks.find((c) => c.id === "decision-layer.trace-present")!;
       expect(present.status).toBe("fail");
       expect(String(present.diff)).toContain("runDecisionTrace");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("passes scenarios-pass and the coverage gate when the suite is green and coverage is met", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeScenario(tmp, goodScenario);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const pass = checks.find((c) => c.id === "decision-layer.scenarios-pass")!;
+      expect(pass.status).toBe("pass");
+      expect(pass.value).toBe(2);
+      const cov = checks.find((c) => c.id === "decision-layer.coverage-met")!;
+      expect(cov.status).toBe("pass");
+      expect(cov.value).toBe(100);
+      expect(cov.threshold).toBe(80);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a failing scenario case and the scenarios-pass aggregate", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeScenario(tmp, {
+        ...goodScenario,
+        cases: [
+          {
+            scenario: "S",
+            name: "wrong outcome",
+            pass: false,
+            detail: "type expected deny, got approve",
+          },
+        ],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decision-layer.scenario.s.wrong-outcome");
+      expect(failed).toContain("decision-layer.scenarios-pass");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the coverage gate when coverage is below the declared threshold", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeScenario(tmp, { ...goodScenario, coverage: 0.6, coveredRows: 3 });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const cov = checks.find((c) => c.id === "decision-layer.coverage-met")!;
+      expect(cov.status).toBe("fail");
+      expect(cov.value).toBe(60);
+      expect(cov.threshold).toBe(80);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the scenario-coverage artifact is missing", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const present = checks.find((c) => c.id === "decision-layer.scenarios-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("runScenarioCoverage");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("passes feel-vectors-green when every vector matches its pin", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeFeel(tmp, goodFeel);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const agg = checks.find((c) => c.id === "decision-layer.feel-vectors-green")!;
+      expect(agg.status).toBe("pass");
+      expect(agg.value).toBe(2);
+      expect(agg.threshold).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a drifted FEEL vector and the feel-vectors-green aggregate", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeFeel(tmp, {
+        ...goodFeel,
+        vectors: [{ id: "sort-ascending", expect: "[1, 2, 3]", actual: "[3, 2, 1]", green: false }],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decision-layer.feel.sort-ascending");
+      expect(failed).toContain("decision-layer.feel-vectors-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the FEEL-vector artifact is missing", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const present = checks.find((c) => c.id === "decision-layer.feel-vectors-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("runFeelVectors");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

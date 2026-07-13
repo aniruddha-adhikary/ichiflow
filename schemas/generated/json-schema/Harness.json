@@ -1,0 +1,34 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Harness.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "type": "string",
+            "const": "Harness"
+        },
+        "decisionModel": {
+            "type": "string",
+            "description": "The DecisionModel under test, as `id@version`."
+        },
+        "coverageThreshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Minimum rule/row coverage the scenario suite must achieve (0..1) for release (§6.2)."
+        },
+        "scenarios": {
+            "type": "array",
+            "items": {
+                "$ref": "Scenario.json"
+            }
+        }
+    },
+    "required": [
+        "kind",
+        "decisionModel",
+        "coverageThreshold",
+        "scenarios"
+    ],
+    "description": "A governed **`Harness`** — the DecisionModel's scenario suite + coverage gate, versioned with the\nmodel and required for release (doc 03 §6). The decision-source model itself lives beside the\nharness (`<id>.source.json`); the harness references it by `decisionModel` id"
+}
