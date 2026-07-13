@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Rewrite.json",
+    "type": "object",
+    "properties": {
+        "direct": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Direct assignment (OpenFGA `this`): the relation is populated by stored tuples for it. The listed\nstrings are the allowed subject type refs (`user`, or a userset type like `team#member`),\ndocumentary of what may be assigned; membership is decided by the tuples themselves."
+        },
+        "computedUserset": {
+            "type": "string",
+            "description": "Computed userset: expand to another relation on the **same** object (`define X: otherRelation`)."
+        },
+        "tupleToUserset": {
+            "$ref": "TupleToUserset.json",
+            "description": "Tuple-to-userset: `<relation> from <tupleset>` (indirection through a related object)."
+        },
+        "unionOf": {
+            "type": "array",
+            "items": {
+                "$ref": "Rewrite.json"
+            },
+            "description": "Union: the user set is the union of the child rewrites (OpenFGA `or`)."
+        }
+    },
+    "description": "A userset-rewrite node — how a relation's user set is computed, matching OpenFGA check semantics.\nExactly one variant is set per node (`this` | `computedUserset` | `tupleToUserset` | `union`)."
+}

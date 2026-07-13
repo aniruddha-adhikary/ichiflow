@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -126,6 +126,18 @@ response schema for their status and hit the pinned ids/versions/totals/error-co
 operation is covered; and the runtime boundary validator provably rejects malformed writes (≥1 `422`,
 `vectors_green == total`). The store binding uses monotonic sequence stamps (no wall-clock/RNG), so run
 `pnpm api:contract` before `pnpm verify` to produce `packages/api/build/api-contract-results.json`.
+
+`authz` is the Phase 4.3 gate (ADR-0010/0025, doc 06 Parts 2 & 4, doc 13 §2.f): the **PDP slice**. v1
+authorization is OpenFGA-only — Teams, membership, role-as-relation (steward/approver/editor/viewer),
+and artifact/case ownership are a ReBAC model (`schemas/authz/model.json`), and one central PDP answers
+both **design-time** (artifact edit/approve) and **runtime** (Case view/modify) checks over one
+relationship graph (`schemas/authz/tuples.json`). The committed vectors
+(`schemas/authz/vectors/*.vectors.json`) validate against the emitted `AuthzVector.json`; replaying each
+through the PDP over the deterministic in-memory OpenFGA-semantics engine reproduces its pinned
+allow/deny across the required relations (`vectors_green == total`), covers both enforcement surfaces
+with **design-time = runtime parity** (the artifact-access and data-access PEPs never disagree), and
+emits a schema-valid `AuthzDecisionLog` per decision. Deterministic (content-hash decision ids, no
+wall-clock/RNG), so run `pnpm authz:jvm` before `pnpm verify` to produce `core/build/authz-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuthzModel.json",
+    "type": "object",
+    "properties": {
+        "schemaVersion": {
+            "type": "string",
+            "description": "OpenFGA model schema version marker (documentary, e.g. `1.1`)."
+        },
+        "types": {
+            "type": "array",
+            "items": {
+                "$ref": "TypeDef.json"
+            }
+        }
+    },
+    "required": [
+        "schemaVersion",
+        "types"
+    ],
+    "description": "The committed **OpenFGA-style authorization model** (doc 06 §4.3–4.4): the object types (organization,\nteam, artifact, case, association) and their relations (membership, role-as-relation, ownership,\nderived `can_*`). One model governs design-time and runtime alike."
+}

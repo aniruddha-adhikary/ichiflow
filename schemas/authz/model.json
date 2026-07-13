@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.1",
+  "types": [
+    {
+      "type": "organization",
+      "relations": [{ "name": "member", "rewrite": { "direct": ["user"] } }]
+    },
+    {
+      "type": "team",
+      "relations": [
+        { "name": "parent", "rewrite": { "direct": ["organization", "team"] } },
+        { "name": "member", "rewrite": { "direct": ["user", "team#member"] } },
+        { "name": "steward", "rewrite": { "direct": ["user"] } },
+        { "name": "approver", "rewrite": { "direct": ["user", "team#member"] } },
+        { "name": "editor", "rewrite": { "direct": ["user", "team#member"] } },
+        { "name": "viewer", "rewrite": { "direct": ["user", "team#member"] } }
+      ]
+    },
+    {
+      "type": "artifact",
+      "relations": [
+        { "name": "owner", "rewrite": { "direct": ["team"] } },
+        {
+          "name": "can_approve",
+          "rewrite": {
+            "unionOf": [
+              { "tupleToUserset": { "tupleset": "owner", "relation": "approver" } },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "steward" } }
+            ]
+          }
+        },
+        {
+          "name": "can_edit",
+          "rewrite": {
+            "unionOf": [
+              { "tupleToUserset": { "tupleset": "owner", "relation": "steward" } },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "editor" } },
+              { "computedUserset": "can_approve" }
+            ]
+          }
+        },
+        {
+          "name": "can_view",
+          "rewrite": {
+            "unionOf": [
+              { "tupleToUserset": { "tupleset": "owner", "relation": "viewer" } },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "member" } },
+              { "computedUserset": "can_edit" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "case",
+      "relations": [
+        { "name": "owner", "rewrite": { "direct": ["team"] } },
+        { "name": "assignee", "rewrite": { "direct": ["user"] } },
+        { "name": "association", "rewrite": { "direct": ["association"] } },
+        {
+          "name": "can_modify",
+          "rewrite": {
+            "unionOf": [
+              { "computedUserset": "assignee" },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "editor" } }
+            ]
+          }
+        },
+        {
+          "name": "can_view",
+          "rewrite": {
+            "unionOf": [
+              { "computedUserset": "can_modify" },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "viewer" } },
+              { "tupleToUserset": { "tupleset": "owner", "relation": "member" } },
+              { "tupleToUserset": { "tupleset": "association", "relation": "reader" } }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "association",
+      "relations": [
+        { "name": "member", "rewrite": { "direct": ["case"] } },
+        { "name": "reader", "rewrite": { "direct": ["user", "team#member"] } }
+      ]
+    }
+  ]
+}

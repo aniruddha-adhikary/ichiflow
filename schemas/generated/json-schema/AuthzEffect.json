@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuthzEffect.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "allow"
+        },
+        {
+            "type": "string",
+            "const": "deny"
+        }
+    ],
+    "description": "The effect of an authorization decision — the PDP answers `allow` or `deny`."
+}

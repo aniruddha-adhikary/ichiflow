@@ -13,6 +13,7 @@ import { flowLayerScope } from "./scopes/flow-layer.js";
 import { decisionRecordScope } from "./scopes/decisionrecord.js";
 import { entityStoreScope } from "./scopes/entity-store.js";
 import { entityApiScope } from "./scopes/entity-api.js";
+import { authzScope } from "./scopes/authz.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
@@ -36,6 +37,7 @@ const SCOPES: Scope[] = [
   decisionRecordScope,
   entityStoreScope,
   entityApiScope,
+  authzScope,
   codeQualityScope,
 ];
 

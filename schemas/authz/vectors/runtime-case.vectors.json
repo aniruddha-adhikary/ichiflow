@@ -1,0 +1,90 @@
+[
+  {
+    "name": "assignee-can-modify-case",
+    "surface": "runtime",
+    "subject": "user:dan",
+    "relation": "can_modify",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "assignee-can-view-case",
+    "surface": "runtime",
+    "subject": "user:dan",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "team-editor-can-modify-owned-case",
+    "surface": "runtime",
+    "subject": "user:eve",
+    "relation": "can_modify",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "team-viewer-can-view-owned-case",
+    "surface": "runtime",
+    "subject": "user:vic",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "team-viewer-cannot-modify-owned-case",
+    "surface": "runtime",
+    "subject": "user:vic",
+    "relation": "can_modify",
+    "object": "case:c-100",
+    "expect": "deny"
+  },
+  {
+    "name": "team-member-can-view-owned-case",
+    "surface": "runtime",
+    "subject": "user:mel",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "partner-member-cannot-view-other-teams-case",
+    "surface": "runtime",
+    "subject": "user:pat",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "deny"
+  },
+  {
+    "name": "association-reader-can-view-linked-case",
+    "surface": "runtime",
+    "subject": "user:iris",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "allow"
+  },
+  {
+    "name": "association-reader-cannot-modify-linked-case",
+    "surface": "runtime",
+    "subject": "user:iris",
+    "relation": "can_modify",
+    "object": "case:c-100",
+    "expect": "deny"
+  },
+  {
+    "name": "peer-case-assignee-gains-no-visibility-into-linked-peer",
+    "surface": "runtime",
+    "subject": "user:carl",
+    "relation": "can_view",
+    "object": "case:c-100",
+    "expect": "deny"
+  },
+  {
+    "name": "association-reader-can-view-other-linked-peer",
+    "surface": "runtime",
+    "subject": "user:iris",
+    "relation": "can_view",
+    "object": "case:c-101",
+    "expect": "allow"
+  }
+]

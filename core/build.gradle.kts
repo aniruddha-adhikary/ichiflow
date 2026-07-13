@@ -165,6 +165,16 @@ tasks.register<JavaExec>("runEntityStore") {
     mainClass.set("ai.ichiflow.core.entity.EntityStoreRunner")
 }
 
+// Replay the committed authz allow/deny vectors through the PDP over the OpenFGA reference engine
+// (build plan 4.3). Writes core/build/authz-results.json for the `authz` scope's vectors_green /
+// parity(design-time, runtime) / decision-log gates.
+tasks.register<JavaExec>("runAuthz") {
+    group = "verification"
+    description = "Run the authz PDP vectors and write core/build/authz-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.authz.AuthzRunner")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

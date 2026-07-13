@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuthzSurface.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "design-time"
+        },
+        {
+            "type": "string",
+            "const": "runtime"
+        }
+    ],
+    "description": "Which enforcement surface a check exercises. The single PDP spans both: `design-time` is the\nWorkspace **artifact-access** path (the `artifact` object type — CodeSet/Schema/Decision/Flow),\n`runtime` is the **data-access** path (the `case`/entity object types). Proving both surfaces are\ncovered by *one* vector set through *one* PDP is the parity claim (doc 06 §4.2, doc 13 §2.f)."
+}

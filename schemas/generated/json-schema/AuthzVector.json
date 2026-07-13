@@ -1,0 +1,50 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuthzVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "surface": {
+            "$ref": "AuthzSurface.json",
+            "description": "The enforcement surface this vector exercises (design-time artifact vs runtime data)."
+        },
+        "subject": {
+            "type": "string",
+            "description": "The principal, `user:<id>`."
+        },
+        "relation": {
+            "type": "string",
+            "description": "The action being checked, expressed as a relation (`can_view`, `can_edit`, `can_approve`, …)."
+        },
+        "object": {
+            "type": "string",
+            "description": "The resource, `type:id`."
+        },
+        "context": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "Optional attribute context (OpenFGA conditional relationships / future ABAC)."
+        },
+        "expect": {
+            "$ref": "AuthzEffect.json",
+            "description": "The pinned expected decision."
+        }
+    },
+    "required": [
+        "name",
+        "surface",
+        "subject",
+        "relation",
+        "object",
+        "expect"
+    ],
+    "description": "One committed **authz allow/deny vector** (doc 13 §2.f): a `{ subject, relation, object, context }`\nquestion with its pinned `expect`ed effect, tagged with the enforcement `surface` it belongs to. The\nsame corpus spans `design-time` (artifact) and `runtime` (case/entity) so the harness can prove one\nPDP answers both without drift.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

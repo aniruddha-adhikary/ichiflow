@@ -1,0 +1,51 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AuthzDecisionLog.json",
+    "type": "object",
+    "properties": {
+        "decisionId": {
+            "type": "string",
+            "description": "Stable decision id (deterministic, derived from the checked tuple — no wall-clock/RNG)."
+        },
+        "principal": {
+            "type": "string",
+            "description": "The principal evaluated."
+        },
+        "action": {
+            "type": "string",
+            "description": "The action (relation) checked."
+        },
+        "resource": {
+            "type": "string",
+            "description": "The resource (`type:id`)."
+        },
+        "context": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "The attribute context supplied to the decision."
+        },
+        "effect": {
+            "$ref": "AuthzEffect.json"
+        },
+        "reason": {
+            "type": "string",
+            "description": "Human/machine-readable reason — the granting relation path, or why it was denied."
+        }
+    },
+    "required": [
+        "decisionId",
+        "principal",
+        "action",
+        "resource",
+        "context",
+        "effect",
+        "reason"
+    ],
+    "description": "One **authorization decision-log** entry (doc 06 §2.4, ADR-0010) — mandatory for every PDP decision.\nFeeds both compliance audit and the UI \"why is this hidden\" explanation surface, and joins the\nDecisionRecord. The `reason` is the relation/rule path that granted access, or the denial reason.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}
