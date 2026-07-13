@@ -1,0 +1,35 @@
+{
+  "name": "external-task timeout (§2.8) — no correlated reply within the 30-day SLA, so the escalation path fires and onTimeout auto-decides (verified under time-skip, month-long SLA in ms)",
+  "flow": {
+    "id": "external-timeout",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "applicantId": 9 } },
+    "steps": [
+      {
+        "id": "screen",
+        "type": "external-task",
+        "requestRef": "adapter://vetting/credential-check-submit",
+        "responseSchema": "schema://vetting/CredentialCheckResult/1",
+        "in": ["applicantId"],
+        "out": "verdict",
+        "provider": "acme-vetting",
+        "slaMs": 2592000000,
+        "onTimeout": -1,
+        "escalationQueue": "vetting-supervisor"
+      }
+    ]
+  },
+  "expect": {
+    "vars": { "applicantId": 9, "verdict": -1 },
+    "steps": 1,
+    "slaMs": 2592000000,
+    "events": [
+      "case.created",
+      "external.submitted",
+      "external.timeout",
+      "external.escalated",
+      "case.resolved"
+    ],
+    "correlations": [{ "stepId": "screen", "correlationId": "conformance-external-timeout/screen" }]
+  }
+}

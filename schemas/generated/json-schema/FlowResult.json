@@ -34,6 +34,13 @@
             "items": {
                 "$ref": "CaseEvent.json"
             }
+        },
+        "correlations": {
+            "type": "array",
+            "items": {
+                "$ref": "CaseCorrelation.json"
+            },
+            "description": "The correlation id injected on each `external-task` submit (doc 04 §2.8, doc 05 §11.1), in step order; empty for flows with no delegation."
         }
     },
     "required": [

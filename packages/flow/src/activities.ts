@@ -3,8 +3,12 @@
  * interpreter workflow stays deterministic. Phase 3.2 wires the two dispatch registries the core step
  * types resolve against — the unified **code-activity** contract (`compute`, doc 04 §2.6) and the
  * **decision** engine (`decision-eval`, doc 04 §2.3, standing in for the Kotlin rule-eval SPI worker) —
- * plus `createTask` for `human-task`.
+ * plus `createTask` for `human-task`. Phase 5.2 adds `submitExternalTask` for the `external-task`
+ * (delegation) step, which rides the adapter runtime's canonical↔wire Message-Translator (5.1).
  */
+
+import { translate } from "@ichiflow/adapters/dist/mapping.js";
+import type { CanonicalEnvelope, Mapping } from "@ichiflow/adapters/dist/types.js";
 
 /** A registered code activity: a total, pure numeric transform addressed by a versioned `ref`. */
 export type CodeActivity = (args: number[]) => number;
@@ -82,4 +86,50 @@ export async function createTask(input: {
   return { taskId: `task:${input.stepId}`, assignee: input.assignee ?? "unassigned" };
 }
 
-export const activities = { compute, decisionEval, createTask };
+/**
+ * The outbound Message-Translator for an `external-task` submit (doc 05 §2/§11.1) — copies the numeric
+ * request args verbatim and, crucially, injects the interpreter's correlation id via `correlationFrom`
+ * so the mock external system's reply can be correlated back. Reused from the adapter runtime (5.1) so
+ * the delegation submit rides the *same* canonical↔wire boundary rather than a bespoke encoder.
+ */
+const EXTERNAL_SUBMIT_MAPPING: Mapping = {
+  id: "flow/external-task-submit",
+  schemaVersion: "adapter/v1",
+  version: "1.0.0",
+  direction: "outbound",
+  kind: "Command",
+  canonicalType: "flow.external-task.submit",
+  messageIdFrom: "/messageId",
+  correlationFrom: "/correlationId",
+  caseIdFrom: "/caseId",
+  rules: [
+    { operation: "copy", from: "/requestRef", to: "request.ref" },
+    { operation: "copy", from: "/provider", to: "request.provider" },
+    { operation: "copy", from: "/args", to: "request.args" },
+  ],
+};
+
+/**
+ * `submitExternalTask` activity — submit a delegation request through the (mock) outbound Adapter (§2.8).
+ * Deterministic and side-effect-free against the mock: it encodes the request into a `CanonicalEnvelope`
+ * with the injected correlation id (doc 05 §11.1) and returns it; no live broker/HTTP is contacted.
+ */
+export async function submitExternalTask(input: {
+  stepId: string;
+  requestRef: string;
+  correlationId: string;
+  provider: string;
+  args: number[];
+}): Promise<{ envelope: CanonicalEnvelope }> {
+  const envelope = translate(EXTERNAL_SUBMIT_MAPPING, {
+    messageId: `submit:${input.correlationId}`,
+    correlationId: input.correlationId,
+    caseId: input.correlationId.split("/")[0]!,
+    requestRef: input.requestRef,
+    provider: input.provider,
+    args: input.args,
+  });
+  return { envelope };
+}
+
+export const activities = { compute, decisionEval, createTask, submitExternalTask };

@@ -1,0 +1,58 @@
+{
+  "name": "external-task dup-response (§2.8, doc 05 §11.1 Idempotent Receiver) — a duplicated correlated reply (same correlationId + messageId) is deduped exactly once; the flow applies the response value once",
+  "flow": {
+    "id": "external-dup-response",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "applicantId": 5 } },
+    "steps": [
+      {
+        "id": "screen",
+        "type": "external-task",
+        "requestRef": "adapter://vetting/credential-check-submit",
+        "responseSchema": "schema://vetting/CredentialCheckResult/1",
+        "in": ["applicantId"],
+        "out": "verdict",
+        "provider": "acme-vetting",
+        "slaMs": 2592000000,
+        "onTimeout": -1
+      }
+    ]
+  },
+  "signals": [
+    { "afterMs": 1000, "stepId": "screen", "action": "pause" },
+    { "afterMs": 3000, "stepId": "screen", "action": "resume" }
+  ],
+  "replies": [
+    {
+      "afterMs": 2000,
+      "stepId": "screen",
+      "correlationId": "conformance-external-dup-response/screen",
+      "messageId": "reply-1",
+      "value": 9
+    },
+    {
+      "afterMs": 2000,
+      "stepId": "screen",
+      "correlationId": "conformance-external-dup-response/screen",
+      "messageId": "reply-1",
+      "value": 9
+    }
+  ],
+  "expect": {
+    "vars": { "applicantId": 5, "verdict": 9 },
+    "steps": 1,
+    "slaMs": 0,
+    "events": [
+      "case.created",
+      "external.submitted",
+      "sla.paused",
+      "sla.resumed",
+      "external.responded",
+      "external.deduped",
+      "case.resolved"
+    ],
+    "correlations": [
+      { "stepId": "screen", "correlationId": "conformance-external-dup-response/screen" }
+    ]
+  }
+}

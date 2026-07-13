@@ -131,6 +131,54 @@ model TimerStep extends FlowStep {
   durationMs: int64;
 }
 
+/**
+ * An `external-task` step — the **delegation** primitive (doc 04 §2.8, ADR-0028): the *machine analog
+ * of `human-task`*. It **submits** a schema'd request through an outbound Adapter, durably **awaits a
+ * correlated inbound response**, **validates** it against a response schema, and **resumes** — racing
+ * the *same* pausable-clock SLA + escalation machinery as `human-task` (§5.7/§5.2) and the Adapter
+ * layer's **Idempotent Receiver / DLQ** (doc 05 §11.1). The transport is a pluggable Adapter binding
+ * beneath the one canonical step, never a fork of the step vocabulary (§11.2).
+ *
+ *   - **correlation contract** (§11.1): the interpreter *injects* a deterministic correlation id
+ *     (`case_id '/' step.id`) onto the outbound request; a reply *correlates* only when it carries that
+ *     id, and is *deduped* on `(correlation-id, response messageId)` so a duplicated reply applies once.
+ *   - **failure taxonomy** (§2.8): a schema-invalid (malformed) reply → **DLQ + Case surfacing**, never
+ *     a stuck flow; no correlated reply within the SLA → the **escalation** path writes `onTimeout`.
+ *
+ * Provider selection is itself a Decision (§2.8, mirroring assignment-as-Decision §5.3); v1 ships the
+ * static `provider` label and the transport/correlation contract, with routing-as-a-Decision an additive
+ * follow-up on the same seam `human-task` already uses.
+ */
+model ExternalTaskStep extends FlowStep {
+  type: "external-task";
+
+  /** The outbound submit Adapter / canonical request ref the delegation submits through (doc 05 §11 outbound binding). */
+  requestRef: string;
+
+  /** The canonical **response schema** id the correlated reply is validated against before resume (doc 05 §11.1). */
+  responseSchema: string;
+
+  /** Blackboard variables passed, in order, as the submitted request's inputs. */
+  @minItems(1)
+  `in`: string[];
+
+  /** Blackboard variable the validated response value (or escalation `onTimeout`) is written to. */
+  out: string;
+
+  /** The target external system/provider the delegation is routed to (§2.8; static in v1). */
+  provider?: string;
+
+  /** Pausable SLA budget in milliseconds (§5.7); paused intervals are excluded, exactly as for `human-task`. */
+  @minValue(0)
+  slaMs: int64;
+
+  /** Auto-decide fallback written to `out` when the SLA is exhausted with no correlated reply (the escalation path, §5.2). */
+  onTimeout: float64;
+
+  /** Supervisor/alternate-provider queue the delegation escalates to on SLA expiry; defaults to `supervisor` (§5.2). */
+  escalationQueue?: string;
+}
+
 /** The initial data a Flow is started with — a named-variable blackboard the steps read and write. */
 model FlowInput {
   /** The initial blackboard: variable name → numeric value. */
@@ -162,7 +210,7 @@ model Flow {
   input: FlowInput;
 
   @minItems(1)
-  steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep)[];
+  steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep | ExternalTaskStep)[];
 }
 
 /** A scripted signal a conformance vector delivers to a `human-task` step (correlated by `stepId`, doc 04 §5.2/§5.7). */
@@ -182,6 +230,34 @@ model FlowSignal {
 }
 
 /**
+ * A scripted **inbound correlated reply** a conformance vector delivers to an `external-task` step
+ * (doc 04 §2.8, doc 05 §11.1) — the machine analog of a `FlowSignal.resolve`. Stands in for the mock
+ * external system's response (no live system, doc 13 §2.d): it is routed to the waiting delegation by
+ * `correlationId`, **deduped** on `(correlationId, messageId)`, and validated — a `malformed` reply is
+ * a schema-invalid response the delegation quarantines to the **DLQ** and surfaces on the Case.
+ */
+model ExternalReply {
+  /** Test-clock offset (ms from flow start) at which the reply is delivered (time-skip advances between offsets). */
+  @minValue(0)
+  afterMs: int64;
+
+  /** The `external-task` step id this reply targets. */
+  stepId: string;
+
+  /** The correlation id the reply carries; it correlates only when it equals the id injected on submit (`case_id '/' step.id`, §11.1). */
+  correlationId: string;
+
+  /** The reply's own message id; `(correlationId, messageId)` is the Idempotent-Receiver dedup key (§11.1). */
+  messageId: string;
+
+  /** The validated response value written to the step's `out` variable (ignored for a `malformed` reply). */
+  value?: float64;
+
+  /** When true, the reply fails response-schema validation → **DLQ + Case surfacing**, never resume (doc 04 §2.8 taxonomy). */
+  malformed?: boolean;
+}
+
+/**
  * One **conformance vector** (build plan 3.1–3.2 exit criterion). Pairs a DSL-valid Flow — plus any
  * scripted resolution `signals` — with the final blackboard the generic interpreter must produce, an
  * independently-pinned oracle proving the interpreter walks/orders/dispatches/awaits correctly rather
@@ -196,6 +272,9 @@ model FlowConformanceVector {
   /** Resolution signals delivered to `human-task` steps during interpretation; omit to exercise the SLA-escalation path. */
   signals?: FlowSignal[];
 
+  /** Correlated inbound replies delivered to `external-task` steps during interpretation (doc 04 §2.8); omit to exercise the delegation timeout/escalation path. */
+  replies?: ExternalReply[];
+
   expect: FlowExpectation;
 }
 
@@ -207,17 +286,22 @@ model FlowExpectation {
   /** The number of steps the flow declares (guards vector/flow drift). */
   steps: int32;
 
-  /** Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks). */
+  /** Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks + escalated external-tasks). */
   slaMs: int64;
 
   /** Optional pinned Case/Task **event-history** type sequence (doc 04 §5.1/§5.2), e.g. `["case.created", "task.created", …]`. */
   events?: string[];
+
+  /** Optional pinned **correlation ids injected** on each `external-task` submit (doc 04 §2.8, doc 05 §11.1) — proves the correlation contract binds the reply to the waiting instance. */
+  correlations?: CaseCorrelation[];
 }
 
 /**
  * One ordered **Case/Task event** (doc 04 §5.1/§5.2) — the flow event history the DecisionRecord
  * stitches by `case_id`: `case.created`, `task.created`/`task.assigned`, `sla.paused`/`sla.resumed`,
- * `task.resolved`/`task.escalated`, `case.resolved`.
+ * `task.resolved`/`task.escalated`, the delegation events `external.submitted`/`external.responded`/
+ * `external.deduped`/`external.dlq`/`case.flagged`/`external.timeout`/`external.escalated` (doc 04 §2.8),
+ * and `case.resolved`.
  */
 model CaseEvent {
   /** Monotonic in-Case sequence number (ordering key). */
@@ -243,10 +327,10 @@ model FlowTraceEntry {
   /** The step id this entry records (correlation key into the flow + event history). */
   stepId: string;
 
-  /** The step type: `compute` | `decision-eval` | `human-task` | `timer`. */
+  /** The step type: `compute` | `decision-eval` | `human-task` | `timer` | `external-task`. */
   type: string;
 
-  /** Blackboard variable written (compute/decision-eval/human-task). */
+  /** Blackboard variable written (compute/decision-eval/human-task/external-task). */
   out?: string;
 
   /** The numeric value written to `out`. */
@@ -261,13 +345,13 @@ model FlowTraceEntry {
   /** The Decision's typed Outcome type (decision-eval steps). */
   outcomeType?: string;
 
-  /** How a `human-task` settled — `resolved` by signal or `escalated` on SLA exhaustion. */
+  /** How a `human-task`/`external-task` settled — `resolved` (by signal / correlated reply) or `escalated` on SLA exhaustion. */
   resolution?: TaskResolution;
 
   /** The durable wait duration (timer steps). */
   durationMs?: int64;
 
-  /** The routed assignee/queue (human-task steps). */
+  /** The routed assignee/queue (human-task steps) or resolved provider / escalation queue (external-task steps). */
   assignee?: string;
 }
 
@@ -300,4 +384,16 @@ model FlowResult {
   trace: FlowTraceEntry[];
 
   events: CaseEvent[];
+
+  /** The correlation id injected on each `external-task` submit (doc 04 §2.8, doc 05 §11.1), in step order; empty for flows with no delegation. */
+  correlations?: CaseCorrelation[];
+}
+
+/** The correlation id injected onto one `external-task`'s outbound request (doc 05 §11.1) — the key a reply must carry to correlate. */
+model CaseCorrelation {
+  /** The `external-task` step the correlation id was injected for. */
+  stepId: string;
+
+  /** The injected correlation id (`case_id '/' step.id`). */
+  correlationId: string;
 }

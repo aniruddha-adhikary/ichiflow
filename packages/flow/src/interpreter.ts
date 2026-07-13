@@ -9,7 +9,9 @@ import {
 import type { Flow, Vars } from "./dsl.js";
 import type { activities } from "./activities.js";
 
-const { compute, decisionEval, createTask } = proxyActivities<typeof activities>({
+const { compute, decisionEval, createTask, submitExternalTask } = proxyActivities<
+  typeof activities
+>({
   startToCloseTimeout: "1 minute",
 });
 
@@ -23,6 +25,25 @@ export const taskSignal =
   defineSignal<[{ stepId: string; action?: "resolve" | "pause" | "resume"; value?: number }]>(
     "taskSignal",
   );
+
+/**
+ * Deliver a **correlated inbound reply** to an `external-task` step (doc 04 §2.8, doc 05 §11.1) — the
+ * machine analog of `taskSignal.resolve`, standing in for the mock external system's response (no live
+ * system). The reply is buffered per step and routed by `correlationId` against the id the interpreter
+ * injected on submit; `(correlationId, messageId)` is the Idempotent-Receiver dedup key. A `malformed`
+ * reply is a schema-invalid response the delegation quarantines to the DLQ and surfaces on the Case.
+ */
+export const replySignal = defineSignal<
+  [
+    {
+      stepId: string;
+      correlationId: string;
+      messageId: string;
+      value?: number;
+      malformed?: boolean;
+    },
+  ]
+>("replySignal");
 
 /** A typed trace entry per executed step — the audit-spine material the DecisionRecord stitches (doc 04 §2.6). */
 export interface TraceEntry {
@@ -46,6 +67,12 @@ export interface CaseEvent {
   assignee?: string;
 }
 
+/** The correlation id injected onto one `external-task`'s outbound submit (doc 05 §11.1) — the key a reply must carry. */
+export interface CaseCorrelation {
+  stepId: string;
+  correlationId: string;
+}
+
 export interface FlowResult {
   flowId: string;
   /** The Case's global `case_id` (doc 04 §5.1) — here the durable Temporal workflow id. */
@@ -56,6 +83,16 @@ export interface FlowResult {
   trace: TraceEntry[];
   /** The Case/Task event history in order (doc 04 §5.1). */
   events: CaseEvent[];
+  /** The correlation id injected on each `external-task` submit (doc 04 §2.8), in step order. */
+  correlations: CaseCorrelation[];
+}
+
+/** One buffered inbound reply awaiting its `external-task` step. */
+interface BufferedReply {
+  correlationId: string;
+  messageId: string;
+  value?: number;
+  malformed?: boolean;
 }
 
 /**
@@ -67,6 +104,10 @@ export interface FlowResult {
  *   - `human-task` creates a Task whose assignee is *routed by a Decision* (§5.3), then races an
  *     await-signal against a **pausable** SLA timer (§5.7) — resolve on signal, escalate on budget
  *     exhaustion to a supervisor queue (§5.2);
+ *   - `external-task` (§2.8) is the machine analog: submit through the outbound Adapter with an injected
+ *     correlation id (§11.1), then race the *same* pausable SLA against a **correlated** inbound reply —
+ *     dedupe duplicates on `(correlationId, messageId)`, DLQ + surface a malformed reply (never hang),
+ *     resume on a valid reply, escalate on budget exhaustion;
  *   - `timer` is a durable wait the test env fast-forwards.
  * Every step appends a typed trace entry, and the Case/Task lifecycle appends ordered `events`.
  * `Date.now()` is Temporal's replay-safe workflow clock (not wall-clock), so pausable-SLA accounting
@@ -76,6 +117,7 @@ export async function interpret(flow: Flow): Promise<FlowResult> {
   const vars: Vars = { ...flow.input.vars };
   const trace: TraceEntry[] = [];
   const events: CaseEvent[] = [];
+  const correlations: CaseCorrelation[] = [];
   const caseId = workflowInfo().workflowId;
   let slaMs = 0;
   let seq = 0;
@@ -90,6 +132,16 @@ export async function interpret(flow: Flow): Promise<FlowResult> {
     if (action === "pause") paused.add(stepId);
     else if (action === "resume") paused.delete(stepId);
     else resolved.set(stepId, value ?? 0);
+  });
+
+  // Buffer external-task replies per step; the queue is drained in delivery order so dedup/DLQ is
+  // deterministic under replay regardless of when the mock external system delivers them.
+  const replyQueues = new Map<string, BufferedReply[]>();
+  const pendingReplies = (stepId: string): boolean => (replyQueues.get(stepId)?.length ?? 0) > 0;
+  setHandler(replySignal, ({ stepId, correlationId, messageId, value, malformed }) => {
+    const q = replyQueues.get(stepId) ?? [];
+    q.push({ correlationId, messageId, value, malformed });
+    replyQueues.set(stepId, q);
   });
 
   const read = (names: string[]): number[] => names.map((n) => vars[n]!);
@@ -195,10 +247,132 @@ export async function interpret(flow: Flow): Promise<FlowResult> {
         trace.push({ stepId: step.id, type: step.type, durationMs: step.durationMs });
         break;
       }
+      case "external-task": {
+        // §2.8 delegation — the machine analog of `human-task`: submit through the outbound Adapter,
+        // inject a deterministic correlation id (§11.1), then await a correlated reply against the
+        // *same* pausable SLA + escalation machinery (§5.7/§5.2), deduping on (correlationId, messageId).
+        const provider = step.provider ?? "external";
+        const correlationId = `${caseId}/${step.id}`;
+        correlations.push({ stepId: step.id, correlationId });
+        await submitExternalTask({
+          stepId: step.id,
+          requestRef: step.requestRef,
+          correlationId,
+          provider,
+          args: read(step.in),
+        });
+        emit("external.submitted", { stepId: step.id, assignee: provider });
+
+        const seen = new Set<string>(); // (correlationId '/' messageId) — Idempotent Receiver (§11.1)
+        let responded: number | undefined;
+        const drain = (): void => {
+          const q = replyQueues.get(step.id) ?? [];
+          while (q.length > 0) {
+            const r = q.shift()!;
+            // §11.1 correlation contract — a reply correlates only when it carries the injected id.
+            if (r.correlationId !== correlationId) {
+              emit("external.dlq", { stepId: step.id });
+              emit("case.flagged", { stepId: step.id });
+              continue;
+            }
+            const dedupKey = `${r.correlationId}/${r.messageId}`;
+            if (seen.has(dedupKey)) {
+              emit("external.deduped", { stepId: step.id }); // duplicate correlated reply — deduped once
+              continue;
+            }
+            seen.add(dedupKey);
+            if (r.malformed) {
+              // schema-invalid reply → DLQ + Case surfacing, never a stuck flow (§2.8 taxonomy).
+              emit("external.dlq", { stepId: step.id });
+              emit("case.flagged", { stepId: step.id });
+              continue;
+            }
+            if (responded === undefined) {
+              responded = r.value ?? 0;
+              emit("external.responded", { stepId: step.id });
+            } else {
+              // single mode — the response already resolved; a further distinct reply is deduped.
+              emit("external.deduped", { stepId: step.id });
+            }
+          }
+          replyQueues.set(step.id, q);
+        };
+
+        let remaining = step.slaMs;
+        let escalated = false;
+        for (;;) {
+          // §5.7 — while the pausable clock is stopped (`awaiting-applicant`) the delegation neither
+          // consumes replies nor burns budget; drain only runs on an active clock, so a reply buffered
+          // during the pause is applied deterministically on resume (not raced in ahead of the pause).
+          if (paused.has(step.id)) {
+            emit("sla.paused", { stepId: step.id });
+            await condition(() => !paused.has(step.id));
+            emit("sla.resumed", { stepId: step.id });
+            continue;
+          }
+          drain();
+          if (responded !== undefined) break;
+          // §5.7 pausable SLA — race the correlated reply (or a pause) against the remaining budget
+          // (mirrors the `human-task` await-signal loop). `condition` cancels the budget timer when a
+          // reply arrives first; on budget exhaustion it fires → escalation.
+          const startedAt = Date.now();
+          const met = await condition(
+            () => pendingReplies(step.id) || paused.has(step.id),
+            remaining,
+          );
+          remaining = Math.max(0, remaining - (Date.now() - startedAt));
+          if (!met) {
+            escalated = true;
+            break;
+          }
+        }
+
+        if (escalated) {
+          slaMs += step.slaMs;
+          const escQueue = step.escalationQueue ?? "supervisor";
+          vars[step.out] = step.onTimeout;
+          emit("external.timeout", { stepId: step.id });
+          emit("external.escalated", { stepId: step.id, assignee: escQueue });
+          trace.push({
+            stepId: step.id,
+            type: step.type,
+            out: step.out,
+            value: step.onTimeout,
+            resolution: "escalated",
+            assignee: escQueue,
+          });
+        } else {
+          // Resolving cancels the pending budget timer; yield one instant tick so that cancellation
+          // settles in its own workflow task and never shares an activation with a subsequent workflow
+          // completion (the SDK's timer state machine rejects cancel-and-complete in one activation).
+          // The escalation path needs no such tick — there the budget timer *fires*, which is terminal.
+          // Time-skip collapses the tick to 0ms, and it is not counted against the SLA budget.
+          await sleep(1);
+          vars[step.out] = responded!;
+          trace.push({
+            stepId: step.id,
+            type: step.type,
+            out: step.out,
+            value: responded!,
+            resolution: "resolved",
+            assignee: provider,
+          });
+        }
+        break;
+      }
     }
   }
 
   emit("case.resolved");
 
-  return { flowId: flow.id, caseId, steps: flow.steps.length, vars, slaMs, trace, events };
+  return {
+    flowId: flow.id,
+    caseId,
+    steps: flow.steps.length,
+    vars,
+    slaMs,
+    trace,
+    events,
+    correlations,
+  };
 }
