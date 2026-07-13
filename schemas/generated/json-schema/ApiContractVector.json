@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ApiContractVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "requests": {
+            "type": "array",
+            "items": {
+                "$ref": "ApiRequest.json"
+            }
+        }
+    },
+    "required": [
+        "name",
+        "requests"
+    ],
+    "description": "One committed **API-contract conformance vector** (build plan 4.2): a named sequence of HTTP\nrequests against the generated BFF, each pinned to a status + response shape. Proves the API\nconforms to the emitted OpenAPI and that runtime JSON-Schema validation guards every boundary."
+}

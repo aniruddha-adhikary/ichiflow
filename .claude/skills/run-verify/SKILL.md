@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -115,6 +115,17 @@ outbox oracle in order, with the relay marking every outbox record delivered
 (`vectors_green == total`, `outbox_delivered == outbox_total`). The binding uses monotonic sequence
 stamps (no wall-clock/RNG), so run `pnpm entity:jvm` before `pnpm verify` to produce
 `core/build/entity-store-results.json`.
+
+`entity-api` is the Phase 4.2 gate (ADR-0018, doc 02 §5): the **generated BFF** over the entity store.
+The LoanApplication CRUD/list HTTP surface is authored once in TypeSpec (`schemas/entity-api.tsp`) and
+emitted to OpenAPI 3.1; the BFF (`packages/api/`) routes by that emitted document and validates every
+request body and every response against the _same_ JSON Schema (zero-drift). The committed API-contract
+vectors (`schemas/entity-api/vectors/*.vector.json`) validate against the emitted `ApiContractVector.json`;
+replaying each through a fresh BFF+store yields responses that validate against the emitted OpenAPI
+response schema for their status and hit the pinned ids/versions/totals/error-codes; every non-`Verify_status`
+operation is covered; and the runtime boundary validator provably rejects malformed writes (≥1 `422`,
+`vectors_green == total`). The store binding uses monotonic sequence stamps (no wall-clock/RNG), so run
+`pnpm api:contract` before `pnpm verify` to produce `packages/api/build/api-contract-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

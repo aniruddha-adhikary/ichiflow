@@ -24,6 +24,7 @@ import { interpreterDeterminismSpikeScope } from "../src/verify/scopes/interpret
 import { flowLayerScope } from "../src/verify/scopes/flow-layer.js";
 import { decisionRecordScope } from "../src/verify/scopes/decisionrecord.js";
 import { entityStoreScope } from "../src/verify/scopes/entity-store.js";
+import { entityApiScope } from "../src/verify/scopes/entity-api.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -1427,6 +1428,179 @@ describe("entity-store scope (Phase 4.1)", () => {
       setup(tmp, { results: null });
       const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
       const present = checks.find((c) => c.id === "entity-store.results-present")!;
+      expect(present.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("entity-api scope (Phase 4.2)", () => {
+  const validVector = {
+    name: "v0",
+    requests: [
+      {
+        method: "POST",
+        path: "/loan-applications",
+        body: {
+          id: "app-1",
+          applicant: "Ada",
+          amount: 100,
+          productCode: "P-HOME",
+          status: "submitted",
+        },
+        expectStatus: 201,
+        expectBodyId: "app-1",
+        expectVersion: 1,
+      },
+    ],
+  };
+  const results = {
+    vectorsGreen: 1,
+    total: 1,
+    operationsCovered: [
+      "LoanApplications_create",
+      "LoanApplications_list",
+      "LoanApplications_read",
+      "LoanApplications_remove",
+      "LoanApplications_update",
+    ],
+    operationsDeclared: [
+      "LoanApplications_create",
+      "LoanApplications_list",
+      "LoanApplications_read",
+      "LoanApplications_remove",
+      "LoanApplications_update",
+      "Verify_status",
+    ],
+    boundaryRejections: 2,
+    vectors: [
+      {
+        name: "v0",
+        green: true,
+        requests: [
+          {
+            method: "POST",
+            path: "/loan-applications",
+            operationId: "LoanApplications_create",
+            status: 201,
+            expectStatus: 201,
+            conforms: true,
+            ok: true,
+            detail: "",
+          },
+        ],
+      },
+    ],
+  };
+  const setup = (root: string, opts: { vectors?: unknown[]; results?: unknown | null } = {}) => {
+    const vdir = join(root, "schemas/entity-api/vectors");
+    mkdirSync(vdir, { recursive: true });
+    const vectors = opts.vectors ?? [validVector];
+    vectors.forEach((v, i) => writeFileSync(join(vdir, `v${i}.vector.json`), JSON.stringify(v)));
+    if (opts.results !== null) {
+      const rp = join(root, "packages/api/build/api-contract-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when vectors are DSL-valid, every response conforms, all ops covered, boundary rejects", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      setup(tmp);
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "entity-api.vectors-green")!;
+      expect(green.value).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed vector via the ApiContractVector schema", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      // Request missing the required `method`/`expectStatus`.
+      const bad = { name: "v0", requests: [{ path: "/loan-applications" }] };
+      setup(tmp, { vectors: [bad] });
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(
+        checks.some((c) => c.id.startsWith("entity-api.dsl-valid.") && c.status === "fail"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a vector whose response diverges from the emitted contract or its pinned expectation", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          vectorsGreen: 0,
+          vectors: [
+            {
+              name: "v0",
+              green: false,
+              requests: [
+                {
+                  method: "POST",
+                  path: "/loan-applications",
+                  operationId: "LoanApplications_create",
+                  status: 201,
+                  expectStatus: 201,
+                  conforms: false,
+                  ok: false,
+                  detail: "non-conforming response: /meta missing required property version",
+                },
+              ],
+            },
+          ],
+        },
+      });
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("entity-api.conforms.v0");
+      expect(failed).toContain("entity-api.vectors-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails operations-covered when an entity operation is never exercised", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      setup(tmp, {
+        results: { ...results, operationsCovered: ["LoanApplications_create"] },
+      });
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      const covered = checks.find((c) => c.id === "entity-api.operations-covered")!;
+      expect(covered.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails boundary-rejects when no malformed write is exercised", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      setup(tmp, { results: { ...results, boundaryRejections: 0 } });
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      const boundary = checks.find((c) => c.id === "entity-api.boundary-rejects")!;
+      expect(boundary.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-api-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      const present = checks.find((c) => c.id === "entity-api.results-present")!;
       expect(present.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });

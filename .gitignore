@@ -149,6 +149,8 @@ vite.config.ts.timestamp-*
 .ichiflow/contract-diff.json
 # Interpreter determinism-spike verdict — derived state produced by `pnpm interpreter:spike` (chunk 3.0).
 packages/flow/build/
+# Generated-BFF contract-conformance results — derived state produced by `pnpm api:contract` (chunk 4.2).
+packages/api/build/
 
 # Gradle / Kotlin core
 core/.gradle/

@@ -8,3 +8,4 @@ import "./flow.tsp";
 import "./decisionrecord.tsp";
 import "./entity.tsp";
 import "./service.tsp";
+import "./entity-api.tsp";

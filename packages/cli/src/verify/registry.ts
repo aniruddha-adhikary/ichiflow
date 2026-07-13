@@ -12,6 +12,7 @@ import { interpreterDeterminismSpikeScope } from "./scopes/interpreter-determini
 import { flowLayerScope } from "./scopes/flow-layer.js";
 import { decisionRecordScope } from "./scopes/decisionrecord.js";
 import { entityStoreScope } from "./scopes/entity-store.js";
+import { entityApiScope } from "./scopes/entity-api.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
@@ -34,6 +35,7 @@ const SCOPES: Scope[] = [
   flowLayerScope,
   decisionRecordScope,
   entityStoreScope,
+  entityApiScope,
   codeQualityScope,
 ];
 

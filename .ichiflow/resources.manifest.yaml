@@ -212,3 +212,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/entity-store.ts
     description: Domain entity-store gate (build plan 4.1, doc 13) — committed vectors are DSL-valid, every persisted payload validates against the schema-defined entity (LoanApplication) at the boundary, and each round-trips on the deterministic Repository SPI reference binding to its pinned audit/outbox oracle with the outbox fully delivered by the relay (transactional-outbox liveness). Consumes the artifact from `pnpm entity:jvm`.
+  - id: entity-api-schema
+    kind: schema
+    path: schemas/entity-api.tsp
+    description: Canonical generated-BFF API surface over the entity store (build plan 4.2, ADR-0018, doc 02 §5) — the LoanApplication CRUD/list HTTP operations authored on the BFF service, the record/page response shapes, the 404/422 error models, and the API-contract-vector DSL. TypeSpec authoring; the emitted OpenAPI 3.1 (and JSON Schema) is the contract that validates every request/response at the runtime boundary (zero-drift).
+  - id: entity-api-vectors
+    kind: pattern
+    path: schemas/entity-api/vectors
+    description: API-contract conformance vectors (build plan 4.2, harness-first) — named sequences of HTTP requests against the generated BFF, each pinned to a status + response shape (created/read/updated/soft-deleted record ids+versions, list ids+totals, and 404/422 error codes). Cover the CRUD lifecycle, query/filter/search/pagination, and runtime boundary rejection of malformed writes. Replayed by `pnpm api:contract` through a fresh BFF+store per vector and validated against the emitted OpenAPI.
+  - id: entity-api
+    kind: harness
+    path: packages/cli/src/verify/scopes/entity-api.ts
+    description: Generated-BFF gate (build plan 4.2, doc 13) — committed API-contract vectors are DSL-valid, every response validates against the emitted OpenAPI response schema for its status, every non-verify operation is exercised, and the runtime boundary validator provably rejects malformed writes (≥1 422). Consumes the artifact from `pnpm api:contract`.

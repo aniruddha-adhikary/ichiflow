@@ -1,0 +1,76 @@
+{
+  "name": "query-pagination",
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "app-a",
+        "applicant": "Alice",
+        "amount": 100,
+        "productCode": "P-HOME",
+        "status": "submitted"
+      },
+      "expectStatus": 201,
+      "expectBodyId": "app-a"
+    },
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "app-b",
+        "applicant": "Bob",
+        "amount": 200,
+        "productCode": "P-AUTO",
+        "status": "submitted"
+      },
+      "expectStatus": 201,
+      "expectBodyId": "app-b"
+    },
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "app-c",
+        "applicant": "Carol",
+        "amount": 300,
+        "productCode": "P-HOME",
+        "status": "approved"
+      },
+      "expectStatus": 201,
+      "expectBodyId": "app-c"
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications",
+      "query": { "productCode": "P-HOME", "sort": "applicant" },
+      "expectStatus": 200,
+      "expectTotal": 2,
+      "expectIds": ["app-a", "app-c"]
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications",
+      "query": { "search": "bob" },
+      "expectStatus": 200,
+      "expectTotal": 1,
+      "expectIds": ["app-b"]
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications",
+      "query": { "sort": "amount", "page": "0", "size": "2" },
+      "expectStatus": 200,
+      "expectTotal": 3,
+      "expectIds": ["app-a", "app-b"]
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications",
+      "query": { "sort": "amount", "page": "1", "size": "2" },
+      "expectStatus": 200,
+      "expectTotal": 3,
+      "expectIds": ["app-c"]
+    }
+  ]
+}
