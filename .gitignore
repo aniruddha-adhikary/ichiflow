@@ -147,6 +147,8 @@ vite.config.ts.timestamp-*
 .ichiflow/ledger/
 # oasdiff breaking-change results — derived state produced by `pnpm contract:diff` (chunk 1.4a).
 .ichiflow/contract-diff.json
+# Interpreter determinism-spike verdict — derived state produced by `pnpm interpreter:spike` (chunk 3.0).
+packages/flow/build/
 
 # Gradle / Kotlin core
 core/.gradle/

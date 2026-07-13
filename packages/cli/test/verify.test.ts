@@ -20,6 +20,7 @@ import {
   type CodeSetDoc,
 } from "../src/verify/reference-data.js";
 import { contractGateScope } from "../src/verify/scopes/contract-gate.js";
+import { interpreterDeterminismSpikeScope } from "../src/verify/scopes/interpreter-determinism-spike.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -808,5 +809,113 @@ describe("full verify", () => {
     const ledger = readScopeLedger(repoRoot, "self-check");
     expect(ledger?.latest.scope).toBe("self-check");
     expect(ledger?.history.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("interpreter-determinism-spike scope (Phase 3.0)", () => {
+  const goodSpike = {
+    sdk: "@temporalio",
+    sdkVersion: "1.11.7",
+    flowId: "toy-3step",
+    steps: 3,
+    expected: 43,
+    result: 43,
+    resultCorrect: true,
+    secondResult: 43,
+    resultsIdentical: true,
+    replays: [
+      { attempt: 1, ok: true, error: null },
+      { attempt: 2, ok: true, error: null },
+    ],
+    replayClean: true,
+    historyEvents: 22,
+    sla: { scheduledMs: 2592000000, wallMs: 102, fastForwarded: true },
+  };
+  const write = (root: string, body: unknown) => {
+    const p = join(root, "packages/flow/build/interpreter-spike-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
+
+  it("passes when replay is clean, result is stable, and the SLA timer fast-forwards", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flow-"));
+    try {
+      write(tmp, goodSpike);
+      const checks = interpreterDeterminismSpikeScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const clean = checks.find((c) => c.id === "interpreter-determinism-spike.replay-clean")!;
+      expect(clean.value).toBe(2);
+      expect(clean.threshold).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a determinism violation on replay and the replay-clean aggregate", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flow-"));
+    try {
+      write(tmp, {
+        ...goodSpike,
+        replayClean: false,
+        replays: [
+          { attempt: 1, ok: true, error: null },
+          { attempt: 2, ok: false, error: "DeterminismViolationError: command mismatch" },
+        ],
+      });
+      const checks = interpreterDeterminismSpikeScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("interpreter-determinism-spike.replay-clean.2");
+      expect(failed).toContain("interpreter-determinism-spike.replay-clean");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when the SLA timer did not fast-forward", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flow-"));
+    try {
+      write(tmp, {
+        ...goodSpike,
+        sla: { scheduledMs: 2592000000, wallMs: 2592000000, fastForwarded: false },
+      });
+      const checks = interpreterDeterminismSpikeScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const ff = checks.find((c) => c.id === "interpreter-determinism-spike.sla-fast-forwarded")!;
+      expect(ff.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a drifted result and an unpinned SDK", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flow-"));
+    try {
+      write(tmp, {
+        ...goodSpike,
+        sdkVersion: "1.10.0",
+        result: 99,
+        resultCorrect: false,
+        secondResult: 43,
+        resultsIdentical: false,
+      });
+      const checks = interpreterDeterminismSpikeScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("interpreter-determinism-spike.sdk-pinned");
+      expect(failed).toContain("interpreter-determinism-spike.result-correct");
+      expect(failed).toContain("interpreter-determinism-spike.results-identical");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the spike artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flow-"));
+    try {
+      const checks = interpreterDeterminismSpikeScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const present = checks.find((c) => c.id === "interpreter-determinism-spike.results-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("determinism harness");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

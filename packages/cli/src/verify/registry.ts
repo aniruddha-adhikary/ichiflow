@@ -8,6 +8,7 @@ import { contractVectorsScope } from "./scopes/contract-vectors.js";
 import { referenceDataScope } from "./scopes/reference-data.js";
 import { decisionProjectionSpikeScope } from "./scopes/decision-projection-spike.js";
 import { decisionLayerScope } from "./scopes/decision-layer.js";
+import { interpreterDeterminismSpikeScope } from "./scopes/interpreter-determinism-spike.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
@@ -26,6 +27,7 @@ const SCOPES: Scope[] = [
   decisionProjectionSpikeScope,
   contractGateScope,
   decisionLayerScope,
+  interpreterDeterminismSpikeScope,
   codeQualityScope,
 ];
 

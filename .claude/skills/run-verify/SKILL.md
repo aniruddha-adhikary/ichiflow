@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -73,6 +73,13 @@ and meet the declared rule/row **coverage** threshold (`rule_row_coverage_pct >=
 frozen **FEEL semantics vectors** (doc 13 §2.b) still evaluate to their pinned results on the
 reference engine (`feel_vectors_green == total`); run `pnpm feel:jvm` first to produce
 `core/build/feel-vector-results.json`.
+
+`interpreter-determinism-spike` is the Phase 3.0 riskiest-bet proof (doc 14 §6): the generic Temporal
+interpreter (`packages/flow/`) runs a toy 3-step flow (compute → 30-day SLA timer → compute) on the
+time-skipping test env; the harness asserts the recorded history **replays twice with no
+non-determinism violation**, the result is stable across an independent re-execution, and the
+month-long SLA timer **fast-forwards** to milliseconds. Run `pnpm interpreter:spike` before
+`pnpm verify` to produce `packages/flow/build/interpreter-spike-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

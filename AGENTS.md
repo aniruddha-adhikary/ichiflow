@@ -34,6 +34,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).     |
 | `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).  |
 | `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).              |
+| `pnpm interpreter:spike`                | Run the flow-interpreter determinism harness on Temporal (chunk 3.0).  |
 | `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.               |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
@@ -42,7 +43,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                     |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                 |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `code-quality`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -86,13 +87,20 @@ a KIE bump that silently shifts list-sort ordering or decimal rounding fails her
 first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
 **detekt** (zero findings, from SARIF) and **ArchUnit** rule results (notably the SPI boundary — only
 `…decision.spi` may depend on `org.kie..`), both of which also fail `./gradlew check`/`test`; run
-`pnpm quality:jvm` first.
+`pnpm quality:jvm` first. `interpreter-determinism-spike` is the Phase 3.0 riskiest-bet proof (doc 14
+§6): the generic Temporal interpreter (`packages/flow/`) runs a toy 3-step flow (compute → 30-day SLA
+timer → compute) on the time-skipping test env, and the harness asserts the recorded history replays
+twice with **no non-determinism violation**, the result is stable across an independent re-execution,
+and the month-long SLA timer **fast-forwards** to milliseconds. Determinism is the whole flow layer's
+correctness property, so it is proven on a toy before the full step set; run `pnpm interpreter:spike`
+first to produce the verdict artifact.
 
 ## Layout
 
 - `schemas/` — TypeSpec authoring; emitted JSON Schema + OpenAPI 3.1 in `schemas/generated/` are the contract of record.
 - `packages/cli/` — the `ichiflow` CLI and the verify harness engine.
 - `packages/contracts-ts/` — generated TypeScript contract types (hey-api) in `src/gen/`; regenerate, never hand-edit.
+- `packages/flow/` — the Phase 3 flow layer: the generic Temporal interpreter over the flow-JSON DSL + its determinism harness.
 - `core/` — the Kotlin core (Gradle); generated contract models (Fabrikt) in `core/generated/`.
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
 - `.ichiflow/resources.manifest.yaml` — version pins + named resources (doc 10 §2.5).
