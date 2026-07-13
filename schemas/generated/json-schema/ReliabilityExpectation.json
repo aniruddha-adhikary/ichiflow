@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ReliabilityExpectation.json",
+    "type": "object",
+    "properties": {
+        "applied": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Distinct messages applied to business state (each exactly once)."
+        },
+        "deduped": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Inbound duplicates deduped by the Idempotent Receiver."
+        },
+        "dlq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Messages that exhausted their attempts and were dead-lettered."
+        }
+    },
+    "required": [
+        "applied",
+        "deduped",
+        "dlq"
+    ],
+    "description": "The pinned reliability outcome of driving a `ReliabilityVector`'s sequence through the Idempotent Receiver + DLQ machinery."
+}

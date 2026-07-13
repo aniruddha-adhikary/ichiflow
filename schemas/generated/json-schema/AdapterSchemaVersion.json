@@ -1,0 +1,11 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AdapterSchemaVersion.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "adapter/v1"
+        }
+    ],
+    "description": "The pinned adapter-artifact schema version a Port/Mapping declares (doc 05 §9, contract versioning)."
+}

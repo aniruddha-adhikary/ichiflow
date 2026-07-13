@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "MappingRule.json",
+    "type": "object",
+    "properties": {
+        "operation": {
+            "$ref": "MappingOp.json"
+        },
+        "from": {
+            "type": "string",
+            "description": "JSON Pointer (RFC 6901) into the decoded wire message; required for `copy`/`copyNumber`."
+        },
+        "to": {
+            "type": "string",
+            "description": "Dotted path into the canonical `payload` this rule writes (e.g. `applicant.id`)."
+        },
+        "value": {
+            "description": "The literal value for a `constant` op."
+        },
+        "optional": {
+            "type": "boolean",
+            "description": "When true, a missing/undefined `from` value is allowed (the field is simply omitted); otherwise it is a mapping error."
+        }
+    },
+    "required": [
+        "operation",
+        "to"
+    ],
+    "description": "One declarative **Message-Translator rule** (doc 05 §2). Rules are evaluated in order into the\ncanonical `payload`; each is a pure transform of the decoded input, so the mapping's golden pairs are\nstable. `from` is a JSON Pointer into the wire message (RFC 6901); `to` is a dotted canonical path."
+}

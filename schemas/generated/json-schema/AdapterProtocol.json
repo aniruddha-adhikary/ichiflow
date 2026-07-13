@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AdapterProtocol.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "rest",
+            "description": "Synchronous HTTP request/response (REST in or out)."
+        },
+        {
+            "type": "string",
+            "const": "broker",
+            "description": "A message broker (queue/topic) — publish/consume, driven against a mock broker (no live MQ/Kafka)."
+        },
+        {
+            "type": "string",
+            "const": "webhook",
+            "description": "An inbound HTTP webhook the core exposes for external callbacks."
+        }
+    ],
+    "description": "The transport binding a Port speaks (doc 05 §11.2). v1 ships REST + one message broker + webhook; each runs the same §2.d vector set against its mock. SFTP is design-only/post-v1 (ADR-0028)."
+}

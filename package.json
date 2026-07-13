@@ -40,6 +40,7 @@
     "flow:conformance": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow conformance",
     "decisionrecord:assemble": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow decisionrecord",
     "portal:preview": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/portal build && pnpm --filter @ichiflow/portal preview",
+    "adapters:preview": "pnpm --filter @ichiflow/adapters build && pnpm --filter @ichiflow/adapters preview",
     "quality:jvm": "cd core && ./gradlew -q detekt test",
     "verify": "node packages/cli/dist/cli.js verify"
   },

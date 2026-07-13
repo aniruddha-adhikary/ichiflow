@@ -155,6 +155,8 @@ packages/api/build/
 packages/uischema/build/
 # Portal preview harness results — derived state produced by `pnpm portal:preview` (chunk 4.4).
 packages/portal/build/
+# Adapter harness results — derived state produced by `pnpm adapters:preview` (chunk 5.1).
+packages/adapters/build/
 
 # Gradle / Kotlin core
 core/.gradle/

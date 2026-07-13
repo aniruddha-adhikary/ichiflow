@@ -1,0 +1,15 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CanonicalKind.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "Command"
+        },
+        {
+            "type": "string",
+            "const": "Event"
+        }
+    ],
+    "description": "Whether a canonical message is a `Command` (an imperative request) or an `Event` (a fact) on the bus (doc 05 §1)."
+}

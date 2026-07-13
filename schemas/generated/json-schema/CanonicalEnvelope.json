@@ -1,0 +1,47 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CanonicalEnvelope.json",
+    "type": "object",
+    "properties": {
+        "kind": {
+            "$ref": "CanonicalKind.json"
+        },
+        "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*([.][a-z0-9]+)+[.]v[0-9]+$",
+            "description": "The versioned canonical type, e.g. `loan.application.received.v1`."
+        },
+        "messageId": {
+            "type": "string",
+            "description": "Stable idempotency key — the Idempotent Receiver dedups on this (doc 05 §reliability)."
+        },
+        "correlationId": {
+            "type": "string",
+            "description": "Correlation Identifier tying async request/reply and every message to its Case (doc 05 §11)."
+        },
+        "caseId": {
+            "type": "string",
+            "description": "The Case this message belongs to — the DecisionRecord stitch key (doc 04 §5.1)."
+        },
+        "payload": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "The translated canonical body (a pure function of the decoded wire message)."
+        }
+    },
+    "required": [
+        "kind",
+        "type",
+        "messageId",
+        "correlationId",
+        "caseId",
+        "payload"
+    ],
+    "description": "A **canonical envelope** (doc 05 §1) — the only shape the core sees. `type` is a versioned canonical\nname (`loan.application.received.v1`); `messageId` is the stable idempotency key checked by the\nIdempotent Receiver; `correlationId` + `caseId` tie the message to its Case (doc 05 §11).",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

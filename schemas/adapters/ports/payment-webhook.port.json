@@ -1,0 +1,9 @@
+{
+  "id": "payment-webhook",
+  "schemaVersion": "adapter/v1",
+  "direction": "inbound",
+  "protocol": "webhook",
+  "canonicalType": "payment.received.v1",
+  "mapping": "payment-received",
+  "reliability": { "maxAttempts": 3, "dedup": true, "dlq": true }
+}

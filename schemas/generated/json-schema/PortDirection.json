@@ -1,0 +1,17 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "PortDirection.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "inbound",
+            "description": "Wire → canonical: decode an external message, translate, publish onto the canonical bus."
+        },
+        {
+            "type": "string",
+            "const": "outbound",
+            "description": "Canonical → wire: translate a canonical event from the outbox, encode, deliver with retry/DLQ."
+        }
+    ],
+    "description": "The direction a Port moves messages relative to the core (doc 05 §3)."
+}

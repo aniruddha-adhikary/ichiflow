@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "InboundMessage.json",
+    "type": "object",
+    "properties": {
+        "messageId": {
+            "type": "string"
+        },
+        "poison": {
+            "type": "boolean",
+            "description": "Deterministically fails handling (a poison message) — drives the DLQ path."
+        }
+    },
+    "required": [
+        "messageId"
+    ],
+    "description": "One inbound message in a reliability sequence — its `messageId` and whether handling it (deterministically) fails (a poison payload)."
+}

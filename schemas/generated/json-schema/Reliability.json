@@ -1,0 +1,27 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Reliability.json",
+    "type": "object",
+    "properties": {
+        "maxAttempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Bounded delivery attempts before a message is dead-lettered (exponential backoff is emulated deterministically in the harness)."
+        },
+        "dedup": {
+            "type": "boolean",
+            "description": "When true, an inbound duplicate `messageId` is deduped once (Idempotent Receiver)."
+        },
+        "dlq": {
+            "type": "boolean",
+            "description": "When true, an attempts-exhausted message lands in the Dead Letter Channel rather than being dropped or retried forever."
+        }
+    },
+    "required": [
+        "maxAttempts",
+        "dedup",
+        "dlq"
+    ],
+    "description": "The **reliability** block of a Port (doc 05 §reliability). Retries are bounded then the message is\ndead-lettered; `dedup` turns on the Idempotent Receiver at the inbound edge."
+}
