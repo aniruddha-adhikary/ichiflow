@@ -179,12 +179,12 @@ resources:
   - id: flow-dsl
     kind: schema
     path: schemas/flow.tsp
-    description: Canonical Flow DSL (build plan 3.1, ADR-0004, doc 04 §2) — the schema-validated flow-JSON document the generic interpreter walks. Closed step set (compute + timer in 3.1). TypeSpec authoring; emitted JSON Schema is the contract of record.
+    description: Canonical Flow DSL (build plan 3.1–3.2, ADR-0004, doc 04 §2) — the schema-validated flow-JSON document the generic interpreter walks over a named-variable blackboard. Closed core step set (compute via a versioned code-activity ref, decision-eval, human-task, timer). TypeSpec authoring; emitted JSON Schema is the contract of record.
   - id: flow-conformance-vectors
     kind: pattern
     path: schemas/flow/vectors
-    description: Skeleton flow conformance vectors (build plan 3.1) — DSL-valid Flow documents paired with the interpreter result they must produce; run by `pnpm flow:conformance` for vectors_green/total + replay determinism.
+    description: Flow conformance vectors (build plan 3.1–3.2) — DSL-valid Flow documents (+ scripted human-task resolution signals) paired with the final blackboard, step trace, and scheduled SLA the interpreter must produce; run by `pnpm flow:conformance` for vectors_green/total + replay determinism under time-skip.
   - id: flow-layer
     kind: harness
     path: packages/cli/src/verify/scopes/flow-layer.ts
-    description: Flow interpreter conformance gate (build plan 3.1) — committed vectors are DSL-valid and each interprets to its pinned oracle with clean replay determinism under time-skip. Consumes the artifact from `pnpm flow:conformance`.
+    description: Flow interpreter conformance gate (build plan 3.1–3.2) — committed vectors are DSL-valid and each interprets to its pinned oracle (blackboard, steps, SLA, complete step trace) with clean replay determinism under time-skip, across compute/decision-eval/human-task/timer. Consumes the artifact from `pnpm flow:conformance`.

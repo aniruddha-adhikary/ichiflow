@@ -1,14 +1,32 @@
 {
-  "name": "timer-free compute chain — double → double → inc (step ordering)",
+  "name": "compute chain over the blackboard — Double → Double → Increment",
   "flow": {
     "id": "compute-chain",
     "schemaVersion": "flow/v1",
-    "input": { "value": 5 },
+    "input": { "vars": { "x": 5 } },
     "steps": [
-      { "id": "s1", "type": "compute", "op": "double" },
-      { "id": "s2", "type": "compute", "op": "double" },
-      { "id": "s3", "type": "compute", "op": "inc" }
+      {
+        "id": "s1",
+        "type": "compute",
+        "ref": "ts://flow-kit/Double@1.0.0",
+        "in": ["x"],
+        "out": "x"
+      },
+      {
+        "id": "s2",
+        "type": "compute",
+        "ref": "ts://flow-kit/Double@1.0.0",
+        "in": ["x"],
+        "out": "x"
+      },
+      {
+        "id": "s3",
+        "type": "compute",
+        "ref": "ts://flow-kit/Increment@1.0.0",
+        "in": ["x"],
+        "out": "x"
+      }
     ]
   },
-  "expect": { "result": 21, "steps": 3, "slaMs": 0 }
+  "expect": { "vars": { "x": 21 }, "steps": 3, "slaMs": 0 }
 }

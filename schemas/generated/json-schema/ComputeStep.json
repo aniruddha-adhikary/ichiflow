@@ -7,18 +7,34 @@
             "type": "string",
             "const": "compute"
         },
-        "op": {
-            "$ref": "ComputeOp.json"
+        "ref": {
+            "type": "string",
+            "pattern": "^(kt|ts|py)://[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@[0-9]+[.][0-9]+[.][0-9]+$",
+            "description": "The versioned code-activity reference: `<lang>://<module>/<Name>@<major>.<minor>.<patch>` (doc 04 §2.6)."
+        },
+        "in": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "description": "Blackboard variables passed, in order, as the code activity's inputs."
+        },
+        "out": {
+            "type": "string",
+            "description": "Blackboard variable the code activity's result is written to."
         }
     },
     "required": [
         "type",
-        "op"
+        "ref",
+        "in",
+        "out"
     ],
     "allOf": [
         {
             "$ref": "FlowStep.json"
         }
     ],
-    "description": "A `compute` step — a pure code-activity that reshapes inter-step data (doc 04 §2.6). Runs as an\nactivity (the non-determinism boundary), so the interpreter body stays deterministic."
+    "description": "A `compute` step — a typed **code activity** for computation neither a Decision nor an Adapter owns\n(doc 04 §2.6). Referenced by a versioned, language-parameterised `ref` (`<lang>://<module>/<Name>@<semver>`)\nover a schema'd I/O boundary; runs as an activity (the non-determinism boundary) and emits a trace."
 }

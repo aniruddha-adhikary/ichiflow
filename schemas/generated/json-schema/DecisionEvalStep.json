@@ -1,0 +1,39 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionEvalStep.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "const": "decision-eval"
+        },
+        "decision": {
+            "type": "string",
+            "description": "The DecisionModel identifier to evaluate."
+        },
+        "in": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "description": "Blackboard variables passed, in order, as the decision's inputs."
+        },
+        "out": {
+            "type": "string",
+            "description": "Blackboard variable the decision's value facet is written to."
+        }
+    },
+    "required": [
+        "type",
+        "decision",
+        "in",
+        "out"
+    ],
+    "allOf": [
+        {
+            "$ref": "FlowStep.json"
+        }
+    ],
+    "description": "A `decision-eval` step — evaluate a DMN **DecisionModel** and annotate the blackboard with its typed\nOutcome (doc 04 §2.3). The value facet of the Outcome is written to `out`; the outcome type is\nrecorded on the trace. In production this is an activity on the Kotlin rule-eval queue behind the SPI."
+}

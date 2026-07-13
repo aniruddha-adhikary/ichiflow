@@ -1,0 +1,39 @@
+{
+  "name": "mixed flow — decision-eval → timer → human-task (signal buffered during the wait) → compute",
+  "flow": {
+    "id": "mixed-full",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "score": 60, "base": 10 } },
+    "steps": [
+      {
+        "id": "s1",
+        "type": "decision-eval",
+        "decision": "threshold-approval",
+        "in": ["score"],
+        "out": "gate"
+      },
+      { "id": "s2", "type": "timer", "durationMs": 604800000 },
+      {
+        "id": "s3",
+        "type": "human-task",
+        "assignee": "ops-queue",
+        "slaMs": 7776000000,
+        "out": "signoff",
+        "onTimeout": 0
+      },
+      {
+        "id": "s4",
+        "type": "compute",
+        "ref": "ts://flow-kit/Sum@1.0.0",
+        "in": ["gate", "signoff", "base"],
+        "out": "total"
+      }
+    ]
+  },
+  "signals": [{ "afterMs": 1000, "stepId": "s3", "value": 5 }],
+  "expect": {
+    "vars": { "score": 60, "base": 10, "gate": 1, "signoff": 5, "total": 16 },
+    "steps": 4,
+    "slaMs": 604800000
+  }
+}

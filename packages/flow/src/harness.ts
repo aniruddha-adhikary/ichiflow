@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import { Worker } from "@temporalio/worker";
-import { activities, applyCompute } from "./activities.js";
-import type { Flow } from "./dsl.js";
+import { activities, runCodeActivity } from "./activities.js";
+import type { Flow, Vars } from "./dsl.js";
 import { ensureRuntime } from "./runtime.js";
 
 const require = createRequire(import.meta.url);
@@ -31,13 +31,17 @@ export interface SpikeResult {
   sla: { scheduledMs: number; wallMs: number; fastForwarded: boolean };
 }
 
-/** Fold the pure compute reference over the flow to get the answer the interpreter must produce. */
-function expectedResult(flow: Flow): number {
-  let value = flow.input.value;
+/** Fold the pure code-activity reference over the flow's blackboard to get the answer the interpreter must produce. */
+function expectedResult(flow: Flow, resultVar: string): number {
+  const vars: Vars = { ...flow.input.vars };
   for (const step of flow.steps) {
-    if (step.type === "compute") value = applyCompute(step.op, value);
+    if (step.type === "compute")
+      vars[step.out] = runCodeActivity(
+        step.ref,
+        step.in.map((n) => vars[n]!),
+      );
   }
-  return value;
+  return vars[resultVar]!;
 }
 
 function scheduledSlaMs(flow: Flow): number {
@@ -55,8 +59,9 @@ function scheduledSlaMs(flow: Flow): number {
 export async function runInterpreterSpike(opts: {
   workflowsPath: string;
   flow: Flow;
+  resultVar: string;
 }): Promise<SpikeResult> {
-  const { workflowsPath, flow } = opts;
+  const { workflowsPath, flow, resultVar } = opts;
   ensureRuntime();
   const env = await TestWorkflowEnvironment.createTimeSkipping();
   try {
@@ -74,7 +79,7 @@ export async function runInterpreterSpike(opts: {
         workflowId: `spike-${flow.id}-1`,
         taskQueue: "flow-spike",
       });
-      const first = (await h1.result()) as { result: number };
+      const first = (await h1.result()) as { vars: Vars };
       const history = await h1.fetchHistory();
 
       const h2 = await env.client.workflow.start("interpret", {
@@ -82,7 +87,7 @@ export async function runInterpreterSpike(opts: {
         workflowId: `spike-${flow.id}-2`,
         taskQueue: "flow-spike",
       });
-      const second = (await h2.result()) as { result: number };
+      const second = (await h2.result()) as { vars: Vars };
       return { first, second, history };
     });
     const wallMs = Date.now() - t0;
@@ -101,7 +106,9 @@ export async function runInterpreterSpike(opts: {
       }
     }
 
-    const expected = expectedResult(flow);
+    const expected = expectedResult(flow, resultVar);
+    const firstResult = run.first.vars[resultVar]!;
+    const secondResult = run.second.vars[resultVar]!;
     const scheduledMs = scheduledSlaMs(flow);
     return {
       sdk: "@temporalio",
@@ -109,10 +116,10 @@ export async function runInterpreterSpike(opts: {
       flowId: flow.id,
       steps: flow.steps.length,
       expected,
-      result: run.first.result,
-      resultCorrect: run.first.result === expected,
-      secondResult: run.second.result,
-      resultsIdentical: run.first.result === run.second.result,
+      result: firstResult,
+      resultCorrect: firstResult === expected,
+      secondResult,
+      resultsIdentical: firstResult === secondResult,
       replays,
       replayClean: replays.every((r) => r.ok),
       historyEvents: run.history.events?.length ?? 0,

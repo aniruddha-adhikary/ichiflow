@@ -24,15 +24,17 @@ interface ReplayOutcome {
 interface VectorOutcome {
   name: string;
   flowId: string;
-  expected: number;
-  result: number;
-  correct: boolean;
+  vars: Record<string, number>;
+  expectedVars: Record<string, number>;
+  varsMatch: boolean;
   expectedSteps: number;
   steps: number;
   stepsMatch: boolean;
   expectedSlaMs: number;
   slaMs: number;
   slaMatch: boolean;
+  traceStepIds: string[];
+  traceComplete: boolean;
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
@@ -61,9 +63,10 @@ function buildAjv(): Ajv2020 {
  * flow-layer — build plan 3.1 (ADR-0004, doc 04 §2). The whole layer's correctness is one generic
  * interpreter workflow's correctness, gated in two parts. **DSL-valid**: every committed conformance
  * vector (embedding a Flow document) validates against the emitted canonical DSL schema
- * (`FlowConformanceVector.json` → `Flow.json`) — an ill-formed step or unknown op is rejected. **Skeleton
+ * (`FlowConformanceVector.json` → `Flow.json`) — an ill-formed step or unknown `ref` is rejected. **Skeleton
  * conformance**: the same interpreter, run over each vector on Temporal's time-skipping test env, hits
- * each vector's independently-pinned oracle (result/steps/SLA + timer fast-forward) and its history
+ * each vector's independently-pinned oracle (final blackboard/steps/SLA + a complete per-step trace +
+ * timer fast-forward) and its history
  * replays twice with no non-determinism violation. The DSL check runs in-process (deterministic); the
  * interpreter run is captured by `${PRODUCER}` into the verdict artifact this scope reads.
  */
@@ -151,10 +154,10 @@ export const flowLayerScope: Scope = {
       checks.push(
         assert(
           `flow-layer.vector.${v.flowId}`,
-          v.correct && v.stepsMatch && v.slaMatch && v.fastForwarded,
+          v.varsMatch && v.stepsMatch && v.slaMatch && v.traceComplete && v.fastForwarded,
           {
-            expected: `result=${v.expected}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, fast-forwarded`,
-            actual: `result=${v.result}, steps=${v.steps}, slaMs=${v.slaMs}, fastForwarded=${v.fastForwarded}`,
+            expected: `vars=${JSON.stringify(v.expectedVars)}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, complete trace, fast-forwarded`,
+            actual: `vars=${JSON.stringify(v.vars)}, steps=${v.steps}, slaMs=${v.slaMs}, traceComplete=${v.traceComplete}, fastForwarded=${v.fastForwarded}`,
           },
         ),
       );

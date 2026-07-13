@@ -1,0 +1,25 @@
+{
+  "name": "decision-eval APPROVE branch then compute folds the outcome into the blackboard",
+  "flow": {
+    "id": "decision-approve",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "score": 75 } },
+    "steps": [
+      {
+        "id": "s1",
+        "type": "decision-eval",
+        "decision": "threshold-approval",
+        "in": ["score"],
+        "out": "decision"
+      },
+      {
+        "id": "s2",
+        "type": "compute",
+        "ref": "ts://flow-kit/Sum@1.0.0",
+        "in": ["score", "decision"],
+        "out": "total"
+      }
+    ]
+  },
+  "expect": { "vars": { "score": 75, "decision": 1, "total": 76 }, "steps": 2, "slaMs": 0 }
+}

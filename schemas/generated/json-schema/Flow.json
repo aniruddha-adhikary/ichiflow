@@ -21,6 +21,12 @@
                         "$ref": "ComputeStep.json"
                     },
                     {
+                        "$ref": "DecisionEvalStep.json"
+                    },
+                    {
+                        "$ref": "HumanTaskStep.json"
+                    },
+                    {
                         "$ref": "TimerStep.json"
                     }
                 ]
