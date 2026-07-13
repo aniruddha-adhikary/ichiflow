@@ -176,3 +176,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/interpreter-determinism-spike.ts
     description: Riskiest-bet proof (doc 14 §6) — replay-twice determinism (no non-determinism violation) + SLA-timer fast-forward under Temporal time-skip. Consumes the artifact from `pnpm interpreter:spike`.
+  - id: flow-dsl
+    kind: schema
+    path: schemas/flow.tsp
+    description: Canonical Flow DSL (build plan 3.1, ADR-0004, doc 04 §2) — the schema-validated flow-JSON document the generic interpreter walks. Closed step set (compute + timer in 3.1). TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: flow-conformance-vectors
+    kind: pattern
+    path: schemas/flow/vectors
+    description: Skeleton flow conformance vectors (build plan 3.1) — DSL-valid Flow documents paired with the interpreter result they must produce; run by `pnpm flow:conformance` for vectors_green/total + replay determinism.
+  - id: flow-layer
+    kind: harness
+    path: packages/cli/src/verify/scopes/flow-layer.ts
+    description: Flow interpreter conformance gate (build plan 3.1) — committed vectors are DSL-valid and each interprets to its pinned oracle with clean replay determinism under time-skip. Consumes the artifact from `pnpm flow:conformance`.

@@ -1,0 +1,11 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowSchemaVersion.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "flow/v1"
+        }
+    ],
+    "description": "The pinned DSL schema version a Flow declares; the interpreter validates against the version it declares (doc 04 §2.2, two-version-axes)."
+}

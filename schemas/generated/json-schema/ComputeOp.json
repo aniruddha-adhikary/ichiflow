@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ComputeOp.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "double"
+        },
+        {
+            "type": "string",
+            "const": "inc"
+        },
+        {
+            "type": "string",
+            "const": "identity"
+        }
+    ],
+    "description": "The closed set of pure `compute` transforms the skeleton interpreter's code-activity supports (doc 04 §2.6)."
+}

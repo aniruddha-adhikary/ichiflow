@@ -1,0 +1,14 @@
+{
+  "name": "compute → 30-day SLA timer → compute (the determinism-spike toy)",
+  "flow": {
+    "id": "toy-3step",
+    "schemaVersion": "flow/v1",
+    "input": { "value": 21 },
+    "steps": [
+      { "id": "s1", "type": "compute", "op": "double" },
+      { "id": "s2", "type": "timer", "durationMs": 2592000000 },
+      { "id": "s3", "type": "compute", "op": "inc" }
+    ]
+  },
+  "expect": { "result": 43, "steps": 3, "slaMs": 2592000000 }
+}

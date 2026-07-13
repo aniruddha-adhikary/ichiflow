@@ -1,0 +1,27 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowExpectation.json",
+    "type": "object",
+    "properties": {
+        "result": {
+            "type": "number",
+            "description": "The final accumulator value the interpreter must return."
+        },
+        "steps": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "The number of steps the flow declares (guards vector/flow drift)."
+        },
+        "slaMs": {
+            "type": "integer",
+            "description": "Total scheduled SLA/timer duration in milliseconds across the flow."
+        }
+    },
+    "required": [
+        "result",
+        "steps",
+        "slaMs"
+    ],
+    "description": "The pinned expected observations of interpreting a conformance vector's Flow."
+}

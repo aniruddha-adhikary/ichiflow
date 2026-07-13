@@ -4,4 +4,5 @@ import "./reference-data.tsp";
 import "./spike.tsp";
 import "./decision-contracts.tsp";
 import "./decision-testing.tsp";
+import "./flow.tsp";
 import "./service.tsp";
