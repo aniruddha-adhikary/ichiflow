@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `portal`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -142,6 +142,21 @@ wall-clock/RNG), so run `pnpm authz:jvm` before `pnpm verify` to produce `core/b
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce
 `core/build/reports/detekt/detekt.sarif` and `core/build/arch-rules-results.json`.
+
+`ui` is the Phase 4.5 gate (build plan 4.5, ADR-0024, doc 07 §2/§3/§11/§12, doc 13 §2.e): the
+**uischema layer** (JSON Forms). A uischema is a layout tree authored independently of the data schema
+(`schemas/ui.tsp` → emitted `UiSchema.json`); the generated-once baseline
+(`schemas/ui/baseline/*.uischema.json`, produced by `pnpm ui:generate`) is a `VerticalLayout` with one
+scoped Control per data-schema property. The scope asserts, as enumerable counts: the baseline is
+DSL-valid + provenance-current; **scope lint** — every `Control.scope` JSON Pointer resolves against the
+current data schema (a dangling pointer fails with a fix-it hint naming the pointer + file); **PDP-state
+story coverage** — every placed control renders in all four PDP-shaped states (hidden / read-only / error
+/ validation-failed), `states_covered == states_required`; **a11y AA** — axe-core (WCAG 2.2 AA) passes on
+every story rendered headlessly in jsdom (`axe_aa_pass == stories_run`) with the token-contract contrast
+gate met (text ≥ 4.5:1, UI ≥ 3:1); and **preview snapshots** — serialized-DOM baselines regenerate
+byte-identically (`snapshots_matched == produced`, no timestamps/random ids). Deterministic (no
+wall-clock/RNG/network), so run `pnpm ui:preview` before `pnpm verify` to produce
+`packages/uischema/build/ui-results.json`.
 
 `portal` is the Phase 4.4 gate (doc 07 §5/§7/§11, doc 13 §2.e/§2.f): the first back-office **Portal**
 (`packages/portal/`, React under jsdom). Its deterministic preview harness renders a **PDP-filtered,

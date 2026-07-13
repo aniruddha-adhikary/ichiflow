@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "UiSchema.json",
+    "type": "object",
+    "properties": {
+        "dataSchema": {
+            "$ref": "DataSchemaRef.json",
+            "description": "Provenance: the data schema `$id` + content version this document targets (doc 07 §2 rule 2)."
+        },
+        "layout": {
+            "$ref": "UiElement.json",
+            "description": "The JSON Forms layout tree root (a `VerticalLayout` for the generated baseline)."
+        }
+    },
+    "required": [
+        "dataSchema",
+        "layout"
+    ],
+    "description": "A committed **uischema document** (build plan 4.5): the JSON Forms `layout` tree plus the\n`dataSchema` provenance it targets. The generated baseline is a `VerticalLayout` over all fields\n(doc 07 §3 rule 1); designer overrides are versioned documents of the same shape (rule 2)."
+}
