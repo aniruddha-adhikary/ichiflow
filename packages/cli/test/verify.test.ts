@@ -28,6 +28,7 @@ import { entityApiScope } from "../src/verify/scopes/entity-api.js";
 import { authzScope } from "../src/verify/scopes/authz.js";
 import { uiScope } from "../src/verify/scopes/ui.js";
 import { portalScope } from "../src/verify/scopes/portal.js";
+import { adaptersScope } from "../src/verify/scopes/adapters.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -2166,6 +2167,195 @@ describe("portal scope (Phase 4.4 — first Portal)", () => {
       setup(tmp, { results: null });
       const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
       expect(checks.find((c) => c.id === "portal.results-present")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("adapters scope (Phase 5.1)", () => {
+  const mkMapping = (id: string, canonicalType: string) => ({
+    id,
+    schemaVersion: "adapter/v1",
+    version: "1.0.0",
+    direction: "inbound",
+    kind: "Event",
+    canonicalType,
+    messageIdFrom: "/id",
+    correlationFrom: "/corr",
+    caseIdFrom: "/case",
+    rules: [{ operation: "copy", from: "/x", to: "x" }],
+  });
+  const mkPort = (id: string, protocol: string, mapping: string, canonicalType: string) => ({
+    id,
+    schemaVersion: "adapter/v1",
+    direction: "inbound",
+    protocol,
+    canonicalType,
+    mapping,
+    reliability: { maxAttempts: 3, dedup: true, dlq: true },
+  });
+  const mkGolden = (mappingId: string, canonicalType: string) => ({
+    name: `golden-${mappingId}`,
+    mappingId,
+    wire: { id: "m", corr: "c", case: "k", x: 1 },
+    expected: {
+      kind: "Event",
+      type: canonicalType,
+      messageId: "m",
+      correlationId: "c",
+      caseId: "k",
+      payload: { x: 1 },
+    },
+  });
+  const bindings = [
+    { id: "p-rest", protocol: "rest", mapping: "m-rest", type: "a.rest.v1" },
+    { id: "p-broker", protocol: "broker", mapping: "m-broker", type: "a.broker.v1" },
+    { id: "p-webhook", protocol: "webhook", mapping: "m-webhook", type: "a.webhook.v1" },
+  ];
+  const reliability = [
+    {
+      name: "dup",
+      scenario: "duplicate",
+      maxAttempts: 3,
+      messages: [{ messageId: "a" }, { messageId: "a" }],
+      expect: { applied: 1, deduped: 1, dlq: 0 },
+    },
+    {
+      name: "poison",
+      scenario: "poison",
+      maxAttempts: 3,
+      messages: [{ messageId: "p", poison: true }],
+      expect: { applied: 0, deduped: 0, dlq: 1 },
+    },
+    {
+      name: "redeliver",
+      scenario: "redelivery",
+      maxAttempts: 3,
+      messages: [{ messageId: "r" }, { messageId: "r" }],
+      expect: { applied: 1, deduped: 1, dlq: 0 },
+    },
+  ];
+  const greenResults = {
+    mappingsCount: 3,
+    portsCount: 3,
+    goldens: bindings.map((b) => ({
+      name: `golden-${b.mapping}`,
+      mappingId: b.mapping,
+      match: true,
+      error: null,
+    })),
+    goldensGreen: 3,
+    bindings: bindings.map((b) => ({ protocol: b.protocol, inboundPorts: 1, covered: true })),
+    bindingsCovered: true,
+    bindingContract: bindings.map((b) => ({
+      portId: b.id,
+      protocol: b.protocol,
+      roundTrips: true,
+      error: null,
+    })),
+    bindingContractGreen: 3,
+    reliability: reliability.map((r) => ({
+      name: r.name,
+      scenario: r.scenario,
+      expected: r.expect,
+      actual: r.expect,
+      pass: true,
+    })),
+    reliabilityGreen: 3,
+    dedupPass: true,
+    dlqPass: true,
+    redeliveryPass: true,
+  };
+
+  const setup = (root: string, opts: { results?: unknown | null } = {}) => {
+    for (const [sub, suffix, docs] of [
+      ["mappings", ".mapping.json", bindings.map((b) => mkMapping(b.mapping, b.type))],
+      ["ports", ".port.json", bindings.map((b) => mkPort(b.id, b.protocol, b.mapping, b.type))],
+      ["goldens", ".golden.json", bindings.map((b) => mkGolden(b.mapping, b.type))],
+      ["reliability", ".vector.json", reliability],
+    ] as const) {
+      const dir = join(root, "schemas/adapters", sub);
+      mkdirSync(dir, { recursive: true });
+      docs.forEach((doc, i) => writeFileSync(join(dir, `f${i}${suffix}`), JSON.stringify(doc)));
+    }
+    if (opts.results !== null) {
+      const rp = join(root, "packages/adapters/build/adapters-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? greenResults));
+    }
+  };
+
+  it("passes when fixtures are schema-valid and the harness verdict is green", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-adapters-"));
+    try {
+      setup(tmp);
+      const checks = adaptersScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      expect(checks.find((c) => c.id === "adapters.bindings-covered")!.status).toBe("pass");
+      expect(checks.find((c) => c.id === "adapters.dedup")!.status).toBe("pass");
+      expect(checks.find((c) => c.id === "adapters.dlq")!.status).toBe("pass");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly (with a producer fix-it hint) when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-adapters-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = adaptersScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      const present = checks.find((c) => c.id === "adapters.results-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("@ichiflow/adapters");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the golden + goldens-green checks on a mapping golden mismatch", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-adapters-"));
+    try {
+      const tampered = {
+        ...greenResults,
+        goldens: [
+          { name: "g", mappingId: "m-rest", match: false, error: "output differs" },
+          ...greenResults.goldens.slice(1),
+        ],
+        goldensGreen: 2,
+      };
+      setup(tmp, { results: tampered });
+      const checks = adaptersScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(checks.find((c) => c.id === "adapters.golden.m-rest")!.status).toBe("fail");
+      expect(checks.find((c) => c.id === "adapters.goldens-green")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the dedup / dlq checks when the reliability contract is not met", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-adapters-"));
+    try {
+      setup(tmp, { results: { ...greenResults, dedupPass: false, dlqPass: false } });
+      const checks = adaptersScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(checks.find((c) => c.id === "adapters.dedup")!.status).toBe("fail");
+      expect(checks.find((c) => c.id === "adapters.dlq")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a contract check on a schema-invalid fixture", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-adapters-"));
+    try {
+      setup(tmp);
+      // Corrupt one port fixture: an unknown protocol is not in the AdapterProtocol enum.
+      const bad = { ...mkPort("p-bad", "rest", "m-rest", "a.rest.v1"), protocol: "grpc" };
+      writeFileSync(join(tmp, "schemas/adapters/ports", "f0.port.json"), JSON.stringify(bad));
+      const checks = adaptersScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
+      expect(
+        checks.some((c) => c.id.startsWith("adapters.contract.ports.") && c.status === "fail"),
+      ).toBe(true);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

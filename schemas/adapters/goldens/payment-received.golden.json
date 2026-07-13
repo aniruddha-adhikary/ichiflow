@@ -1,0 +1,23 @@
+{
+  "name": "payment webhook (correlation in query) → canonical payment.received.v1",
+  "mappingId": "payment-received",
+  "wire": {
+    "txnId": "pay-1",
+    "caseRef": "case-loan-1",
+    "amountCents": "12345",
+    "currency": "USD",
+    "_query": { "corr": "corr-pay-1" }
+  },
+  "expected": {
+    "kind": "Event",
+    "type": "payment.received.v1",
+    "messageId": "pay-1",
+    "correlationId": "corr-pay-1",
+    "caseId": "case-loan-1",
+    "payload": {
+      "amountCents": 12345,
+      "currency": "USD",
+      "channel": "webhook"
+    }
+  }
+}

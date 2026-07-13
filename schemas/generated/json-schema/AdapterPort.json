@@ -1,0 +1,41 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "AdapterPort.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "schemaVersion": {
+            "$ref": "AdapterSchemaVersion.json"
+        },
+        "direction": {
+            "$ref": "PortDirection.json"
+        },
+        "protocol": {
+            "$ref": "AdapterProtocol.json"
+        },
+        "canonicalType": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*([.][a-z0-9]+)+[.]v[0-9]+$",
+            "description": "The canonical type this port bridges (must match its mapping's `canonicalType`)."
+        },
+        "mapping": {
+            "type": "string",
+            "description": "The `Mapping.id` this port applies."
+        },
+        "reliability": {
+            "$ref": "Reliability.json"
+        }
+    },
+    "required": [
+        "id",
+        "schemaVersion",
+        "direction",
+        "protocol",
+        "canonicalType",
+        "mapping",
+        "reliability"
+    ],
+    "description": "A declared **Adapter Port** (doc 05 §1, §3) — a transport binding + the canonical type it bridges +\nits mapping + reliability block. A binding re-homes by changing `protocol`; the core is unchanged."
+}

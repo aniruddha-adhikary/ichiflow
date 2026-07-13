@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ReliabilityScenario.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "duplicate",
+            "description": "A duplicate `messageId` arrives; the Idempotent Receiver must apply it once."
+        },
+        {
+            "type": "string",
+            "const": "poison",
+            "description": "A poison message repeatedly fails handling; after bounded attempts it must land in the DLQ."
+        },
+        {
+            "type": "string",
+            "const": "redelivery",
+            "description": "A crash mid-handle redelivers the message; it must apply exactly once."
+        }
+    ],
+    "description": "The reliability scenario a `ReliabilityVector` exercises (doc 13 §2.d \"idempotency / DLQ behavior vectors\")."
+}

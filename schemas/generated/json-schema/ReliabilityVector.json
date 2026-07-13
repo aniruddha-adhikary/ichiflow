@@ -1,0 +1,38 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ReliabilityVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "scenario": {
+            "$ref": "ReliabilityScenario.json"
+        },
+        "maxAttempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Bounded attempts before dead-lettering (mirrors the Port's `Reliability.maxAttempts`)."
+        },
+        "messages": {
+            "type": "array",
+            "items": {
+                "$ref": "InboundMessage.json"
+            },
+            "minItems": 1,
+            "description": "The inbound message sequence (duplicates share a `messageId`)."
+        },
+        "expect": {
+            "$ref": "ReliabilityExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "scenario",
+        "maxAttempts",
+        "messages",
+        "expect"
+    ],
+    "description": "One **reliability vector** (doc 13 §2.d) — a deterministic inbound sequence + the pinned reliability\noutcome the runtime must produce: how many messages were `applied` to business state (each once), how\nmany duplicates were `deduped`, and how many exhausted messages landed in the `dlq`."
+}

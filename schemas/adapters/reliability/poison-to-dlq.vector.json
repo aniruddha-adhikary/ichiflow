@@ -1,0 +1,11 @@
+{
+  "name": "poison message lands in DLQ after bounded attempts; healthy messages still apply",
+  "scenario": "poison",
+  "maxAttempts": 3,
+  "messages": [
+    { "messageId": "m-ok-1" },
+    { "messageId": "m-poison", "poison": true },
+    { "messageId": "m-ok-2" }
+  ],
+  "expect": { "applied": 2, "deduped": 0, "dlq": 1 }
+}

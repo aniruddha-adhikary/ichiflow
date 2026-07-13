@@ -1,0 +1,15 @@
+{
+  "id": "case-status-changed",
+  "schemaVersion": "adapter/v1",
+  "version": "1.0.0",
+  "direction": "inbound",
+  "kind": "Event",
+  "canonicalType": "case.status.changed.v1",
+  "messageIdFrom": "/_headers/message-id",
+  "correlationFrom": "/_headers/correlation-id",
+  "caseIdFrom": "/case",
+  "rules": [
+    { "operation": "copy", "from": "/status", "to": "status" },
+    { "operation": "copy", "from": "/actor", "to": "actor" }
+  ]
+}

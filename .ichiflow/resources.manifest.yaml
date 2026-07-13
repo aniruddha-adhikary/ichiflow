@@ -276,3 +276,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/portal.ts
     description: First-Portal gate (build plan 4.4, doc 07 §5/§7/§11, doc 13 §2.e/§2.f) — the back-office Task inbox is PDP-filtered to exactly the permitted id set per seeded principal (rows_visible == expected, incl. a cross-team principal seeing strictly fewer rows) and SLA-ordered soonest-due first, the Case/review action form emits a Flow signal that validates against the emitted FlowSignal schema (never a direct mutation), the assembled DecisionRecord validates against the emitted DecisionRecord schema and its trace nodes render, and field-level entitlements render ≥1 hidden (with a "why?" affordance) + ≥1 read-only for a lower-privilege principal. Consumes the artifact from `pnpm portal:preview`.
+  - id: adapter-schema
+    kind: schema
+    path: schemas/adapters.tsp
+    description: Canonical adapter contracts (build plan 5.1, ADR-0028, doc 05) — the CanonicalEnvelope (kind/versioned type/messageId/correlationId/caseId/payload), the pure declarative Message-Translator Mapping (copy/copyNumber/constant rules over RFC-6901 wire pointers), the AdapterPort transport binding (rest/broker/webhook) + Reliability block (bounded maxAttempts/dedup/dlq), and the harness vector DSLs (MappingGoldenVector, ReliabilityVector). TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: adapter-fixtures
+    kind: pattern
+    path: schemas/adapters
+    description: Committed adapter fixtures (build plan 5.1, harness-first, doc 13 §2.d) — inbound Ports (one per v1 binding — REST/broker/webhook), versioned pure Mappings, mapping golden pairs (input wire → expected canonical event), and idempotency/DLQ reliability vectors (duplicate deduped once, poison → DLQ after bounded attempts, crash redelivery applies once). Validated against the emitted adapter schemas and run by `pnpm adapters:preview`.
+  - id: adapters
+    kind: harness
+    path: packages/cli/src/verify/scopes/adapters.ts
+    description: Adapter-layer gate (build plan 5.1, doc 05, doc 13 §2.d) — every committed Port/Mapping/golden/reliability fixture is schema-valid and every canonical output validates against CanonicalEnvelope (contract tests); each pure Message-Translator mapping reproduces its golden and every v1 binding (REST/broker/webhook) round-trips decode ∘ translate to the same canonical event (mapping goldens); and the reliability vectors hold — dedup passes, dlq passes, redelivery applies once — all against mocks (no live external system). Consumes the artifact from `pnpm adapters:preview`.

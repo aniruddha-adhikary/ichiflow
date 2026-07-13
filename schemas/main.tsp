@@ -11,3 +11,4 @@ import "./service.tsp";
 import "./entity-api.tsp";
 import "./authz.tsp";
 import "./ui.tsp";
+import "./adapters.tsp";

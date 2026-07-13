@@ -1,0 +1,16 @@
+{
+  "id": "payment-received",
+  "schemaVersion": "adapter/v1",
+  "version": "1.0.0",
+  "direction": "inbound",
+  "kind": "Event",
+  "canonicalType": "payment.received.v1",
+  "messageIdFrom": "/txnId",
+  "correlationFrom": "/_query/corr",
+  "caseIdFrom": "/caseRef",
+  "rules": [
+    { "operation": "copyNumber", "from": "/amountCents", "to": "amountCents" },
+    { "operation": "copy", "from": "/currency", "to": "currency" },
+    { "operation": "constant", "to": "channel", "value": "webhook" }
+  ]
+}

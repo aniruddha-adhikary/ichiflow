@@ -1,0 +1,7 @@
+{
+  "name": "crash redelivery of a seen messageId applies exactly once",
+  "scenario": "redelivery",
+  "maxAttempts": 3,
+  "messages": [{ "messageId": "m-crash" }, { "messageId": "m-crash" }],
+  "expect": { "applied": 1, "deduped": 1, "dlq": 0 }
+}

@@ -121,6 +121,9 @@ jobs:
       - name: Portal — PDP-filtered SLA-ordered inbox + Case/review view harness (action form signals the Flow, chunk 4.4)
         run: pnpm portal:preview
 
+      - name: Adapters — pure Message-Translator mapping goldens + REST/broker/webhook contract round-trips + idempotency/DLQ vectors (chunk 5.1)
+        run: pnpm adapters:preview
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

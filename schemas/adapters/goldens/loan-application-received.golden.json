@@ -1,0 +1,25 @@
+{
+  "name": "loan application received over REST → canonical loan.application.received.v1",
+  "mappingId": "loan-application-received",
+  "wire": {
+    "id": "loan-msg-1",
+    "corr": "corr-loan-1",
+    "caseId": "case-loan-1",
+    "applicant": { "name": "Ada Lovelace", "ssn": "111-22-3333" },
+    "amount": "50000",
+    "note": "expedite"
+  },
+  "expected": {
+    "kind": "Event",
+    "type": "loan.application.received.v1",
+    "messageId": "loan-msg-1",
+    "correlationId": "corr-loan-1",
+    "caseId": "case-loan-1",
+    "payload": {
+      "applicant": { "name": "Ada Lovelace", "ssn": "111-22-3333" },
+      "amount": 50000,
+      "note": "expedite",
+      "source": "portal"
+    }
+  }
+}

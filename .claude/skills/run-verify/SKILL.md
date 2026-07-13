@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -170,3 +170,15 @@ read-only for a lower-privilege principal, doc 07 §6/§11). Deterministic (seed
 wall-clock/RNG), so run `pnpm portal:preview` before `pnpm verify` to produce
 `packages/portal/build/portal-results.json`. The action-form uischema fixture is INTERIM (hand-authored
 locally); wiring the generated `packages/uischema` (Phase 4.5) is a later follow-up.
+
+`adapters` is the Phase 5.1 gate (doc 05, doc 13 §2.d): the canonical↔wire **adapter** boundary
+(`packages/adapters/`), proven **without a live external system**. Its deterministic harness runs three
+check families over the committed fixtures (`schemas/adapters/`): **contract tests** — every
+Port/Mapping/golden/reliability fixture validates against its emitted canonical JSON Schema and every
+canonical output validates against `CanonicalEnvelope`; **mapping goldens** — each **pure**
+Message-Translator mapping reproduces its `input wire → expected canonical event` golden and every v1
+transport binding (REST/broker/webhook) round-trips `decode ∘ translate` back to the same canonical
+event; and **idempotency/DLQ vectors** — a duplicate `messageId` is deduped once (Idempotent Receiver),
+a poison message lands in the DLQ after bounded attempts, and a crash redelivery applies once
+(`dedup: pass`, `dlq: pass`). Deterministic (committed fixtures, no wall-clock/RNG), so run
+`pnpm adapters:preview` before `pnpm verify` to produce `packages/adapters/build/adapters-results.json`.

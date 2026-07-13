@@ -1,0 +1,61 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Mapping.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "schemaVersion": {
+            "$ref": "AdapterSchemaVersion.json"
+        },
+        "version": {
+            "type": "string"
+        },
+        "direction": {
+            "$ref": "PortDirection.json"
+        },
+        "kind": {
+            "$ref": "CanonicalKind.json",
+            "description": "The canonical `kind` this mapping emits."
+        },
+        "canonicalType": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*([.][a-z0-9]+)+[.]v[0-9]+$",
+            "description": "The versioned canonical `type` this mapping emits."
+        },
+        "messageIdFrom": {
+            "type": "string",
+            "description": "Wire JSON Pointer to the stable idempotency key (→ `messageId`)."
+        },
+        "correlationFrom": {
+            "type": "string",
+            "description": "Wire JSON Pointer to the correlation id (→ `correlationId`)."
+        },
+        "caseIdFrom": {
+            "type": "string",
+            "description": "Wire JSON Pointer to the Case id (→ `caseId`)."
+        },
+        "rules": {
+            "type": "array",
+            "items": {
+                "$ref": "MappingRule.json"
+            },
+            "minItems": 1,
+            "description": "Ordered payload rules (doc 05 §2)."
+        }
+    },
+    "required": [
+        "id",
+        "schemaVersion",
+        "version",
+        "direction",
+        "kind",
+        "canonicalType",
+        "messageIdFrom",
+        "correlationFrom",
+        "caseIdFrom",
+        "rules"
+    ],
+    "description": "A versioned **Message-Translator mapping** (doc 05 §2) — the declarative, **pure** function from a\ndecoded wire message to a `CanonicalEnvelope`. `correlationFrom`/`caseIdFrom`/`messageIdFrom` are wire\nJSON Pointers that populate the envelope's correlation triple (doc 05 §11); `rules` populate the\npayload. A change that alters an output is a visible golden diff."
+}

@@ -1,0 +1,9 @@
+{
+  "id": "case-status-broker",
+  "schemaVersion": "adapter/v1",
+  "direction": "inbound",
+  "protocol": "broker",
+  "canonicalType": "case.status.changed.v1",
+  "mapping": "case-status-changed",
+  "reliability": { "maxAttempts": 3, "dedup": true, "dlq": true }
+}

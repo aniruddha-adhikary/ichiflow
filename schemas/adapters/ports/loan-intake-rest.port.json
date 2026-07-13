@@ -1,0 +1,9 @@
+{
+  "id": "loan-intake-rest",
+  "schemaVersion": "adapter/v1",
+  "direction": "inbound",
+  "protocol": "rest",
+  "canonicalType": "loan.application.received.v1",
+  "mapping": "loan-application-received",
+  "reliability": { "maxAttempts": 3, "dedup": true, "dlq": true }
+}

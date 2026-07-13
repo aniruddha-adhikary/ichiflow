@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "MappingOp.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "copy",
+            "description": "Copy the value at the wire JSON Pointer `from` to the canonical field `to`."
+        },
+        {
+            "type": "string",
+            "const": "constant",
+            "description": "Assign the literal `value` to the canonical field `to` (no wire read)."
+        },
+        {
+            "type": "string",
+            "const": "copyNumber",
+            "description": "Copy the value at `from`, coercing a numeric string to a number (a common wire→canonical normalization)."
+        }
+    ],
+    "description": "How a single canonical field is produced from the decoded wire message — the closed, **pure** op set of the Message-Translator (doc 05 §2)."
+}

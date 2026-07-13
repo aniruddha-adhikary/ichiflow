@@ -1,0 +1,18 @@
+{
+  "id": "loan-application-received",
+  "schemaVersion": "adapter/v1",
+  "version": "1.0.0",
+  "direction": "inbound",
+  "kind": "Event",
+  "canonicalType": "loan.application.received.v1",
+  "messageIdFrom": "/id",
+  "correlationFrom": "/corr",
+  "caseIdFrom": "/caseId",
+  "rules": [
+    { "operation": "copy", "from": "/applicant/name", "to": "applicant.name" },
+    { "operation": "copy", "from": "/applicant/ssn", "to": "applicant.ssn" },
+    { "operation": "copyNumber", "from": "/amount", "to": "amount" },
+    { "operation": "copy", "from": "/note", "to": "note", "optional": true },
+    { "operation": "constant", "to": "source", "value": "portal" }
+  ]
+}
