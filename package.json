@@ -32,6 +32,7 @@
     "scenario:jvm": "cd core && ./gradlew -q runScenarioCoverage",
     "feel:jvm": "cd core && ./gradlew -q runFeelVectors",
     "entity:jvm": "cd core && ./gradlew -q runEntityStore",
+    "api:contract": "pnpm --filter @ichiflow/api build && pnpm --filter @ichiflow/api contract",
     "interpreter:spike": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow spike",
     "flow:conformance": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow conformance",
     "decisionrecord:assemble": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow decisionrecord",

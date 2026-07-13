@@ -1,0 +1,58 @@
+{
+  "name": "boundary-validation",
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "bad-1",
+        "applicant": "Grace Hopper",
+        "amount": -10,
+        "productCode": "P-HOME",
+        "status": "not-a-status"
+      },
+      "expectStatus": 422,
+      "expectErrorCode": "validation-failed"
+    },
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": { "id": "bad-2", "applicant": "Missing Fields" },
+      "expectStatus": 422,
+      "expectErrorCode": "validation-failed"
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications/bad-1",
+      "expectStatus": 404,
+      "expectErrorCode": "entity-not-found"
+    },
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "ok-1",
+        "applicant": "Katherine Johnson",
+        "amount": 250,
+        "productCode": "P-AUTO",
+        "status": "draft"
+      },
+      "expectStatus": 201,
+      "expectBodyId": "ok-1",
+      "expectVersion": 1
+    },
+    {
+      "method": "PATCH",
+      "path": "/loan-applications/ok-1",
+      "body": {
+        "id": "ok-1",
+        "applicant": "Katherine Johnson",
+        "amount": "not-a-number",
+        "productCode": "P-AUTO",
+        "status": "draft"
+      },
+      "expectStatus": 422,
+      "expectErrorCode": "validation-failed"
+    }
+  ]
+}

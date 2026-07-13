@@ -1,0 +1,75 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ApiRequest.json",
+    "type": "object",
+    "properties": {
+        "method": {
+            "$ref": "ApiMethod.json"
+        },
+        "path": {
+            "type": "string",
+            "description": "Request path relative to the API root, e.g. `/loan-applications/app-1`."
+        },
+        "query": {
+            "$ref": "#/$defs/RecordString",
+            "description": "Query parameters for the list endpoint (name → stringified value)."
+        },
+        "body": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "JSON request body for create/update (validated against `LoanApplication` at the boundary)."
+        },
+        "expectStatus": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "The pinned HTTP status this request must return."
+        },
+        "expectBodyId": {
+            "type": "string",
+            "description": "For a record response: assert `meta.id`."
+        },
+        "expectVersion": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "For a record response: assert `meta.version`."
+        },
+        "expectTotal": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "For a list response: assert the total match count."
+        },
+        "expectIds": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "For a list response: assert the returned record ids in deterministic order."
+        },
+        "expectErrorCode": {
+            "type": "string",
+            "description": "For a 4xx response: assert the error `code`."
+        }
+    },
+    "required": [
+        "method",
+        "path",
+        "expectStatus"
+    ],
+    "description": "One request of an API-contract **conformance vector** (build plan 4.2, harness-first). Drives the\ngenerated BFF and pins the expected HTTP status; positive requests pin the returned record id /\nversion or list ids / total, negative requests pin the boundary-rejection error code (the runtime\nJSON-Schema validation firing at the edge).",
+    "$defs": {
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        },
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

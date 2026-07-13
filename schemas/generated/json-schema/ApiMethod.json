@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ApiMethod.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "GET"
+        },
+        {
+            "type": "string",
+            "const": "POST"
+        },
+        {
+            "type": "string",
+            "const": "PATCH"
+        },
+        {
+            "type": "string",
+            "const": "DELETE"
+        }
+    ],
+    "description": "The HTTP method exercised by an API-contract vector step."
+}

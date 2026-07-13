@@ -1,0 +1,64 @@
+{
+  "name": "crud-lifecycle",
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/loan-applications",
+      "body": {
+        "id": "app-1",
+        "applicant": "Ada Lovelace",
+        "amount": 5000,
+        "productCode": "P-HOME",
+        "status": "submitted"
+      },
+      "expectStatus": 201,
+      "expectBodyId": "app-1",
+      "expectVersion": 1
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications/app-1",
+      "expectStatus": 200,
+      "expectBodyId": "app-1",
+      "expectVersion": 1
+    },
+    {
+      "method": "PATCH",
+      "path": "/loan-applications/app-1",
+      "body": {
+        "id": "app-1",
+        "applicant": "Ada Lovelace",
+        "amount": 5000,
+        "productCode": "P-HOME",
+        "status": "approved"
+      },
+      "expectStatus": 200,
+      "expectBodyId": "app-1",
+      "expectVersion": 2
+    },
+    {
+      "method": "DELETE",
+      "path": "/loan-applications/app-1",
+      "expectStatus": 204
+    },
+    {
+      "method": "GET",
+      "path": "/loan-applications/app-1",
+      "expectStatus": 404,
+      "expectErrorCode": "entity-not-found"
+    },
+    {
+      "method": "PATCH",
+      "path": "/loan-applications/does-not-exist",
+      "body": {
+        "id": "does-not-exist",
+        "applicant": "Ghost",
+        "amount": 1,
+        "productCode": "P-HOME",
+        "status": "draft"
+      },
+      "expectStatus": 404,
+      "expectErrorCode": "entity-not-found"
+    }
+  ]
+}

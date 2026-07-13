@@ -1,0 +1,18 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "LoanApplicationRecord.json",
+    "type": "object",
+    "properties": {
+        "data": {
+            "$ref": "LoanApplication.json"
+        },
+        "meta": {
+            "$ref": "EntityMeta.json"
+        }
+    },
+    "required": [
+        "data",
+        "meta"
+    ],
+    "description": "A persisted record as returned over the API — the entity payload plus store-owned metadata."
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@ichiflow/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 4.2 generated BFF API over the domain entity store (ADR-0018, doc 02 §5) — HTTP surface emitted from TypeSpec, with runtime JSON-Schema validation at every boundary.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "test": "vitest run",
+    "contract": "node dist/contract-run.js"
+  },
+  "dependencies": {
+    "@ichiflow/schemas": "workspace:*",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.6.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.15.0",
+    "@types/node": "20.17.6",
+    "eslint": "9.15.0",
+    "typescript": "5.6.3",
+    "typescript-eslint": "8.18.0",
+    "vitest": "2.1.5"
+  }
+}

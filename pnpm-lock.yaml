@@ -12,6 +12,40 @@ importers:
         specifier: 3.3.3
         version: 3.3.3
 
+  packages/api:
+    dependencies:
+      '@ichiflow/schemas':
+        specifier: workspace:*
+        version: link:../../schemas
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
+      ajv-formats:
+        specifier: 3.0.1
+        version: 3.0.1(ajv@8.17.1)
+      yaml:
+        specifier: 2.6.1
+        version: 2.6.1
+    devDependencies:
+      '@eslint/js':
+        specifier: 9.15.0
+        version: 9.15.0
+      '@types/node':
+        specifier: 20.17.6
+        version: 20.17.6
+      eslint:
+        specifier: 9.15.0
+        version: 9.15.0(jiti@2.7.0)
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+      typescript-eslint:
+        specifier: 8.18.0
+        version: 8.18.0(eslint@9.15.0(jiti@2.7.0))(typescript@5.6.3)
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@20.17.6)(terser@5.49.0)
+
   packages/cli:
     dependencies:
       '@ichiflow/schemas':

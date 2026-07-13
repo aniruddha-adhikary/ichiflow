@@ -44,7 +44,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                       |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                   |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `code-quality`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -107,6 +107,7 @@ fast-forward) with clean replay determinism under time-skip (`vectors_green == t
 - `packages/cli/` — the `ichiflow` CLI and the verify harness engine.
 - `packages/contracts-ts/` — generated TypeScript contract types (hey-api) in `src/gen/`; regenerate, never hand-edit.
 - `packages/flow/` — the Phase 3 flow layer: the generic Temporal interpreter over the flow-JSON DSL + its determinism harness.
+- `packages/api/` — the Phase 4.2 generated BFF over the entity store: an OpenAPI-driven request dispatcher with runtime JSON-Schema boundary validation + its contract-conformance harness.
 - `core/` — the Kotlin core (Gradle); generated contract models (Fabrikt) in `core/generated/`.
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
 - `.ichiflow/resources.manifest.yaml` — version pins + named resources (doc 10 §2.5).
