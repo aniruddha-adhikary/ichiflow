@@ -10,6 +10,7 @@ import { decisionProjectionSpikeScope } from "./scopes/decision-projection-spike
 import { decisionLayerScope } from "./scopes/decision-layer.js";
 import { interpreterDeterminismSpikeScope } from "./scopes/interpreter-determinism-spike.js";
 import { flowLayerScope } from "./scopes/flow-layer.js";
+import { decisionRecordScope } from "./scopes/decisionrecord.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
@@ -30,6 +31,7 @@ const SCOPES: Scope[] = [
   decisionLayerScope,
   interpreterDeterminismSpikeScope,
   flowLayerScope,
+  decisionRecordScope,
   codeQualityScope,
 ];
 

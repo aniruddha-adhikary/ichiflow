@@ -22,6 +22,7 @@ import {
 import { contractGateScope } from "../src/verify/scopes/contract-gate.js";
 import { interpreterDeterminismSpikeScope } from "../src/verify/scopes/interpreter-determinism-spike.js";
 import { flowLayerScope } from "../src/verify/scopes/flow-layer.js";
+import { decisionRecordScope } from "../src/verify/scopes/decisionrecord.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -954,6 +955,8 @@ describe("flow-layer scope (Phase 3.2)", () => {
     events: ["case.created", "case.resolved"],
     expectedEvents: null,
     eventsMatch: true,
+    chainComplete: true,
+    orphans: [],
     replays: [
       { attempt: 1, ok: true, error: null },
       { attempt: 2, ok: true, error: null },
@@ -1111,6 +1114,159 @@ describe("flow-layer scope (Phase 3.2)", () => {
       const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
       const caseId = checks.find((c) => c.id === "flow-layer.case-id.vec-a")!;
       expect(caseId.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a vector whose assembled DecisionRecord has an orphan event (3.4 real-source completeness)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...conformance,
+          vectors: [
+            { ...outcome, chainComplete: false, orphans: ["task.resolved@seq:3 for step s3 has no originating task.created"] },
+          ],
+        },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const dr = checks.find((c) => c.id === "flow-layer.decisionrecord.vec-a")!;
+      expect(dr.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("decisionrecord scope (Phase 3.4)", () => {
+  const validCase = {
+    name: "case-a",
+    result: {
+      flowId: "case-a",
+      caseId: "case-a-1",
+      steps: 1,
+      vars: { approved: 5 },
+      slaMs: 0,
+      trace: [
+        { stepId: "review", type: "human-task", out: "approved", value: 5, resolution: "resolved", assignee: "ops-queue" },
+      ],
+      events: [
+        { seq: 0, type: "case.created" },
+        { seq: 1, type: "task.created", stepId: "review" },
+        { seq: 2, type: "task.assigned", stepId: "review", assignee: "ops-queue" },
+        { seq: 3, type: "task.resolved", stepId: "review" },
+        { seq: 4, type: "case.resolved" },
+      ],
+    },
+    expect: { chainComplete: true, orphans: [], decisions: 0, tasks: 1 },
+  };
+  const cleanOutcome = {
+    name: "case-a",
+    caseId: "case-a-1",
+    chainComplete: true,
+    expectedChainComplete: true,
+    orphans: [],
+    expectedOrphans: [],
+    orphansMatch: true,
+    decisions: 0,
+    expectedDecisions: 0,
+    tasks: 1,
+    expectedTasks: 1,
+    ok: true,
+  };
+  const orphanOutcome = {
+    name: "case-b",
+    caseId: "case-b-1",
+    chainComplete: false,
+    expectedChainComplete: false,
+    orphans: ["task.resolved@seq:2 for step ghost has no originating task.created"],
+    expectedOrphans: ["task.resolved@seq:2 for step ghost has no originating task.created"],
+    orphansMatch: true,
+    decisions: 0,
+    expectedDecisions: 0,
+    tasks: 1,
+    expectedTasks: 1,
+    ok: true,
+  };
+  const results = { cases: [cleanOutcome, orphanOutcome], casesGreen: 2, chainsComplete: 1 };
+  const setup = (root: string, opts: { cases?: unknown[]; results?: unknown | null } = {}) => {
+    const cdir = join(root, "schemas/decisionrecord/cases");
+    mkdirSync(cdir, { recursive: true });
+    const cases = opts.cases ?? [validCase];
+    cases.forEach((c, i) => writeFileSync(join(cdir, `c${i}.case.json`), JSON.stringify(c)));
+    if (opts.results !== null) {
+      const rp = join(root, "packages/flow/build/decisionrecord-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when cases are DSL-valid and each assembles to its pinned chain/orphan oracle", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dr-"));
+    try {
+      setup(tmp);
+      const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "decisionrecord.cases-green")!;
+      expect(green.value).toBe(2);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed case fixture via the DecisionRecordCase schema", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dr-"));
+    try {
+      const bad = { ...validCase, result: { ...validCase.result, caseId: 123 } };
+      setup(tmp, { cases: [bad] });
+      const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      expect(
+        checks.some((c) => c.id.startsWith("decisionrecord.dsl-valid.") && c.status === "fail"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when a case's assembled orphans diverge from its pinned oracle", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dr-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          casesGreen: 1,
+          cases: [cleanOutcome, { ...orphanOutcome, orphansMatch: false, ok: false }],
+        },
+      });
+      const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decisionrecord.assembled.case-b-1");
+      expect(failed).toContain("decisionrecord.cases-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when no negative fixture exercises the orphan detector (a clean-only suite proves nothing)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dr-"));
+    try {
+      setup(tmp, { results: { cases: [cleanOutcome], casesGreen: 1, chainsComplete: 1 } });
+      const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const exercised = checks.find((c) => c.id === "decisionrecord.detector-exercised")!;
+      expect(exercised.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the assembly artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dr-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const present = checks.find((c) => c.id === "decisionrecord.assembly-present")!;
+      expect(present.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

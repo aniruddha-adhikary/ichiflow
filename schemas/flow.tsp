@@ -213,3 +213,91 @@ model FlowExpectation {
   /** Optional pinned Case/Task **event-history** type sequence (doc 04 §5.1/§5.2), e.g. `["case.created", "task.created", …]`. */
   events?: string[];
 }
+
+/**
+ * One ordered **Case/Task event** (doc 04 §5.1/§5.2) — the flow event history the DecisionRecord
+ * stitches by `case_id`: `case.created`, `task.created`/`task.assigned`, `sla.paused`/`sla.resumed`,
+ * `task.resolved`/`task.escalated`, `case.resolved`.
+ */
+model CaseEvent {
+  /** Monotonic in-Case sequence number (ordering key). */
+  @minValue(0)
+  seq: int32;
+
+  /** The event type, e.g. `task.assigned`. */
+  type: string;
+
+  /** The `human-task` step this event belongs to (Task-scoped events only). */
+  stepId?: string;
+
+  /** The routed assignee/queue (on `task.assigned`) or escalation queue (on `task.escalated`). */
+  assignee?: string;
+}
+
+/**
+ * One typed **trace entry** per executed step (doc 04 §2.6) — the audit-spine material the
+ * DecisionRecord stitches: `decision-eval` entries carry the fired `decision` + `outcomeType`,
+ * `human-task` entries carry the `resolution` + routed `assignee`.
+ */
+model FlowTraceEntry {
+  /** The step id this entry records (correlation key into the flow + event history). */
+  stepId: string;
+
+  /** The step type: `compute` | `decision-eval` | `human-task` | `timer`. */
+  type: string;
+
+  /** Blackboard variable written (compute/decision-eval/human-task). */
+  out?: string;
+
+  /** The numeric value written to `out`. */
+  value?: float64;
+
+  /** The versioned code-activity ref (compute steps). */
+  ref?: string;
+
+  /** The evaluated DecisionModel id (decision-eval steps). */
+  decision?: string;
+
+  /** The Decision's typed Outcome type (decision-eval steps). */
+  outcomeType?: string;
+
+  /** How a `human-task` settled — `resolved` by signal or `escalated` on SLA exhaustion. */
+  resolution?: TaskResolution;
+
+  /** The durable wait duration (timer steps). */
+  durationMs?: int64;
+
+  /** The routed assignee/queue (human-task steps). */
+  assignee?: string;
+}
+
+/** How a `human-task` Task settled (doc 04 §5.2) — resolved by signal, or escalated on SLA exhaustion. */
+union TaskResolution {
+  resolved: "resolved",
+  escalated: "escalated",
+}
+
+/**
+ * The interpreter's output contract (doc 04 §2/§5) — the deterministic result of walking a Flow: the
+ * final blackboard, the scheduled SLA total, the per-step `trace`, and the ordered Case/Task `events`,
+ * all keyed by the Case's global `caseId`. This is the source material the DecisionRecord assembles.
+ */
+model FlowResult {
+  flowId: string;
+
+  /** The Case's global `case_id` (doc 04 §5.1). */
+  caseId: string;
+
+  @minValue(0)
+  steps: int32;
+
+  /** The final blackboard: variable name → value. */
+  vars: Record<float64>;
+
+  /** Total scheduled SLA/timer duration in milliseconds. */
+  slaMs: int64;
+
+  trace: FlowTraceEntry[];
+
+  events: CaseEvent[];
+}

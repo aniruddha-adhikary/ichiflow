@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionRecordCase.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Human-readable case name; doubles as intent documentation."
+        },
+        "result": {
+            "$ref": "FlowResult.json",
+            "description": "The interpreter output the DecisionRecord is assembled from."
+        },
+        "expect": {
+            "$ref": "DecisionRecordExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "result",
+        "expect"
+    ],
+    "description": "One committed **DecisionRecord case fixture** (build plan 3.4, harness-first). Pairs a `FlowResult`\n(the interpreter output — the assembly source) with the pinned assembled record the pure assembler\nmust produce, including the expected `orphans`. Negative fixtures inject a gap (a Task-lifecycle\nevent with no `task.created`, a `human-task` with no terminal event) to prove the detector flags it."
+}

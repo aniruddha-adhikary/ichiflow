@@ -1,0 +1,38 @@
+{
+  "name": "decision-eval → timer → resolved human-task → compute stitches into a complete chain (1 Decision, 1 Task, no orphans)",
+  "result": {
+    "flowId": "mixed-full",
+    "caseId": "case-mixed-full",
+    "steps": 4,
+    "vars": { "score": 60, "base": 10, "gate": 1, "signoff": 5, "total": 16 },
+    "slaMs": 604800000,
+    "trace": [
+      {
+        "stepId": "s1",
+        "type": "decision-eval",
+        "decision": "threshold-approval",
+        "out": "gate",
+        "value": 1,
+        "outcomeType": "APPROVE"
+      },
+      { "stepId": "s2", "type": "timer", "durationMs": 604800000 },
+      {
+        "stepId": "s3",
+        "type": "human-task",
+        "out": "signoff",
+        "value": 5,
+        "resolution": "resolved",
+        "assignee": "ops-queue"
+      },
+      { "stepId": "s4", "type": "compute", "ref": "ts://flow-kit/Sum@1.0.0", "out": "total", "value": 16 }
+    ],
+    "events": [
+      { "seq": 0, "type": "case.created" },
+      { "seq": 1, "type": "task.created", "stepId": "s3" },
+      { "seq": 2, "type": "task.assigned", "stepId": "s3", "assignee": "ops-queue" },
+      { "seq": 3, "type": "task.resolved", "stepId": "s3" },
+      { "seq": 4, "type": "case.resolved" }
+    ]
+  },
+  "expect": { "chainComplete": true, "orphans": [], "decisions": 1, "tasks": 1 }
+}

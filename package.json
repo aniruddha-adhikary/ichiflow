@@ -33,6 +33,7 @@
     "feel:jvm": "cd core && ./gradlew -q runFeelVectors",
     "interpreter:spike": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow spike",
     "flow:conformance": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow conformance",
+    "decisionrecord:assemble": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow decisionrecord",
     "quality:jvm": "cd core && ./gradlew -q detekt test",
     "verify": "node packages/cli/dist/cli.js verify"
   },

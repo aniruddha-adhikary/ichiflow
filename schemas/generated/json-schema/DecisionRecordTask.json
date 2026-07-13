@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionRecordTask.json",
+    "type": "object",
+    "properties": {
+        "stepId": {
+            "type": "string",
+            "description": "The `human-task` step id."
+        },
+        "assignee": {
+            "type": "string",
+            "description": "The routed assignee/queue (or escalation queue) attributed to the resolution."
+        },
+        "resolution": {
+            "$ref": "TaskResolution.json",
+            "description": "How the Task settled — `resolved` by signal or `escalated` on SLA exhaustion."
+        },
+        "value": {
+            "type": "number",
+            "description": "The value written to the Task's `out` (the reviewer's outcome, or the `onTimeout` auto-decide)."
+        }
+    },
+    "required": [
+        "stepId",
+        "assignee",
+        "resolution",
+        "value"
+    ],
+    "description": "One **Task** resolution stitched into the chain (doc 04 §5.2) — a `human-task` outcome + attribution."
+}

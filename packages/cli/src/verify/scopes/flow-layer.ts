@@ -39,6 +39,8 @@ interface VectorOutcome {
   events: string[];
   expectedEvents: string[] | null;
   eventsMatch: boolean;
+  chainComplete: boolean;
+  orphans: string[];
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
@@ -182,6 +184,14 @@ export const flowLayerScope: Scope = {
             actual: JSON.stringify(v.caseId),
           },
         ),
+      );
+      // Real-source DecisionRecord completeness (build plan 3.4 §2.c / doc 13 §2.g): every real vector
+      // stitches into a gap-free causal chain — the orphan detector is clean on the current sources.
+      checks.push(
+        assert(`flow-layer.decisionrecord.${v.flowId}`, v.chainComplete && v.orphans.length === 0, {
+          expected: "DecisionRecord stitches with no orphan",
+          actual: `chainComplete=${v.chainComplete}, orphans=${JSON.stringify(v.orphans)}`,
+        }),
       );
       checks.push(
         assert(`flow-layer.determinism.${v.flowId}`, v.replayClean, {

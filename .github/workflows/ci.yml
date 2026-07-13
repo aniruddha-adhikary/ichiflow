@@ -100,6 +100,9 @@ jobs:
       - name: Flow layer — core step-type + Case/Task conformance vectors (compute/decision-eval/human-task w/ assignment-as-Decision·pausable-SLA·escalation/timer, Temporal time-skip, chunk 3.1–3.3)
         run: pnpm flow:conformance
 
+      - name: Flow layer — DecisionRecord assembly + orphan-event detector on committed case fixtures (chunk 3.4)
+        run: pnpm decisionrecord:assemble
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 
