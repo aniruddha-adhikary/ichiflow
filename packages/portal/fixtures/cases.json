@@ -1,0 +1,28 @@
+[
+  {
+    "caseId": "case:c-100",
+    "title": "Trade permit — Acme Freight",
+    "applicantName": "Acme Freight Pte Ltd",
+    "activeStep": "review",
+    "obligations": [
+      { "code": "OBL-INSPECTION", "kind": "blocking", "state": "pending", "deadlineMs": 172800000 },
+      { "code": "OBL-DUTY-PAID", "kind": "post-approval", "state": "fulfilled", "deadlineMs": 0 }
+    ]
+  },
+  {
+    "caseId": "case:c-101",
+    "title": "Partner licence — Beacon Logistics",
+    "applicantName": "Beacon Logistics",
+    "activeStep": "review",
+    "obligations": [
+      { "code": "OBL-DOCS", "kind": "blocking", "state": "pending", "deadlineMs": 86400000 }
+    ]
+  },
+  {
+    "caseId": "case:c-200",
+    "title": "Trade permit — Cedar Exports",
+    "applicantName": "Cedar Exports",
+    "activeStep": "review",
+    "obligations": []
+  }
+]

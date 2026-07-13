@@ -27,6 +27,7 @@ import { entityStoreScope } from "../src/verify/scopes/entity-store.js";
 import { entityApiScope } from "../src/verify/scopes/entity-api.js";
 import { authzScope } from "../src/verify/scopes/authz.js";
 import { uiScope } from "../src/verify/scopes/ui.js";
+import { portalScope } from "../src/verify/scopes/portal.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -1953,6 +1954,218 @@ describe("authz scope (Phase 4.3 — PDP slice)", () => {
       setup(tmp, { results: null });
       const checks = authzScope.run({ repoRoot: tmp, seed: deriveSeed("z") });
       expect(checks.find((c) => c.id === "authz.results-present")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("portal scope (Phase 4.4 — first Portal)", () => {
+  const principals = [
+    { id: "user:eve", crossTeam: false, expectedInbox: ["t-1", "t-2"] },
+    { id: "user:pat", crossTeam: true, expectedInbox: ["t-3"] },
+  ];
+  const scenarios = [
+    {
+      principal: "user:eve",
+      caseId: "case:c-1",
+      expected: { applicantName: "read-only", decision: "editable" },
+    },
+    {
+      principal: "user:iris",
+      caseId: "case:c-1",
+      expected: { decision: "read-only", reviewerNote: "hidden" },
+    },
+  ];
+  const dataSchema = {
+    type: "object",
+    properties: { applicantName: {}, decision: {}, reviewerNote: {} },
+  };
+  const uischema = {
+    type: "VerticalLayout",
+    elements: [
+      { type: "Control", scope: "#/properties/applicantName" },
+      { type: "Control", scope: "#/properties/decision" },
+      { type: "Control", scope: "#/properties/reviewerNote" },
+    ],
+  };
+  const record = {
+    caseId: "case:c-1",
+    events: [
+      { seq: 0, type: "case.created" },
+      { seq: 1, type: "task.resolved", stepId: "review" },
+    ],
+    decisions: [{ stepId: "s1", decision: "threshold", outcomeType: "APPROVE", value: 1 }],
+    tasks: [{ stepId: "review", assignee: "user:dan", resolution: "resolved", value: 1 }],
+    outcome: { decision: 1 },
+    orphans: [],
+    chainComplete: true,
+  };
+  const results = {
+    seed: "portal-4.4",
+    inbox: [
+      {
+        principal: "user:eve",
+        crossTeam: false,
+        expected: ["t-1", "t-2"],
+        visible: ["t-1", "t-2"],
+        dueOrder: [100, 200],
+        orderingOk: true,
+      },
+      {
+        principal: "user:pat",
+        crossTeam: true,
+        expected: ["t-3"],
+        visible: ["t-3"],
+        dueOrder: [300],
+        orderingOk: true,
+      },
+    ],
+    crossTeam: {
+      principal: "user:pat",
+      baselinePrincipal: "user:eve",
+      visibleCount: 1,
+      baselineCount: 2,
+      fewer: true,
+    },
+    signal: {
+      emitted: true,
+      principal: "user:eve",
+      caseId: "case:c-1",
+      payload: { afterMs: 0, stepId: "review", action: "resolve", value: 1 },
+    },
+    trace: {
+      caseId: "case:c-1",
+      chainComplete: true,
+      nodeIds: ["event:0:case.created", "decision:s1", "task:review"],
+      record,
+    },
+    fields: [
+      {
+        principal: "user:eve",
+        caseId: "case:c-1",
+        states: { applicantName: "read-only", decision: "editable", reviewerNote: "editable" },
+      },
+      {
+        principal: "user:iris",
+        caseId: "case:c-1",
+        states: { applicantName: "read-only", decision: "read-only", reviewerNote: "hidden" },
+      },
+    ],
+    uischema: { controls: 3, resolvedControls: 3, unresolved: [] },
+  };
+  const setup = (root: string, opts: { results?: unknown | null } = {}) => {
+    const fdir = join(root, "packages/portal/fixtures");
+    mkdirSync(fdir, { recursive: true });
+    writeFileSync(join(fdir, "principals.json"), JSON.stringify(principals));
+    writeFileSync(join(fdir, "field-scenarios.json"), JSON.stringify(scenarios));
+    writeFileSync(join(fdir, "action.dataschema.json"), JSON.stringify(dataSchema));
+    writeFileSync(join(fdir, "action.uischema.json"), JSON.stringify(uischema));
+    if (opts.results !== null) {
+      const rp = join(root, "packages/portal/build/portal-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when rows are PDP-filtered + SLA-ordered, the signal validates, the trace renders, and entitlements match", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      setup(tmp);
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const rows = checks.find((c) => c.id === "portal.rows-visible")!;
+      expect(rows.value).toBe(3);
+      expect(checks.find((c) => c.id === "portal.cross-team-fewer")!.status).toBe("pass");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("catches wrong PDP filtering (inbox diverges from the permitted id set)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      const wrong = {
+        ...results,
+        inbox: [
+          { ...results.inbox[0], visible: ["t-1", "t-2", "t-3"], dueOrder: [100, 200, 300] },
+          results.inbox[1],
+        ],
+      };
+      setup(tmp, { results: wrong });
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.find((c) => c.id === "portal.pdp-filtered.user:eve")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("catches bad SLA ordering while the id set is still correct", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      const misordered = {
+        ...results,
+        inbox: [
+          { ...results.inbox[0], visible: ["t-2", "t-1"], dueOrder: [200, 100] },
+          results.inbox[1],
+        ],
+      };
+      setup(tmp, { results: misordered });
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.find((c) => c.id === "portal.pdp-filtered.user:eve")!.status).toBe("pass");
+      expect(checks.find((c) => c.id === "portal.sla-ordering.user:eve")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("catches a missing or schema-invalid Flow signal", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      const badSignal = {
+        ...results,
+        signal: {
+          ...results.signal,
+          emitted: false,
+          payload: { afterMs: -1, action: "resolve", value: 1 },
+        },
+      };
+      setup(tmp, { results: badSignal });
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.find((c) => c.id === "portal.signal-emitted")!.status).toBe("fail");
+      expect(checks.find((c) => c.id === "portal.signal-valid")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("catches wrong field entitlements (a hidden field rendered editable)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      const leaked = {
+        ...results,
+        fields: [
+          results.fields[0],
+          {
+            ...results.fields[1],
+            states: { applicantName: "read-only", decision: "read-only", reviewerNote: "editable" },
+          },
+        ],
+      };
+      setup(tmp, { results: leaked });
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.find((c) => c.id === "portal.field-states.user:iris")!.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-portal-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = portalScope.run({ repoRoot: tmp, seed: deriveSeed("p") });
+      expect(checks.find((c) => c.id === "portal.results-present")!.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

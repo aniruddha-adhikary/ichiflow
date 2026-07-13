@@ -252,6 +252,14 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/authz.ts
     description: PDP-slice gate (build plan 4.3, doc 13 §2.f) — the model + vectors are schema-valid, every vector replays to its pinned allow/deny across the required relations (vectors_green == total), both design-time and runtime surfaces are covered by one PDP with design-time = runtime parity, and every decision emits a schema-valid decision log. Consumes the artifact from `pnpm authz:jvm`.
+  - id: portal-fixtures
+    kind: pattern
+    path: packages/portal/fixtures
+    description: Deterministic Portal fixtures (build plan 4.4, harness-first, doc 07 §5/§7/§11) — seeded Tasks/Cases with integer SLA deadlines, relationship tuples over the SAME authz relation model (schemas/authz/model.json), seeded principals with their pinned PDP-permitted inbox id sets (incl. a cross-team principal who sees fewer rows), per-principal field-entitlement scenarios, an assembled FlowResult per case for the decision trace, and the INTERIM hand-authored action-form uischema + data schema (packages/uischema wiring is a later follow-up). Consumed by the harness that `pnpm portal:preview` runs.
+  - id: portal
+    kind: harness
+    path: packages/cli/src/verify/scopes/portal.ts
+    description: First-Portal gate (build plan 4.4, doc 07 §5/§7/§11, doc 13 §2.e/§2.f) — the back-office Task inbox is PDP-filtered to exactly the permitted id set per seeded principal (rows_visible == expected, incl. a cross-team principal seeing strictly fewer rows) and SLA-ordered soonest-due first, the Case/review action form emits a Flow signal that validates against the emitted FlowSignal schema (never a direct mutation), the assembled DecisionRecord validates against the emitted DecisionRecord schema and its trace nodes render, and field-level entitlements render ≥1 hidden (with a "why?" affordance) + ≥1 read-only for a lower-privilege principal. Consumes the artifact from `pnpm portal:preview`.
   - id: ui-schema
     kind: schema
     path: schemas/ui.tsp

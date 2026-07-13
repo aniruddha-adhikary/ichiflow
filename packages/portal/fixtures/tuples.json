@@ -1,0 +1,24 @@
+[
+  { "object": "team:trade", "relation": "steward", "user": "user:sara" },
+  { "object": "team:trade", "relation": "approver", "user": "user:amir" },
+  { "object": "team:trade", "relation": "editor", "user": "user:eve" },
+  { "object": "team:trade", "relation": "viewer", "user": "user:vic" },
+  { "object": "team:trade", "relation": "member", "user": "user:mel" },
+
+  { "object": "team:partner", "relation": "member", "user": "user:pat" },
+
+  { "object": "case:c-100", "relation": "owner", "user": "team:trade" },
+  { "object": "case:c-100", "relation": "assignee", "user": "user:dan" },
+  { "object": "case:c-100", "relation": "association", "user": "association:invgroup" },
+
+  { "object": "case:c-101", "relation": "owner", "user": "team:partner" },
+  { "object": "case:c-101", "relation": "assignee", "user": "user:carl" },
+  { "object": "case:c-101", "relation": "association", "user": "association:invgroup" },
+
+  { "object": "case:c-200", "relation": "owner", "user": "team:trade" },
+  { "object": "case:c-200", "relation": "assignee", "user": "user:dan" },
+
+  { "object": "association:invgroup", "relation": "member", "user": "case:c-100" },
+  { "object": "association:invgroup", "relation": "member", "user": "case:c-101" },
+  { "object": "association:invgroup", "relation": "reader", "user": "user:iris" }
+]

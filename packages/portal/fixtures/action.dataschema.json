@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CaseReviewAction",
+  "type": "object",
+  "properties": {
+    "applicantName": { "type": "string", "title": "Applicant" },
+    "decision": {
+      "type": "integer",
+      "title": "Decision",
+      "description": "Reviewer outcome written to the Task's out variable (1 = approve, 0 = reject)."
+    },
+    "reviewerNote": { "type": "string", "title": "Reviewer note (internal)" }
+  },
+  "required": ["decision"]
+}

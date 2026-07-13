@@ -1,0 +1,20 @@
+[
+  {
+    "id": "user:eve",
+    "label": "Trade editor",
+    "crossTeam": false,
+    "expectedInbox": ["t-500", "t-1000", "t-3000"]
+  },
+  {
+    "id": "user:pat",
+    "label": "Partner member (cross-team)",
+    "crossTeam": true,
+    "expectedInbox": ["t-2000", "t-4000"]
+  },
+  {
+    "id": "user:iris",
+    "label": "Association reader (low-privilege)",
+    "crossTeam": false,
+    "expectedInbox": ["t-1000", "t-2000", "t-3000", "t-4000"]
+  }
+]

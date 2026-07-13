@@ -39,6 +39,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm entity:jvm`                       | Replay the entity-store CRUD/audit/outbox vectors (chunk 4.1).                  |
 | `pnpm api:contract`                     | Replay the generated-BFF API contract vectors vs emitted OpenAPI (4.2).         |
 | `pnpm authz:jvm`                        | Replay the authz PDP allow/deny vectors + design-time=runtime parity (4.3).     |
+| `pnpm portal:preview`                   | Render the Portal inbox + Case/review harness → `portal-results.json` (4.4).    |
 | `pnpm ui:generate`                      | (Re)generate the generated-once baseline uischema from the data schema (4.5).   |
 | `pnpm ui:preview`                       | Render the PDP-state stories + axe-core AA + preview snapshots (uischema, 4.5). |
 | `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.                        |
@@ -49,7 +50,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                              |
 | `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                          |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `code-quality`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `portal`, `ui`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -113,6 +114,7 @@ fast-forward) with clean replay determinism under time-skip (`vectors_green == t
 - `packages/contracts-ts/` — generated TypeScript contract types (hey-api) in `src/gen/`; regenerate, never hand-edit.
 - `packages/flow/` — the Phase 3 flow layer: the generic Temporal interpreter over the flow-JSON DSL + its determinism harness.
 - `packages/api/` — the Phase 4.2 generated BFF over the entity store: an OpenAPI-driven request dispatcher with runtime JSON-Schema boundary validation + its contract-conformance harness.
+- `packages/portal/` — the Phase 4.4 first Portal (React, headless under jsdom): a PDP-filtered SLA-ordered Task inbox + Case/review view (decision trace, an action form that signals the Flow, obligation checklist, field-level entitlements) + its deterministic `portal:preview` harness.
 - `packages/uischema/` — the Phase 4.5 uischema layer: deterministic JSON Forms uischema generation from an emitted data schema + the headless UI harness (scope lint · PDP-state story coverage · axe-core AA · preview snapshots) behind `pnpm ui:preview`.
 - `core/` — the Kotlin core (Gradle); generated contract models (Fabrikt) in `core/generated/`.
 - `.claude/` — skills and the scoped-verify hook (the guaranteed-execution layer, doc 10 §2.2).
