@@ -921,33 +921,35 @@ describe("interpreter-determinism-spike scope (Phase 3.0)", () => {
   });
 });
 
-describe("flow-layer scope (Phase 3.1)", () => {
+describe("flow-layer scope (Phase 3.2)", () => {
   const validVector = {
     name: "vec-a",
     flow: {
       id: "vec-a",
       schemaVersion: "flow/v1",
-      input: { value: 21 },
+      input: { vars: { x: 21 } },
       steps: [
-        { id: "s1", type: "compute", op: "double" },
+        { id: "s1", type: "compute", ref: "ts://flow-kit/Double@1.0.0", in: ["x"], out: "x" },
         { id: "s2", type: "timer", durationMs: 2592000000 },
-        { id: "s3", type: "compute", op: "inc" },
+        { id: "s3", type: "compute", ref: "ts://flow-kit/Increment@1.0.0", in: ["x"], out: "x" },
       ],
     },
-    expect: { result: 43, steps: 3, slaMs: 2592000000 },
+    expect: { vars: { x: 43 }, steps: 3, slaMs: 2592000000 },
   };
   const outcome = {
     name: "vec-a",
     flowId: "vec-a",
-    expected: 43,
-    result: 43,
-    correct: true,
+    vars: { x: 43 },
+    expectedVars: { x: 43 },
+    varsMatch: true,
     expectedSteps: 3,
     steps: 3,
     stepsMatch: true,
     expectedSlaMs: 2592000000,
     slaMs: 2592000000,
     slaMatch: true,
+    traceStepIds: ["s1", "s2", "s3"],
+    traceComplete: true,
     replays: [
       { attempt: 1, ok: true, error: null },
       { attempt: 2, ok: true, error: null },
@@ -988,12 +990,15 @@ describe("flow-layer scope (Phase 3.1)", () => {
     }
   });
 
-  it("rejects an ill-formed vector (unknown compute op) via the DSL schema", () => {
+  it("rejects an ill-formed vector (malformed unversioned code-activity ref) via the DSL schema", () => {
     const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
     try {
       const bad = {
         ...validVector,
-        flow: { ...validVector.flow, steps: [{ id: "s1", type: "compute", op: "triple" }] },
+        flow: {
+          ...validVector.flow,
+          steps: [{ id: "s1", type: "compute", ref: "ts://flow-kit/Double", in: ["x"], out: "x" }],
+        },
       };
       setup(tmp, { vectors: [bad] });
       const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
@@ -1046,8 +1051,8 @@ describe("flow-layer scope (Phase 3.1)", () => {
           vectors: [
             {
               ...outcome,
-              result: 99,
-              correct: false,
+              vars: { x: 99 },
+              varsMatch: false,
               replayClean: false,
               replays: [
                 { attempt: 1, ok: true, error: null },

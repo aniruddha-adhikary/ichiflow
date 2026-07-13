@@ -3,16 +3,25 @@ import "@typespec/json-schema";
 using TypeSpec.JsonSchema;
 
 /**
- * The canonical ichiflow **Flow DSL** (build plan 3.1; doc 04 §2, ADR-0004). A Flow is a declarative,
- * schema-validated document — *not* Temporal workflow code — that a single generic **interpreter
- * workflow** walks deterministically, pushing all non-determinism into activities (doc 04 §2.2). The
- * step set is **closed by design** so the deterministic interpreter understands every step it must
- * replay; genuinely new kinds are additive at a declared seam, never a fork to the raw SDK.
+ * The canonical ichiflow **Flow DSL** (build plan 3.1–3.2; doc 04 §2, ADR-0004). A Flow is a
+ * declarative, schema-validated document — *not* Temporal workflow code — that a single generic
+ * **interpreter workflow** walks deterministically, pushing all non-determinism into activities
+ * (doc 04 §2.2). The step set is **closed by design** so the deterministic interpreter understands
+ * every step it must replay; genuinely new kinds are additive at a declared seam, never a fork to the
+ * raw SDK.
  *
- * Phase 3.1 is the walking skeleton: the envelope + the two step kinds the interpreter already
- * executes deterministically — `compute` (a pure code-activity) and `timer` (an SLA/durable wait).
- * The remaining catalogue (`decision-eval`, `human-task`, …; doc 04 §2.3) lands in Phase 3.2+ as
- * additive members of the discriminated union, each shipping its conformance vectors first.
+ * The interpreter carries a named-variable **blackboard** (`input.vars`); each step reads declared
+ * `in` vars and writes its `out` var, so a flow is a deterministic fold over that blackboard. Phase 3.2
+ * ships the core catalogue the interpreter executes deterministically:
+ *   - `compute` — a typed **code activity** referenced by a versioned `ref` with a schema'd I/O boundary
+ *     (doc 04 §2.6); the unified code-activity contract also reused by decision feature-functions and
+ *     adapter transforms.
+ *   - `decision-eval` — evaluate a **DecisionModel** and annotate the blackboard with its typed Outcome
+ *     (doc 04 §2.3; the real engine is the Kotlin rule-eval activity behind the SPI).
+ *   - `human-task` — raise a Task and block on **await-signal raced by an SLA timer** (doc 04 §5.2):
+ *     resolve on signal, else escalate when the SLA fires.
+ *   - `timer` — a durable SLA wait; a Temporal timer, fast-forwarded under time-skip.
+ * The remaining catalogue (`adapter-call`, `parallel`, `sub-flow`, …; doc 04 §2.3) lands additively.
  */
 @jsonSchema
 namespace Ichiflow.Flow;
@@ -22,13 +31,6 @@ union FlowSchemaVersion {
   v1: "flow/v1",
 }
 
-/** The closed set of pure `compute` transforms the skeleton interpreter's code-activity supports (doc 04 §2.6). */
-union ComputeOp {
-  double: "double",
-  increment: "inc",
-  identity: "identity",
-}
-
 /**
  * The base of every Flow step. Steps carry a stable `id` (used for durable-side-effect memoization and
  * as the trace key) and a `type` discriminator so the deterministic interpreter dispatches without
@@ -36,20 +38,72 @@ union ComputeOp {
  */
 @discriminator("type")
 model FlowStep {
-  /** Stable, flow-unique step identifier — the ordering/trace/idempotency key. */
+  /** Stable, flow-unique step identifier — the ordering/trace/idempotency/signal-correlation key. */
   id: string;
 
   type: string;
 }
 
 /**
- * A `compute` step — a pure code-activity that reshapes inter-step data (doc 04 §2.6). Runs as an
- * activity (the non-determinism boundary), so the interpreter body stays deterministic.
+ * A `compute` step — a typed **code activity** for computation neither a Decision nor an Adapter owns
+ * (doc 04 §2.6). Referenced by a versioned, language-parameterised `ref` (`<lang>://<module>/<Name>@<semver>`)
+ * over a schema'd I/O boundary; runs as an activity (the non-determinism boundary) and emits a trace.
  */
 model ComputeStep extends FlowStep {
   type: "compute";
 
-  `op`: ComputeOp;
+  /** The versioned code-activity reference: `<lang>://<module>/<Name>@<major>.<minor>.<patch>` (doc 04 §2.6). */
+  @pattern("^(kt|ts|py)://[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@[0-9]+[.][0-9]+[.][0-9]+$")
+  ref: string;
+
+  /** Blackboard variables passed, in order, as the code activity's inputs. */
+  @minItems(1)
+  `in`: string[];
+
+  /** Blackboard variable the code activity's result is written to. */
+  out: string;
+}
+
+/**
+ * A `decision-eval` step — evaluate a DMN **DecisionModel** and annotate the blackboard with its typed
+ * Outcome (doc 04 §2.3). The value facet of the Outcome is written to `out`; the outcome type is
+ * recorded on the trace. In production this is an activity on the Kotlin rule-eval queue behind the SPI.
+ */
+model DecisionEvalStep extends FlowStep {
+  type: "decision-eval";
+
+  /** The DecisionModel identifier to evaluate. */
+  decision: string;
+
+  /** Blackboard variables passed, in order, as the decision's inputs. */
+  @minItems(1)
+  `in`: string[];
+
+  /** Blackboard variable the decision's value facet is written to. */
+  out: string;
+}
+
+/**
+ * A `human-task` step — raise a Task and block until resolved (doc 04 §5.2). Modelled as a `createTask`
+ * activity plus an **await-signal raced by an SLA timer**: a resolution signal writes its value to `out`;
+ * if the SLA fires first the task **escalates** and `onTimeout` is written instead. Time-skip makes a
+ * month-long SLA verify in milliseconds.
+ */
+model HumanTaskStep extends FlowStep {
+  type: "human-task";
+
+  /** Optional assignee/queue hint (assignment-as-Decision is Phase 3.3; here it is a passthrough label). */
+  assignee?: string;
+
+  /** SLA in milliseconds; when it elapses before a resolution signal, the task escalates. */
+  @minValue(0)
+  slaMs: int64;
+
+  /** Blackboard variable the resolution (or `onTimeout`) value is written to. */
+  out: string;
+
+  /** Value written to `out` when the SLA fires before a resolution signal (the escalation path). */
+  onTimeout: float64;
 }
 
 /** A `timer` / SLA step — a durable wait. A Temporal timer; deterministic in the interpreter, fast-forwarded under time-skip (doc 04 §2.3). */
@@ -61,9 +115,10 @@ model TimerStep extends FlowStep {
   durationMs: int64;
 }
 
-/** The initial data a Flow is started with. Skeleton flows carry a single numeric accumulator the compute steps fold over. */
+/** The initial data a Flow is started with — a named-variable blackboard the steps read and write. */
 model FlowInput {
-  value: float64;
+  /** The initial blackboard: variable name → numeric value. */
+  vars: Record<float64>;
 }
 
 /**
@@ -79,13 +134,27 @@ model Flow {
   input: FlowInput;
 
   @minItems(1)
-  steps: (ComputeStep | TimerStep)[];
+  steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep)[];
+}
+
+/** A scripted resolution signal a conformance vector delivers to a `human-task` step (correlated by `stepId`). */
+model FlowSignal {
+  /** Test-clock offset (ms from flow start) at which the signal is delivered. */
+  @minValue(0)
+  afterMs: int64;
+
+  /** The `human-task` step id this signal resolves. */
+  stepId: string;
+
+  /** The resolution value written to the step's `out` variable. */
+  value: float64;
 }
 
 /**
- * One skeleton **conformance vector** (build plan 3.1 exit criterion). Pairs a DSL-valid Flow with the
- * result the generic interpreter must produce for it — an independently-pinned oracle, so the harness
- * proves the interpreter walks/orders/dispatches correctly, not merely that it is self-consistent.
+ * One **conformance vector** (build plan 3.1–3.2 exit criterion). Pairs a DSL-valid Flow — plus any
+ * scripted resolution `signals` — with the final blackboard the generic interpreter must produce, an
+ * independently-pinned oracle proving the interpreter walks/orders/dispatches/awaits correctly rather
+ * than merely being self-consistent.
  */
 model FlowConformanceVector {
   /** Human-readable vector name; doubles as intent documentation. */
@@ -93,17 +162,20 @@ model FlowConformanceVector {
 
   flow: Flow;
 
+  /** Resolution signals delivered to `human-task` steps during interpretation; omit to exercise the SLA-escalation path. */
+  signals?: FlowSignal[];
+
   expect: FlowExpectation;
 }
 
 /** The pinned expected observations of interpreting a conformance vector's Flow. */
 model FlowExpectation {
-  /** The final accumulator value the interpreter must return. */
-  result: float64;
+  /** The final blackboard the interpreter must return: variable name → value. */
+  vars: Record<float64>;
 
   /** The number of steps the flow declares (guards vector/flow drift). */
   steps: int32;
 
-  /** Total scheduled SLA/timer duration in milliseconds across the flow. */
+  /** Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks). */
   slaMs: int64;
 }

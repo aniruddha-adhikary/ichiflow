@@ -5,7 +5,7 @@
     "properties": {
         "id": {
             "type": "string",
-            "description": "Stable, flow-unique step identifier — the ordering/trace/idempotency key."
+            "description": "Stable, flow-unique step identifier — the ordering/trace/idempotency/signal-correlation key."
         },
         "type": {
             "type": "string"

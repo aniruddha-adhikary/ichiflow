@@ -10,10 +10,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const toy3Step: Flow = {
   id: "toy-3step",
   schemaVersion: "flow/v1",
-  input: { value: 21 },
+  input: { vars: { x: 21 } },
   steps: [
-    { id: "s1", type: "compute", op: "double" },
+    { id: "s1", type: "compute", ref: "ts://flow-kit/Double@1.0.0", in: ["x"], out: "x" },
     { id: "s2", type: "timer", durationMs: 30 * DAY_MS },
-    { id: "s3", type: "compute", op: "inc" },
+    { id: "s3", type: "compute", ref: "ts://flow-kit/Increment@1.0.0", in: ["x"], out: "x" },
   ],
 };
+
+/** The blackboard variable the toy's result is read from (21·2 + 1 = 43). */
+export const TOY_RESULT_VAR = "x";

@@ -3,9 +3,9 @@
     "$id": "FlowExpectation.json",
     "type": "object",
     "properties": {
-        "result": {
-            "type": "number",
-            "description": "The final accumulator value the interpreter must return."
+        "vars": {
+            "$ref": "#/$defs/RecordFloat64",
+            "description": "The final blackboard the interpreter must return: variable name → value."
         },
         "steps": {
             "type": "integer",
@@ -15,13 +15,22 @@
         },
         "slaMs": {
             "type": "integer",
-            "description": "Total scheduled SLA/timer duration in milliseconds across the flow."
+            "description": "Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks)."
         }
     },
     "required": [
-        "result",
+        "vars",
         "steps",
         "slaMs"
     ],
-    "description": "The pinned expected observations of interpreting a conformance vector's Flow."
+    "description": "The pinned expected observations of interpreting a conformance vector's Flow.",
+    "$defs": {
+        "RecordFloat64": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "number"
+            }
+        }
+    }
 }

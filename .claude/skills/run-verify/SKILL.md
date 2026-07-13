@@ -81,12 +81,15 @@ non-determinism violation**, the result is stable across an independent re-execu
 month-long SLA timer **fast-forwards** to milliseconds. Run `pnpm interpreter:spike` before
 `pnpm verify` to produce `packages/flow/build/interpreter-spike-results.json`.
 
-`flow-layer` is the Phase 3.1 conformance gate (doc 04 §2): the committed flow-JSON **conformance
+`flow-layer` is the Phase 3.1–3.2 conformance gate (doc 04 §2): the committed flow-JSON **conformance
 vectors** (`schemas/flow/vectors/*.vector.json`) validate against the emitted canonical Flow DSL
-schema (authored in `schemas/flow.tsp`), and the _same_ generic interpreter run over each vector hits
-its independently-pinned oracle (result/steps/SLA + timer fast-forward) with clean replay determinism
-under time-skip (`vectors_green == total`). The DSL check runs in-process; run `pnpm flow:conformance`
-before `pnpm verify` to produce `packages/flow/build/flow-conformance-results.json`.
+schema (authored in `schemas/flow.tsp`), and the _same_ generic interpreter run over each vector —
+across the core step set (`compute` via a versioned code-activity ref, `decision-eval`, `human-task`
+with signal-vs-SLA racing, `timer`) — hits its independently-pinned oracle (final blackboard/steps/SLA
+
+- a complete per-step trace + timer fast-forward) with clean replay determinism under time-skip
+  (`vectors_green == total`). The DSL check runs in-process; run `pnpm flow:conformance` before
+  `pnpm verify` to produce `packages/flow/build/flow-conformance-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce
