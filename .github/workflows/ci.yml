@@ -94,6 +94,9 @@ jobs:
       - name: Decision layer — FEEL semantics vectors
         run: pnpm feel:jvm
 
+      - name: Flow layer — interpreter determinism spike (Temporal time-skip, chunk 3.0)
+        run: pnpm interpreter:spike
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

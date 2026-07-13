@@ -39,6 +39,9 @@ pins:
   - id: archunit
     version: "1.3.0"
     note: Architecture-rule tests (archunit-junit5) enforcing the Decision Engine SPI boundary. Fails ./gradlew test and the code-quality scope on violation.
+  - id: temporalio
+    version: "1.11.7"
+    note: Temporal TypeScript SDK — durable-execution substrate for the flow interpreter (ADR-0003/0004). Pinned; the time-skipping test env powers the interpreter-determinism-spike. Bump reruns `pnpm interpreter:spike`.
 
 resources:
   - id: run-verify
@@ -165,3 +168,11 @@ resources:
     kind: schema
     path: schemas/contract/openapi.baseline.yaml
     description: Released OpenAPI contract baseline; oasdiff compares the emitted contract against it. Advance via `pnpm contract:accept`.
+  - id: flow-interpreter
+    kind: pattern
+    path: packages/flow/src/interpreter.ts
+    description: The generic Temporal flow interpreter (build plan 3.0, ADR-0003/0004) — one workflow that walks any flow's ordered steps; compute steps go through activities, sla steps are Temporal timers. Its determinism is the whole flow layer's correctness property.
+  - id: interpreter-determinism-spike
+    kind: harness
+    path: packages/cli/src/verify/scopes/interpreter-determinism-spike.ts
+    description: Riskiest-bet proof (doc 14 §6) — replay-twice determinism (no non-determinism violation) + SLA-timer fast-forward under Temporal time-skip. Consumes the artifact from `pnpm interpreter:spike`.
