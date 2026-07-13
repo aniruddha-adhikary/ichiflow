@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowConformanceVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Human-readable vector name; doubles as intent documentation."
+        },
+        "flow": {
+            "$ref": "Flow.json"
+        },
+        "expect": {
+            "$ref": "FlowExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "flow",
+        "expect"
+    ],
+    "description": "One skeleton **conformance vector** (build plan 3.1 exit criterion). Pairs a DSL-valid Flow with the\nresult the generic interpreter must produce for it — an independently-pinned oracle, so the harness\nproves the interpreter walks/orders/dispatches correctly, not merely that it is self-consistent."
+}

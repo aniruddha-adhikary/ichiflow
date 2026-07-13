@@ -32,6 +32,7 @@
     "scenario:jvm": "cd core && ./gradlew -q runScenarioCoverage",
     "feel:jvm": "cd core && ./gradlew -q runFeelVectors",
     "interpreter:spike": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow spike",
+    "flow:conformance": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow conformance",
     "quality:jvm": "cd core && ./gradlew -q detekt test",
     "verify": "node packages/cli/dist/cli.js verify"
   },

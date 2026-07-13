@@ -9,10 +9,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export const toy3Step: Flow = {
   id: "toy-3step",
+  schemaVersion: "flow/v1",
   input: { value: 21 },
   steps: [
     { id: "s1", type: "compute", op: "double" },
-    { id: "s2", type: "sla", durationMs: 30 * DAY_MS },
+    { id: "s2", type: "timer", durationMs: 30 * DAY_MS },
     { id: "s3", type: "compute", op: "inc" },
   ],
 };
