@@ -92,8 +92,10 @@ function VerticalLayoutRenderer(props: LayoutProps): JSX.Element {
   );
 }
 
-export const FieldControl = withJsonFormsControlProps(FieldControlRenderer);
-export const VerticalLayout = withJsonFormsLayoutProps(VerticalLayoutRenderer);
+export const FieldControl: JsonFormsRendererRegistryEntry["renderer"] =
+  withJsonFormsControlProps(FieldControlRenderer);
+export const VerticalLayout: JsonFormsRendererRegistryEntry["renderer"] =
+  withJsonFormsLayoutProps(VerticalLayoutRenderer);
 
 export const portalRenderers: JsonFormsRendererRegistryEntry[] = [
   { tester: rankWith(2, uiTypeIs("VerticalLayout")), renderer: VerticalLayout },
