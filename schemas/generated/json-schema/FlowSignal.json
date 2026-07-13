@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowSignal.json",
+    "type": "object",
+    "properties": {
+        "afterMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Test-clock offset (ms from flow start) at which the signal is delivered."
+        },
+        "stepId": {
+            "type": "string",
+            "description": "The `human-task` step id this signal resolves."
+        },
+        "value": {
+            "type": "number",
+            "description": "The resolution value written to the step's `out` variable."
+        }
+    },
+    "required": [
+        "afterMs",
+        "stepId",
+        "value"
+    ],
+    "description": "A scripted resolution signal a conformance vector delivers to a `human-task` step (correlated by `stepId`)."
+}

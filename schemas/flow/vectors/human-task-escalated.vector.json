@@ -1,0 +1,19 @@
+{
+  "name": "human-task escalates when its 30-day SLA fires with no resolution signal",
+  "flow": {
+    "id": "human-task-escalated",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "x": 0 } },
+    "steps": [
+      {
+        "id": "review",
+        "type": "human-task",
+        "assignee": "ops-queue",
+        "slaMs": 2592000000,
+        "out": "approved",
+        "onTimeout": 99
+      }
+    ]
+  },
+  "expect": { "vars": { "x": 0, "approved": 99 }, "steps": 1, "slaMs": 2592000000 }
+}

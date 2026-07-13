@@ -10,6 +10,13 @@
         "flow": {
             "$ref": "Flow.json"
         },
+        "signals": {
+            "type": "array",
+            "items": {
+                "$ref": "FlowSignal.json"
+            },
+            "description": "Resolution signals delivered to `human-task` steps during interpretation; omit to exercise the SLA-escalation path."
+        },
         "expect": {
             "$ref": "FlowExpectation.json"
         }
@@ -19,5 +26,5 @@
         "flow",
         "expect"
     ],
-    "description": "One skeleton **conformance vector** (build plan 3.1 exit criterion). Pairs a DSL-valid Flow with the\nresult the generic interpreter must produce for it — an independently-pinned oracle, so the harness\nproves the interpreter walks/orders/dispatches correctly, not merely that it is self-consistent."
+    "description": "One **conformance vector** (build plan 3.1–3.2 exit criterion). Pairs a DSL-valid Flow — plus any\nscripted resolution `signals` — with the final blackboard the generic interpreter must produce, an\nindependently-pinned oracle proving the interpreter walks/orders/dispatches/awaits correctly rather\nthan merely being self-consistent."
 }
