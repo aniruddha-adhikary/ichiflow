@@ -9,16 +9,10 @@ import {
 import type { Flow, Vars } from "./dsl.js";
 import type { activities } from "./activities.js";
 
-const {
-  compute,
-  decisionEval,
-  createTask,
-  issueDocument,
-  acceptDocument,
-  submitExternalTask,
-} = proxyActivities<typeof activities>({
-  startToCloseTimeout: "1 minute",
-});
+const { compute, decisionEval, createTask, issueDocument, acceptDocument, submitExternalTask } =
+  proxyActivities<typeof activities>({
+    startToCloseTimeout: "1 minute",
+  });
 
 /**
  * Act on a `human-task`, correlated by step id (doc 04 §5.2 await-signal, §5.7 pausable clock):
