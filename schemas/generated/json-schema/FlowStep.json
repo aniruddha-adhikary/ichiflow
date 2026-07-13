@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowStep.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Stable, flow-unique step identifier — the ordering/trace/idempotency key."
+        },
+        "type": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "id",
+        "type"
+    ],
+    "description": "The base of every Flow step. Steps carry a stable `id` (used for durable-side-effect memoization and\nas the trace key) and a `type` discriminator so the deterministic interpreter dispatches without\nambiguity (doc 04 §2.3)."
+}

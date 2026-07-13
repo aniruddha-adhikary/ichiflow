@@ -21,6 +21,7 @@ import {
 } from "../src/verify/reference-data.js";
 import { contractGateScope } from "../src/verify/scopes/contract-gate.js";
 import { interpreterDeterminismSpikeScope } from "../src/verify/scopes/interpreter-determinism-spike.js";
+import { flowLayerScope } from "../src/verify/scopes/flow-layer.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -914,6 +915,154 @@ describe("interpreter-determinism-spike scope (Phase 3.0)", () => {
       const present = checks.find((c) => c.id === "interpreter-determinism-spike.results-present")!;
       expect(present.status).toBe("fail");
       expect(String(present.diff)).toContain("determinism harness");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("flow-layer scope (Phase 3.1)", () => {
+  const validVector = {
+    name: "vec-a",
+    flow: {
+      id: "vec-a",
+      schemaVersion: "flow/v1",
+      input: { value: 21 },
+      steps: [
+        { id: "s1", type: "compute", op: "double" },
+        { id: "s2", type: "timer", durationMs: 2592000000 },
+        { id: "s3", type: "compute", op: "inc" },
+      ],
+    },
+    expect: { result: 43, steps: 3, slaMs: 2592000000 },
+  };
+  const outcome = {
+    name: "vec-a",
+    flowId: "vec-a",
+    expected: 43,
+    result: 43,
+    correct: true,
+    expectedSteps: 3,
+    steps: 3,
+    stepsMatch: true,
+    expectedSlaMs: 2592000000,
+    slaMs: 2592000000,
+    slaMatch: true,
+    replays: [
+      { attempt: 1, ok: true, error: null },
+      { attempt: 2, ok: true, error: null },
+    ],
+    replayClean: true,
+    fastForwarded: true,
+  };
+  const conformance = {
+    sdk: "@temporalio",
+    sdkVersion: "1.11.7",
+    vectors: [outcome],
+    vectorsGreen: 1,
+    determinismClean: true,
+  };
+  const setup = (root: string, opts: { vectors?: unknown[]; results?: unknown | null } = {}) => {
+    const vdir = join(root, "schemas/flow/vectors");
+    mkdirSync(vdir, { recursive: true });
+    const vectors = opts.vectors ?? [validVector];
+    vectors.forEach((v, i) => writeFileSync(join(vdir, `v${i}.vector.json`), JSON.stringify(v)));
+    if (opts.results !== null) {
+      const rp = join(root, "packages/flow/build/flow-conformance-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? conformance));
+    }
+  };
+
+  it("passes when vectors are DSL-valid and each interprets to its oracle with clean replay", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp);
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "flow-layer.vectors-green")!;
+      expect(green.value).toBe(1);
+      expect(green.threshold).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed vector (unknown compute op) via the DSL schema", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      const bad = {
+        ...validVector,
+        flow: { ...validVector.flow, steps: [{ id: "s1", type: "compute", op: "triple" }] },
+      };
+      setup(tmp, { vectors: [bad] });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      expect(
+        checks.some((c) => c.id.startsWith("flow-layer.dsl-valid.") && c.status === "fail"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the conformance artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const present = checks.find((c) => c.id === "flow-layer.conformance-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("conformance harness");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when a committed vector is not covered by the artifact (stale verdict)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        vectors: [
+          validVector,
+          { ...validVector, name: "vec-b", flow: { ...validVector.flow, id: "vec-b" } },
+        ],
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const covered = checks.find((c) => c.id === "flow-layer.vectors-covered")!;
+      expect(covered.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a drifted result and a determinism violation", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...conformance,
+          vectorsGreen: 0,
+          determinismClean: false,
+          vectors: [
+            {
+              ...outcome,
+              result: 99,
+              correct: false,
+              replayClean: false,
+              replays: [
+                { attempt: 1, ok: true, error: null },
+                { attempt: 2, ok: false, error: "DeterminismViolationError" },
+              ],
+            },
+          ],
+        },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("flow-layer.vector.vec-a");
+      expect(failed).toContain("flow-layer.determinism.vec-a");
+      expect(failed).toContain("flow-layer.vectors-green");
+      expect(failed).toContain("flow-layer.determinism-clean");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

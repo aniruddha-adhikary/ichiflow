@@ -19,31 +19,32 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 
 ## Commands
 
-| Command                                 | What it does                                                           |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| `pnpm install`                          | Install the TS workspace.                                              |
-| `pnpm build`                            | Build every workspace package.                                         |
-| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.                      |
-| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).              |
-| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).                      |
-| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.                   |
-| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                  |
-| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.           |
-| `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).            |
-| `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.  |
-| `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).     |
-| `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).  |
-| `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).              |
-| `pnpm interpreter:spike`                | Run the flow-interpreter determinism harness on Temporal (chunk 3.0).  |
-| `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.               |
-| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
-| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
-| `pnpm contract:diff`                    | Run oasdiff → write the breaking-change results `contract-gate` reads. |
-| `pnpm contract:accept`                  | Accept an intentional contract change (advance the baseline).          |
-| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                     |
-| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                 |
+| Command                                 | What it does                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `pnpm install`                          | Install the TS workspace.                                                |
+| `pnpm build`                            | Build every workspace package.                                           |
+| `pnpm --filter @ichiflow/schemas build` | Emit canonical JSON Schema from TypeSpec sources.                        |
+| `pnpm verify --scope self-check --json` | Run the meta-harness (the harness that judges harnesses).                |
+| `pnpm verify --json`                    | Full verify — every registered scope (CI's loop).                        |
+| `pnpm spike:jvm`                        | Produce the JVM (networknt) fidelity-spike verdicts.                     |
+| `pnpm vectors:jvm`                      | Produce the JVM (networknt) contract-vector verdicts.                    |
+| `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.             |
+| `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).              |
+| `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.    |
+| `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).       |
+| `pnpm scenario:jvm`                     | Run the DecisionModel scenario suite + rule/row coverage (doc 03 §6).    |
+| `pnpm feel:jvm`                         | Evaluate the frozen FEEL semantics vectors (doc 13 §2.b).                |
+| `pnpm interpreter:spike`                | Run the flow-interpreter determinism harness on Temporal (chunk 3.0).    |
+| `pnpm flow:conformance`                 | Interpret the flow-JSON DSL conformance vectors on Temporal (chunk 3.1). |
+| `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.                 |
+| `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).                |
+| `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                         |
+| `pnpm contract:diff`                    | Run oasdiff → write the breaking-change results `contract-gate` reads.   |
+| `pnpm contract:accept`                  | Accept an intentional contract change (advance the baseline).            |
+| `pnpm license:check`                    | License-allowlist gate (ADR-0016).                                       |
+| `(cd core && ./gradlew build)`          | Build + test the Kotlin core (incl. model drift gate).                   |
 
-Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `code-quality`.
+Registered scopes: `self-check`, `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`, `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`, `interpreter-determinism-spike`, `flow-layer`, `code-quality`.
 `schema-fidelity-spike` runs a hard JSON Schema probe corpus through **two** validators — Ajv (TS)
 and networknt (JVM) — and requires them to agree; run `pnpm spike:jvm` first to produce the JVM
 verdicts it cross-checks. `schema-pipeline` guards the emitted contract artifacts (OpenAPI 3.1 +
@@ -93,7 +94,12 @@ timer → compute) on the time-skipping test env, and the harness asserts the re
 twice with **no non-determinism violation**, the result is stable across an independent re-execution,
 and the month-long SLA timer **fast-forwards** to milliseconds. Determinism is the whole flow layer's
 correctness property, so it is proven on a toy before the full step set; run `pnpm interpreter:spike`
-first to produce the verdict artifact.
+first to produce the verdict artifact. `flow-layer` is the Phase 3.1 conformance gate (doc 04 §2): the
+committed flow-JSON **conformance vectors** (`schemas/flow/vectors/*.vector.json`) are **DSL-valid**
+against the emitted canonical Flow DSL schema (authored in `schemas/flow.tsp`), and the _same_ generic
+interpreter run over each vector hits its independently-pinned oracle (result/steps/SLA + timer
+fast-forward) with clean replay determinism under time-skip (`vectors_green == total`); run
+`pnpm flow:conformance` first to produce the verdict artifact.
 
 ## Layout
 

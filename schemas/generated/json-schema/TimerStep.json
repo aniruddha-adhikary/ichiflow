@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "TimerStep.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "const": "timer"
+        },
+        "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Wait duration in milliseconds. Integer so the DSL stays parse-free (thus deterministic)."
+        }
+    },
+    "required": [
+        "type",
+        "durationMs"
+    ],
+    "allOf": [
+        {
+            "$ref": "FlowStep.json"
+        }
+    ],
+    "description": "A `timer` / SLA step — a durable wait. A Temporal timer; deterministic in the interpreter, fast-forwarded under time-skip (doc 04 §2.3)."
+}
