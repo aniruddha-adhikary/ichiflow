@@ -25,10 +25,19 @@ export const CODE_ACTIVITIES: Record<string, CodeActivity> = {
   "ts://flow-kit/Negate@1.0.0": (a) => -a[0]!,
 };
 
-/** The decision registry, keyed by DecisionModel id — the pure stand-in for the SPI rule-eval worker. */
+/**
+ * The decision registry, keyed by DecisionModel id — the pure stand-in for the SPI rule-eval worker.
+ * `assignment-*` DecisionModels implement "assignment routing is itself a Decision" (doc 04 §5.3):
+ * their `outcomeType` is the routed assignee/queue that a `human-task` step's `assignmentDecision` binds.
+ */
 export const DECISIONS: Record<string, Decision> = {
   "threshold-approval": (a) =>
     a[0]! >= 50 ? { outcomeType: "APPROVE", value: 1 } : { outcomeType: "DECLINE", value: 0 },
+  // Routes by workload/amount to a tier queue — the assignee is the Decision's outcome (§5.3).
+  "assignment-by-amount": (a) =>
+    a[0]! >= 1000
+      ? { outcomeType: "underwriting-tier2", value: 2 }
+      : { outcomeType: "underwriting-tier1", value: 1 },
 };
 
 /** Guard the code-activity boundary: unknown refs and non-finite I/O are rejected (schema'd-boundary + purity, doc 04 §2.6). */

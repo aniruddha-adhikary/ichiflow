@@ -84,26 +84,42 @@ model DecisionEvalStep extends FlowStep {
 }
 
 /**
- * A `human-task` step — raise a Task and block until resolved (doc 04 §5.2). Modelled as a `createTask`
- * activity plus an **await-signal raced by an SLA timer**: a resolution signal writes its value to `out`;
- * if the SLA fires first the task **escalates** and `onTimeout` is written instead. Time-skip makes a
- * month-long SLA verify in milliseconds.
+ * A `human-task` step — the first-party Case/Task module's manual-review primitive (doc 04 §5.2): a
+ * `createTask` activity, then an **await-signal raced by a pausable SLA timer**. Phase 3.3 adds the Case
+ * layer around it:
+ *   - **assignment-as-Decision** (§5.3): when `assignmentDecision` is set, the assignee/queue is *routed*
+ *     by evaluating that DecisionModel over `assignIn` (governed like any Decision) rather than a static
+ *     `assignee` label.
+ *   - **pausable SLA** (§5.7): a `pause` signal (task enters `awaiting-applicant`) stops the SLA clock and
+ *     a `resume` signal restarts it; the paused interval is excluded from SLA accounting and recorded as
+ *     distinct clock-stop events. Time-skip makes a month-long budget verify in milliseconds.
+ *   - **escalation** (§5.2): if the budget is exhausted before resolution, the task **escalates** to
+ *     `escalationQueue` (supervisor) and `onTimeout` is written to `out` as the auto-decide fallback.
  */
 model HumanTaskStep extends FlowStep {
   type: "human-task";
 
-  /** Optional assignee/queue hint (assignment-as-Decision is Phase 3.3; here it is a passthrough label). */
+  /** Static assignee/queue label; the fallback when no `assignmentDecision` routes the Task (§5.3). */
   assignee?: string;
 
-  /** SLA in milliseconds; when it elapses before a resolution signal, the task escalates. */
+  /** DecisionModel that routes the assignee/queue — "assignment routing is itself a Decision" (§5.3). */
+  assignmentDecision?: string;
+
+  /** Blackboard variables passed, in order, to the assignment Decision. */
+  assignIn?: string[];
+
+  /** Pausable SLA budget in milliseconds (§5.7); paused intervals are excluded from this accounting. */
   @minValue(0)
   slaMs: int64;
 
-  /** Blackboard variable the resolution (or `onTimeout`) value is written to. */
+  /** Blackboard variable the resolution (or escalation `onTimeout`) value is written to. */
   out: string;
 
-  /** Value written to `out` when the SLA fires before a resolution signal (the escalation path). */
+  /** Auto-decide fallback value written to `out` when the SLA budget is exhausted (the escalation path, §5.2). */
   onTimeout: float64;
+
+  /** Supervisor queue the Task escalates to on SLA expiry; defaults to `supervisor` (§5.2 escalation chain). */
+  escalationQueue?: string;
 }
 
 /** A `timer` / SLA step — a durable wait. A Temporal timer; deterministic in the interpreter, fast-forwarded under time-skip (doc 04 §2.3). */
@@ -119,6 +135,18 @@ model TimerStep extends FlowStep {
 model FlowInput {
   /** The initial blackboard: variable name → numeric value. */
   vars: Record<float64>;
+}
+
+/** The action a scripted signal performs against a `human-task` step (doc 04 §5.2, §5.7). */
+union SignalAction {
+  /** Resolve the Task with `value` (the reviewer's outcome). */
+  resolve: "resolve",
+
+  /** Enter `awaiting-applicant` — pause (clock-stop) the SLA (§5.7). */
+  pause: "pause",
+
+  /** Leave `awaiting-applicant` — resume the SLA clock (§5.7). */
+  resume: "resume",
 }
 
 /**
@@ -137,17 +165,20 @@ model Flow {
   steps: (ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep)[];
 }
 
-/** A scripted resolution signal a conformance vector delivers to a `human-task` step (correlated by `stepId`). */
+/** A scripted signal a conformance vector delivers to a `human-task` step (correlated by `stepId`, doc 04 §5.2/§5.7). */
 model FlowSignal {
   /** Test-clock offset (ms from flow start) at which the signal is delivered. */
   @minValue(0)
   afterMs: int64;
 
-  /** The `human-task` step id this signal resolves. */
+  /** The `human-task` step id this signal targets. */
   stepId: string;
 
-  /** The resolution value written to the step's `out` variable. */
-  value: float64;
+  /** What the signal does: `resolve` (default), or `pause`/`resume` the pausable SLA clock (§5.7). */
+  action?: SignalAction;
+
+  /** The resolution value written to the step's `out` variable (required for `resolve`; ignored for pause/resume). */
+  value?: float64;
 }
 
 /**
@@ -178,4 +209,7 @@ model FlowExpectation {
 
   /** Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks). */
   slaMs: int64;
+
+  /** Optional pinned Case/Task **event-history** type sequence (doc 04 §5.1/§5.2), e.g. `["case.created", "task.created", …]`. */
+  events?: string[];
 }

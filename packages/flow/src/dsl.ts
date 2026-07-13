@@ -26,11 +26,19 @@ export interface DecisionEvalStep {
 export interface HumanTaskStep {
   id: string;
   type: "human-task";
+  /** Static assignee/queue; fallback when no `assignmentDecision` routes the Task (doc 04 §5.3). */
   assignee?: string;
+  /** DecisionModel routing the assignee/queue — assignment-as-Decision (§5.3). */
+  assignmentDecision?: string;
+  /** Blackboard vars fed, in order, to the assignment Decision. */
+  assignIn?: string[];
+  /** Pausable SLA budget (ms); paused intervals are excluded from accounting (§5.7). */
   slaMs: number;
   out: string;
-  /** Written to `out` when the SLA fires before a resolution signal (escalation path). */
+  /** Auto-decide fallback written to `out` when the SLA budget is exhausted (escalation, §5.2). */
   onTimeout: number;
+  /** Supervisor queue the Task escalates to on SLA expiry; defaults to `supervisor` (§5.2). */
+  escalationQueue?: string;
 }
 
 export interface TimerStep {
@@ -48,17 +56,24 @@ export interface Flow {
   steps: FlowStep[];
 }
 
-/** A scripted resolution signal delivered to a `human-task` step during interpretation (correlated by `stepId`). */
+/** What a scripted signal does to a `human-task` step (doc 04 §5.2/§5.7). */
+export type SignalAction = "resolve" | "pause" | "resume";
+
+/** A scripted signal delivered to a `human-task` step during interpretation (correlated by `stepId`). */
 export interface FlowSignal {
   afterMs: number;
   stepId: string;
-  value: number;
+  /** `resolve` (default), or `pause`/`resume` the pausable SLA clock (§5.7). */
+  action?: SignalAction;
+  /** Resolution value (required for `resolve`; ignored for pause/resume). */
+  value?: number;
 }
 
-/** A conformance vector — a DSL-valid Flow (+ optional resolution signals) paired with the final blackboard it must produce. */
+/** A conformance vector — a DSL-valid Flow (+ optional signals) paired with the observations it must produce. */
 export interface FlowConformanceVector {
   name: string;
   flow: Flow;
   signals?: FlowSignal[];
-  expect: { vars: Vars; steps: number; slaMs: number };
+  /** `events` optionally pins the Case/Task event-history type sequence (§5.1/§5.2). */
+  expect: { vars: Vars; steps: number; slaMs: number; events?: string[] };
 }

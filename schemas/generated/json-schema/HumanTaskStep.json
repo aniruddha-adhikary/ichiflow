@@ -9,20 +9,35 @@
         },
         "assignee": {
             "type": "string",
-            "description": "Optional assignee/queue hint (assignment-as-Decision is Phase 3.3; here it is a passthrough label)."
+            "description": "Static assignee/queue label; the fallback when no `assignmentDecision` routes the Task (§5.3)."
+        },
+        "assignmentDecision": {
+            "type": "string",
+            "description": "DecisionModel that routes the assignee/queue — \"assignment routing is itself a Decision\" (§5.3)."
+        },
+        "assignIn": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Blackboard variables passed, in order, to the assignment Decision."
         },
         "slaMs": {
             "type": "integer",
             "minimum": 0,
-            "description": "SLA in milliseconds; when it elapses before a resolution signal, the task escalates."
+            "description": "Pausable SLA budget in milliseconds (§5.7); paused intervals are excluded from this accounting."
         },
         "out": {
             "type": "string",
-            "description": "Blackboard variable the resolution (or `onTimeout`) value is written to."
+            "description": "Blackboard variable the resolution (or escalation `onTimeout`) value is written to."
         },
         "onTimeout": {
             "type": "number",
-            "description": "Value written to `out` when the SLA fires before a resolution signal (the escalation path)."
+            "description": "Auto-decide fallback value written to `out` when the SLA budget is exhausted (the escalation path, §5.2)."
+        },
+        "escalationQueue": {
+            "type": "string",
+            "description": "Supervisor queue the Task escalates to on SLA expiry; defaults to `supervisor` (§5.2 escalation chain)."
         }
     },
     "required": [
@@ -36,5 +51,5 @@
             "$ref": "FlowStep.json"
         }
     ],
-    "description": "A `human-task` step — raise a Task and block until resolved (doc 04 §5.2). Modelled as a `createTask`\nactivity plus an **await-signal raced by an SLA timer**: a resolution signal writes its value to `out`;\nif the SLA fires first the task **escalates** and `onTimeout` is written instead. Time-skip makes a\nmonth-long SLA verify in milliseconds."
+    "description": "A `human-task` step — the first-party Case/Task module's manual-review primitive (doc 04 §5.2): a\n`createTask` activity, then an **await-signal raced by a pausable SLA timer**. Phase 3.3 adds the Case\nlayer around it:\n- **assignment-as-Decision** (§5.3): when `assignmentDecision` is set, the assignee/queue is *routed*\nby evaluating that DecisionModel over `assignIn` (governed like any Decision) rather than a static\n`assignee` label.\n- **pausable SLA** (§5.7): a `pause` signal (task enters `awaiting-applicant`) stops the SLA clock and\na `resume` signal restarts it; the paused interval is excluded from SLA accounting and recorded as\ndistinct clock-stop events. Time-skip makes a month-long budget verify in milliseconds.\n- **escalation** (§5.2): if the budget is exhausted before resolution, the task **escalates** to\n`escalationQueue` (supervisor) and `onTimeout` is written to `out` as the auto-decide fallback."
 }

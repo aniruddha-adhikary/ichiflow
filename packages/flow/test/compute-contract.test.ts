@@ -38,4 +38,11 @@ describe("Phase 3.2 — code-activity contract (purity + boundary)", () => {
     expect(runDecision("threshold-approval", [10])).toEqual({ outcomeType: "DECLINE", value: 0 });
     expect(() => runDecision("nope", [1])).toThrow(/unknown decision/);
   });
+
+  it("routes a human-task assignee as a Decision — the outcome IS the queue (§5.3)", () => {
+    // "assignment routing is itself a Decision": the outcomeType a human-task's assignmentDecision
+    // yields is the routed assignee/queue the interpreter records on task.assigned.
+    expect(runDecision("assignment-by-amount", [1500]).outcomeType).toBe("underwriting-tier2");
+    expect(runDecision("assignment-by-amount", [200]).outcomeType).toBe("underwriting-tier1");
+  });
 });

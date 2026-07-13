@@ -1,0 +1,26 @@
+{
+  "name": "human-task routed by an assignment Decision (§5.3) then resolved — Case/Task event history pinned",
+  "flow": {
+    "id": "case-assignment",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "amount": 1500 } },
+    "steps": [
+      {
+        "id": "review",
+        "type": "human-task",
+        "assignmentDecision": "assignment-by-amount",
+        "assignIn": ["amount"],
+        "slaMs": 2592000000,
+        "out": "decision",
+        "onTimeout": -1
+      }
+    ]
+  },
+  "signals": [{ "afterMs": 1000, "stepId": "review", "action": "resolve", "value": 1 }],
+  "expect": {
+    "vars": { "amount": 1500, "decision": 1 },
+    "steps": 1,
+    "slaMs": 0,
+    "events": ["case.created", "task.created", "task.assigned", "task.resolved", "case.resolved"]
+  }
+}

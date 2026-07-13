@@ -1,0 +1,25 @@
+{
+  "name": "escalation chain (§5.2) — the 3-day SLA budget is exhausted with no resolution, so the Task escalates to a supervisor queue and auto-decides onTimeout",
+  "flow": {
+    "id": "case-escalation",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "x": 0 } },
+    "steps": [
+      {
+        "id": "review",
+        "type": "human-task",
+        "assignee": "ops-queue",
+        "slaMs": 259200000,
+        "out": "approved",
+        "onTimeout": 42,
+        "escalationQueue": "supervisor-tier3"
+      }
+    ]
+  },
+  "expect": {
+    "vars": { "x": 0, "approved": 42 },
+    "steps": 1,
+    "slaMs": 259200000,
+    "events": ["case.created", "task.created", "task.assigned", "task.escalated", "case.resolved"]
+  }
+}

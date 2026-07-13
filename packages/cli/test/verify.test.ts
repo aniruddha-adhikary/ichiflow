@@ -950,6 +950,10 @@ describe("flow-layer scope (Phase 3.2)", () => {
     slaMatch: true,
     traceStepIds: ["s1", "s2", "s3"],
     traceComplete: true,
+    caseId: "conformance-vec-a",
+    events: ["case.created", "case.resolved"],
+    expectedEvents: null,
+    eventsMatch: true,
     replays: [
       { attempt: 1, ok: true, error: null },
       { attempt: 2, ok: true, error: null },
@@ -1068,6 +1072,45 @@ describe("flow-layer scope (Phase 3.2)", () => {
       expect(failed).toContain("flow-layer.determinism.vec-a");
       expect(failed).toContain("flow-layer.vectors-green");
       expect(failed).toContain("flow-layer.determinism-clean");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a vector whose Case/Task event history diverges from the pinned sequence (§5.2)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...conformance,
+          vectorsGreen: 0,
+          vectors: [
+            {
+              ...outcome,
+              expectedEvents: ["case.created", "task.created", "task.resolved", "case.resolved"],
+              events: ["case.created", "task.created", "task.escalated", "case.resolved"],
+              eventsMatch: false,
+            },
+          ],
+        },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("flow-layer.vector.vec-a");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a vector with an empty case_id (a Case must carry a global case_id, §5.1)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: { ...conformance, vectors: [{ ...outcome, caseId: "" }] },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const caseId = checks.find((c) => c.id === "flow-layer.case-id.vec-a")!;
+      expect(caseId.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

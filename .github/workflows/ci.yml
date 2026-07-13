@@ -97,7 +97,7 @@ jobs:
       - name: Flow layer — interpreter determinism spike (Temporal time-skip, chunk 3.0)
         run: pnpm interpreter:spike
 
-      - name: Flow layer — core step-type conformance vectors (compute/decision-eval/human-task/timer, Temporal time-skip, chunk 3.1–3.2)
+      - name: Flow layer — core step-type + Case/Task conformance vectors (compute/decision-eval/human-task w/ assignment-as-Decision·pausable-SLA·escalation/timer, Temporal time-skip, chunk 3.1–3.3)
         run: pnpm flow:conformance
 
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
