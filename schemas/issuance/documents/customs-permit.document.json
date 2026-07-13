@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "document/v1",
+  "id": "document:case-53:issue-permit",
+  "caseId": "case-53",
+  "stepId": "issue-permit",
+  "documentType": "customs-permit",
+  "version": "1.0.0",
+  "snapshot": {
+    "applicant": { "fullName": "Ada Applicant" },
+    "outcome": { "amount": 1250 },
+    "issue": { "referenceNumber": "CCP-000001" }
+  },
+  "snapshotRef": "fd5da9ba2a76d7c4cfb70fb4ec50a3f422a4ff57e9ea33415009dba3426b0245",
+  "template": { "id": "customs-permit", "version": "1.0.0" },
+  "referenceNumber": "CCP-000001",
+  "numberAllocation": "allocation://customs/clearance-permit",
+  "status": "issued",
+  "issuedAt": "2030-01-01T00:00:00Z",
+  "verificationHash": "c4d769f9f15f7a5f24851a89159266ac706febd379322826d651196edbc0fe91",
+  "renderHash": "57e3983752915fe6883caee730dd03623f4274e8b3f09478a24569578254401a",
+  "deliveries": [{ "portal": "customer" }]
+}

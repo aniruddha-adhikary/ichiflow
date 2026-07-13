@@ -1,0 +1,13 @@
+{
+  "name": "tampered hash is rejected",
+  "scenario": "tampered",
+  "reference": "$issued",
+  "presentedHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "expect": {
+    "authentic": false,
+    "hashMatch": false,
+    "status": "issued",
+    "rejected": true,
+    "dataMinimal": true
+  }
+}

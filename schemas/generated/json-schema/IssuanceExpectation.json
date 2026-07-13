@@ -1,0 +1,40 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssuanceExpectation.json",
+    "type": "object",
+    "properties": {
+        "documents": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "allocations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "issuedEvents": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "deliveredEvents": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "status": {
+            "$ref": "DocumentLifecycleStatus.json"
+        },
+        "replayIdempotent": {
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "documents",
+        "allocations",
+        "issuedEvents",
+        "deliveredEvents",
+        "status"
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "VerificationExpectation.json",
+    "type": "object",
+    "properties": {
+        "authentic": {
+            "type": "boolean"
+        },
+        "hashMatch": {
+            "type": "boolean"
+        },
+        "status": {
+            "$ref": "DocumentLifecycleStatus.json"
+        },
+        "rejected": {
+            "type": "boolean"
+        },
+        "dataMinimal": {
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "authentic",
+        "hashMatch",
+        "rejected",
+        "dataMinimal"
+    ]
+}

@@ -17,6 +17,7 @@ import { authzScope } from "./scopes/authz.js";
 import { uiScope } from "./scopes/ui.js";
 import { portalScope } from "./scopes/portal.js";
 import { adaptersScope } from "./scopes/adapters.js";
+import { issuanceScope } from "./scopes/issuance.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
 
@@ -44,6 +45,7 @@ const SCOPES: Scope[] = [
   uiScope,
   portalScope,
   adaptersScope,
+  issuanceScope,
   codeQualityScope,
 ];
 

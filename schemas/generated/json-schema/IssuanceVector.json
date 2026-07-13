@@ -1,0 +1,69 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "IssuanceVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "scenario": {
+            "$ref": "IssuanceScenario.json"
+        },
+        "caseId": {
+            "type": "string"
+        },
+        "stepId": {
+            "type": "string"
+        },
+        "documentType": {
+            "type": "string"
+        },
+        "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "template": {
+            "type": "string"
+        },
+        "snapshot": {
+            "$ref": "#/$defs/RecordUnknown"
+        },
+        "allocation": {
+            "$ref": "NumberAllocationContract.json"
+        },
+        "acceptance": {
+            "$ref": "AcceptanceMode.json"
+        },
+        "delivery": {
+            "type": "array",
+            "items": {
+                "$ref": "DocumentDelivery.json"
+            }
+        },
+        "expect": {
+            "$ref": "IssuanceExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "scenario",
+        "caseId",
+        "stepId",
+        "documentType",
+        "issuedAt",
+        "template",
+        "snapshot",
+        "allocation",
+        "acceptance",
+        "delivery",
+        "expect"
+    ],
+    "description": "Lifecycle/replay harness vector; the implementation drives the named scenario to this oracle.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

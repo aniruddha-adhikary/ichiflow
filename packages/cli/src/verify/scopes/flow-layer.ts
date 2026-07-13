@@ -44,6 +44,10 @@ interface VectorOutcome {
   replays: ReplayOutcome[];
   replayClean: boolean;
   fastForwarded: boolean;
+  delegation: boolean;
+  correlations: { stepId: string; correlationId: string }[];
+  expectedCorrelations: { stepId: string; correlationId: string }[] | null;
+  correlationsMatch: boolean;
 }
 
 interface ConformanceResult {
@@ -51,6 +55,8 @@ interface ConformanceResult {
   sdkVersion: string;
   vectors: VectorOutcome[];
   vectorsGreen: number;
+  delegationVectorsGreen: number;
+  delegationVectorsTotal: number;
   determinismClean: boolean;
 }
 
@@ -75,8 +81,11 @@ function buildAjv(): Ajv2020 {
  * the pinned Case/Task **event history** (§5.1/§5.2) where declared, keyed by a non-empty `case_id` +
  * timer fast-forward) and its history replays twice with no non-determinism violation. Phase 3.3
  * vectors exercise assignment-as-Decision (§5.3), the pausable SLA clock (§5.7), and the escalation
- * chain (§5.2) under time-skip. The DSL check runs in-process (deterministic); the interpreter run is
- * captured by `${PRODUCER}` into the verdict artifact this scope reads.
+ * chain (§5.2) under time-skip. Phase 5.2 adds the `external-task` **delegation** vectors (doc 04 §2.8,
+ * doc 13 §2.c): submit / response / timeout / dup-response (Idempotent Receiver) / malformed (DLQ + Case
+ * surfacing, not a stuck flow), each pinning its injected correlation id (doc 05 §11.1) and asserted as a
+ * family via `delegation_vectors_green == total`. The DSL check runs in-process (deterministic); the
+ * interpreter run is captured by `${PRODUCER}` into the verdict artifact this scope reads.
  */
 export const flowLayerScope: Scope = {
   id: "flow-layer",
@@ -167,10 +176,11 @@ export const flowLayerScope: Scope = {
             v.slaMatch &&
             v.traceComplete &&
             v.eventsMatch &&
+            v.correlationsMatch &&
             v.fastForwarded,
           {
-            expected: `vars=${JSON.stringify(v.expectedVars)}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, complete trace, events=${JSON.stringify(v.expectedEvents)}, fast-forwarded`,
-            actual: `vars=${JSON.stringify(v.vars)}, steps=${v.steps}, slaMs=${v.slaMs}, traceComplete=${v.traceComplete}, events=${JSON.stringify(v.events)}, eventsMatch=${v.eventsMatch}, fastForwarded=${v.fastForwarded}`,
+            expected: `vars=${JSON.stringify(v.expectedVars)}, steps=${v.expectedSteps}, slaMs=${v.expectedSlaMs}, complete trace, events=${JSON.stringify(v.expectedEvents)}, correlations=${JSON.stringify(v.expectedCorrelations)}, fast-forwarded`,
+            actual: `vars=${JSON.stringify(v.vars)}, steps=${v.steps}, slaMs=${v.slaMs}, traceComplete=${v.traceComplete}, events=${JSON.stringify(v.events)}, eventsMatch=${v.eventsMatch}, correlations=${JSON.stringify(v.correlations)}, correlationsMatch=${v.correlationsMatch}, fastForwarded=${v.fastForwarded}`,
           },
         ),
       );
@@ -207,6 +217,16 @@ export const flowLayerScope: Scope = {
       metric: "vectors_green",
       value: r.vectorsGreen,
       threshold: r.vectors.length,
+    });
+
+    // Phase 5.2 delegation gate (doc 13 §2.c): every `external-task` vector in the family — submit /
+    // response / timeout / dup-response / malformed — must hit its full oracle (mirrors vectors-green).
+    checks.push({
+      id: "flow-layer.delegation-vectors-green",
+      status: r.delegationVectorsGreen === r.delegationVectorsTotal ? "pass" : "fail",
+      metric: "delegation_vectors_green",
+      value: r.delegationVectorsGreen,
+      threshold: r.delegationVectorsTotal,
     });
 
     checks.push(

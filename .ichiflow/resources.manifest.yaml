@@ -191,15 +191,15 @@ resources:
   - id: flow-dsl
     kind: schema
     path: schemas/flow.tsp
-    description: Canonical Flow DSL (build plan 3.1–3.3, ADR-0004/0005, doc 04 §2/§5) — the schema-validated flow-JSON document the generic interpreter walks over a named-variable blackboard. Closed core step set (compute via a versioned code-activity ref, decision-eval, human-task with assignment-as-Decision + pausable SLA + escalation, timer). TypeSpec authoring; emitted JSON Schema is the contract of record.
+    description: Canonical Flow DSL (build plan 3.1–3.3 + 5.2, ADR-0004/0005/0028, doc 04 §2/§5/§2.8) — the schema-validated flow-JSON document the generic interpreter walks over a named-variable blackboard. Core step set (compute via a versioned code-activity ref, decision-eval, human-task with assignment-as-Decision + pausable SLA + escalation, timer, and external-task delegation — outbound-Adapter submit + correlated inbound reply + pausable SLA/escalation, doc 05 §11.1). TypeSpec authoring; emitted JSON Schema is the contract of record.
   - id: flow-conformance-vectors
     kind: pattern
     path: schemas/flow/vectors
-    description: Flow conformance vectors (build plan 3.1–3.3) — DSL-valid Flow documents (+ scripted resolve/pause/resume signals) paired with the final blackboard, step trace, scheduled SLA, and pinned Case/Task event history the interpreter must produce; run by `pnpm flow:conformance` for vectors_green/total + replay determinism under time-skip.
+    description: Flow conformance vectors (build plan 3.1–3.3 + 5.2) — DSL-valid Flow documents (+ scripted resolve/pause/resume signals and external-task correlated replies) paired with the final blackboard, step trace, scheduled SLA, pinned Case/Task event history, and injected correlation ids the interpreter must produce; includes the delegation family (submit/response/timeout/dup-response/malformed). Run by `pnpm flow:conformance` for vectors_green/total + delegation_vectors_green/total + replay determinism under time-skip.
   - id: flow-layer
     kind: harness
     path: packages/cli/src/verify/scopes/flow-layer.ts
-    description: Flow interpreter + Case/Task conformance gate (build plan 3.1–3.3) — committed vectors are DSL-valid and each interprets to its pinned oracle (blackboard, steps, SLA, complete step trace, Case/Task event history keyed by case_id) with clean replay determinism under time-skip, across compute/decision-eval/human-task (assignment-as-Decision, pausable SLA, escalation)/timer. Also asserts real-source DecisionRecord completeness — every vector stitches into a gap-free causal chain (orphan detector clean). Consumes the artifact from `pnpm flow:conformance`.
+    description: Flow interpreter + Case/Task conformance gate (build plan 3.1–3.3 + 5.2) — committed vectors are DSL-valid and each interprets to its pinned oracle (blackboard, steps, SLA, complete step trace, Case/Task event history + injected correlation ids keyed by case_id) with clean replay determinism under time-skip, across compute/decision-eval/human-task (assignment-as-Decision, pausable SLA, escalation)/timer/external-task. Also asserts real-source DecisionRecord completeness — every vector stitches into a gap-free causal chain (orphan detector clean) — and the Phase 5.2 delegation family as a gate (delegation_vectors_green == total — submit/response/timeout/dup-response/malformed, mock adapter, no live system). Consumes the artifact from `pnpm flow:conformance`.
   - id: decisionrecord-schema
     kind: schema
     path: schemas/decisionrecord.tsp
@@ -288,3 +288,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/adapters.ts
     description: Adapter-layer gate (build plan 5.1, doc 05, doc 13 §2.d) — every committed Port/Mapping/golden/reliability fixture is schema-valid and every canonical output validates against CanonicalEnvelope (contract tests); each pure Message-Translator mapping reproduces its golden and every v1 binding (REST/broker/webhook) round-trips decode ∘ translate to the same canonical event (mapping goldens); and the reliability vectors hold — dedup passes, dlq passes, redelivery applies once — all against mocks (no live external system). Consumes the artifact from `pnpm adapters:preview`.
+  - id: document-schema
+    kind: schema
+    path: schemas/document.tsp
+    description: Canonical Document-issuance contracts (build plan 5.3, ADR-0029, doc 04 §2.9, doc 07 §15) — immutable/versioned Document + doctemplate, pinned snapshot/template/reference/hash, issued/superseded/revoked/accepted lifecycle, allocation contract, and issuance/public-verification vector DSLs. TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: issuance-fixtures
+    kind: pattern
+    path: schemas/issuance
+    description: Committed doctemplate, issued-Document, lifecycle/replay, and public-verification fixtures (build plan 5.3, harness-first, doc 13 §2.c/§2.k) — deterministic render, one allocation/issued event on replay, supersede/revoke/offer-accept, genuine/tampered/unknown verification, binding-scope, accessibility, and gap-free/gapped allocation coverage. Replayed by `pnpm issuance:preview`.
+  - id: issuance
+    kind: harness
+    path: packages/cli/src/verify/scopes/issuance.ts
+    description: Document-issuance gate (build plan 5.3, doc 13 §2.k) — fixtures validate against emitted contracts; the self-contained Typst-default SPI renders normalized-identical bytes and passes binding-scope/PDF-UA/contrast checks; numbering is exactly-once-memoized by (case_id, step.id); lifecycle transitions are audited; replay never double-consumes or double-issues; and public verification is status/hash-correct and data-minimal. Consumes the artifact from `pnpm issuance:preview`.

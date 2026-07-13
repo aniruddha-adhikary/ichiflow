@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentDecisionRecordEventType.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "document.allocated"
+        },
+        {
+            "type": "string",
+            "const": "document.issued"
+        },
+        {
+            "type": "string",
+            "const": "document.delivered"
+        },
+        {
+            "type": "string",
+            "const": "document.superseded"
+        },
+        {
+            "type": "string",
+            "const": "document.revoked"
+        },
+        {
+            "type": "string",
+            "const": "document.accepted"
+        }
+    ]
+}

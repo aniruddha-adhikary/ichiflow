@@ -1,0 +1,40 @@
+{
+  "name": "offer issue-document awaits acceptance under time-skip",
+  "flow": {
+    "id": "issue-document-offer",
+    "schemaVersion": "flow/v1",
+    "input": { "vars": { "amount": 5000 } },
+    "steps": [
+      {
+        "id": "issue-offer",
+        "type": "issue-document",
+        "template": "grant-offer@1.0.0",
+        "binding": { "amount": "amount" },
+        "numberAllocation": "allocation://grants/offer",
+        "lifecycle": { "acceptance": "offer", "slaMs": 2592000000 },
+        "verification": { "endpoint": "public", "hash": "sha256" },
+        "delivery": [{ "portal": "applicant" }]
+      }
+    ]
+  },
+  "signals": [
+    {
+      "afterMs": 259200000,
+      "stepId": "issue-offer",
+      "action": "accept"
+    }
+  ],
+  "expect": {
+    "vars": { "amount": 5000 },
+    "steps": 1,
+    "slaMs": 2592000000,
+    "events": [
+      "case.created",
+      "document.allocated",
+      "document.issued",
+      "document.delivered",
+      "document.accepted",
+      "case.resolved"
+    ]
+  }
+}

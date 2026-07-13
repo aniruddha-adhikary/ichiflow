@@ -1,0 +1,32 @@
+{
+  "name": "replay does not allocate or issue twice",
+  "scenario": "replay",
+  "caseId": "case-replay",
+  "stepId": "issue-permit",
+  "documentType": "customs-permit",
+  "issuedAt": "2030-01-01T00:00:00Z",
+  "template": "customs-permit@1.0.0",
+  "snapshot": {
+    "applicant": { "fullName": "Replay Holder" },
+    "outcome": { "amount": 500 },
+    "issue": { "referenceNumber": "CCP-000001" }
+  },
+  "allocation": {
+    "id": "allocation://customs/replay",
+    "version": "1.0.0",
+    "semantics": "gap-free",
+    "prefix": "RPL-",
+    "width": 6,
+    "startsAt": 1
+  },
+  "acceptance": "none",
+  "delivery": [{ "portal": "customer" }],
+  "expect": {
+    "documents": 1,
+    "allocations": 1,
+    "issuedEvents": 1,
+    "deliveredEvents": 1,
+    "status": "issued",
+    "replayIdempotent": true
+  }
+}

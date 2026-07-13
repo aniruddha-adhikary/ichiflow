@@ -28,6 +28,12 @@
                     },
                     {
                         "$ref": "TimerStep.json"
+                    },
+                    {
+                        "$ref": "IssueDocumentStep.json"
+                    },
+                    {
+                        "$ref": "ExternalTaskStep.json"
                     }
                 ]
             },

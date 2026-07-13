@@ -20,11 +20,23 @@
         "assignee": {
             "type": "string",
             "description": "The routed assignee/queue (on `task.assigned`) or escalation queue (on `task.escalated`)."
+        },
+        "referenceNumber": {
+            "type": "string",
+            "description": "Allocated Document reference for issuance lifecycle events."
+        },
+        "documentStatus": {
+            "type": "string",
+            "description": "Current Document status on issuance lifecycle events."
+        },
+        "verificationHash": {
+            "type": "string",
+            "description": "Document verification identity on issuance lifecycle events."
         }
     },
     "required": [
         "seq",
         "type"
     ],
-    "description": "One ordered **Case/Task event** (doc 04 §5.1/§5.2) — the flow event history the DecisionRecord\nstitches by `case_id`: `case.created`, `task.created`/`task.assigned`, `sla.paused`/`sla.resumed`,\n`task.resolved`/`task.escalated`, `case.resolved`."
+    "description": "One ordered **Case/Task event** (doc 04 §5.1/§5.2) — the flow event history the DecisionRecord\nstitches by `case_id`: `case.created`, `task.created`/`task.assigned`, `sla.paused`/`sla.resumed`,\n`task.resolved`/`task.escalated`, the delegation events `external.submitted`/`external.responded`/\n`external.deduped`/`external.dlq`/`case.flagged`/`external.timeout`/`external.escalated` (doc 04 §2.8),\nand `case.resolved`."
 }

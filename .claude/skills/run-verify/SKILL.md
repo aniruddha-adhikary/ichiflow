@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `ui`, `portal`, `adapters`, `issuance`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -90,8 +90,14 @@ signals), and an **escalation** chain, `timer`) — hits its independently-pinne
 blackboard/steps/SLA + a complete per-step trace + the pinned Case/Task **event history** keyed by
 `case_id` + timer fast-forward) with clean replay determinism under time-skip (`vectors_green ==
 total`). It also asserts **real-source DecisionRecord completeness** — every vector's assembled record
-stitches into a gap-free chain (orphan detector clean). The DSL check runs in-process; run
-`pnpm flow:conformance` before `pnpm verify` to produce
+stitches into a gap-free chain (orphan detector clean). Phase 5.2 adds the `external-task`
+**delegation** step (doc 04 §2.8): submit through a mock outbound Adapter (reusing the 5.1
+`packages/adapters` Idempotent-Receiver/DLQ machinery, no live system), inject a deterministic
+correlation id (doc 05 §11.1), then await a correlated reply against the same pausable SLA +
+escalation. The committed delegation family — submit / response / timeout (time-skip) / dup-response
+(deduped once) / malformed (→ DLQ + Case surfacing, never a stuck flow) — pins each vector's injected
+correlation id and is gated as a family (`delegation_vectors_green == total`). The DSL check runs
+in-process; run `pnpm flow:conformance` before `pnpm verify` to produce
 `packages/flow/build/flow-conformance-results.json`.
 
 `decisionrecord` is the Phase 3.4 gate (ADR-0011, doc 08 §1, doc 13 §2.g): the per-Case
@@ -182,3 +188,15 @@ event; and **idempotency/DLQ vectors** — a duplicate `messageId` is deduped on
 a poison message lands in the DLQ after bounded attempts, and a crash redelivery applies once
 (`dedup: pass`, `dlq: pass`). Deterministic (committed fixtures, no wall-clock/RNG), so run
 `pnpm adapters:preview` before `pnpm verify` to produce `packages/adapters/build/adapters-results.json`.
+
+`issuance` is the Phase 5.3 gate (ADR-0029, doc 04 §2.9, doc 07 §15, doc 13 §2.c/§2.k):
+the canonical immutable/versioned `Document` + `doctemplate` contracts and committed issuance/public-
+verification fixtures (`schemas/issuance/`) validate against emitted JSON Schema; the rendering SPI's
+self-contained Typst-default binding emits normalized-identical bytes across two runs and passes
+binding-scope + PDF/UA/contrast checks; number allocation is exactly-once-memoized by
+`(case_id, step.id)` with gap-free/gapped vector coverage; issued→superseded/revoked/accepted
+transitions emit audit events; replay cannot allocate or emit `issued` twice; and genuine,
+tampered-hash, and unknown-reference verification vectors return a data-minimal status/hash verdict
+without Case data. The flow-layer vectors also prove `issue-document` allocate→render→issue→deliver
+and offer acceptance under Temporal time-skip. Run `pnpm issuance:preview` before `pnpm verify` to
+produce `packages/issuance/build/issuance-results.json`.

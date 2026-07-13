@@ -8,7 +8,7 @@ export interface DecisionRecordDecision {
   value: number;
 }
 
-/** A Task resolution stitched into the chain (doc 04 §5.2) — a `human-task` outcome + attribution. */
+/** A Task resolution stitched into the chain (doc 04 §5.2) — a `human-task` / `external-task` outcome + attribution. */
 export interface DecisionRecordTask {
   stepId: string;
   assignee: string;
@@ -30,15 +30,33 @@ export interface DecisionRecord {
   chainComplete: boolean;
 }
 
-/** Task-lifecycle events (other than `task.created`) that must correlate to an originating Task. */
+/** Events that originate a Task/delegation — the anchor a lifecycle event must correlate back to. */
+const TASK_ORIGINATED = new Set(["task.created", "external.submitted"]);
+/**
+ * Lifecycle events (other than an originating event) that must correlate to an originating Task/delegation.
+ * `external-task` (doc 04 §2.8) reuses the pausable-clock `sla.*` events and adds the delegation lifecycle:
+ * `external.responded` / `external.deduped` (Idempotent Receiver) / `external.dlq` + `case.flagged`
+ * (malformed → surfaced, not stuck) / `external.timeout` / `external.escalated`.
+ */
 const TASK_LIFECYCLE = new Set([
   "task.assigned",
   "sla.paused",
   "sla.resumed",
   "task.resolved",
   "task.escalated",
+  "external.responded",
+  "external.deduped",
+  "external.dlq",
+  "case.flagged",
+  "external.timeout",
+  "external.escalated",
 ]);
-const TASK_TERMINAL = new Set(["task.resolved", "task.escalated"]);
+const TASK_TERMINAL = new Set([
+  "task.resolved",
+  "task.escalated",
+  "external.responded",
+  "external.escalated",
+]);
 
 /**
  * Assemble the per-Case DecisionRecord (build plan 3.4; ADR-0011, doc 13 §2.g) as a **pure,
@@ -62,7 +80,7 @@ export function assembleDecisionRecord(result: FlowResult): DecisionRecord {
         outcomeType: t.outcomeType ?? "",
         value: t.value ?? 0,
       });
-    } else if (t.type === "human-task") {
+    } else if (t.type === "human-task" || t.type === "external-task") {
       tasks.push({
         stepId: t.stepId,
         assignee: t.assignee ?? "unassigned",
@@ -74,7 +92,7 @@ export function assembleDecisionRecord(result: FlowResult): DecisionRecord {
 
   const orphans: string[] = [];
   const createdSteps = new Set(
-    result.events.filter((e) => e.type === "task.created").map((e) => e.stepId),
+    result.events.filter((e) => TASK_ORIGINATED.has(e.type)).map((e) => e.stepId),
   );
   const terminalSteps = new Set(
     result.events.filter((e) => TASK_TERMINAL.has(e.type)).map((e) => e.stepId),

@@ -1,0 +1,44 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentDecisionRecordEvent.json",
+    "type": "object",
+    "properties": {
+        "seq": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+        },
+        "type": {
+            "$ref": "DocumentDecisionRecordEventType.json"
+        },
+        "caseId": {
+            "type": "string"
+        },
+        "stepId": {
+            "type": "string"
+        },
+        "referenceNumber": {
+            "type": "string"
+        },
+        "template": {
+            "type": "string"
+        },
+        "snapshotRef": {
+            "$ref": "Sha256Hash.json"
+        },
+        "verificationHash": {
+            "$ref": "Sha256Hash.json"
+        }
+    },
+    "required": [
+        "seq",
+        "type",
+        "caseId",
+        "stepId",
+        "referenceNumber",
+        "template",
+        "snapshotRef",
+        "verificationHash"
+    ],
+    "description": "Audited lifecycle fact appended to the Case DecisionRecord."
+}

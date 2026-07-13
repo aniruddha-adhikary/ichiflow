@@ -15,7 +15,7 @@
         },
         "slaMs": {
             "type": "integer",
-            "description": "Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks)."
+            "description": "Total scheduled SLA/timer duration in milliseconds across the flow (timer steps + escalated human-tasks + escalated external-tasks)."
         },
         "events": {
             "type": "array",
@@ -23,6 +23,13 @@
                 "type": "string"
             },
             "description": "Optional pinned Case/Task **event-history** type sequence (doc 04 §5.1/§5.2), e.g. `[\"case.created\", \"task.created\", …]`."
+        },
+        "correlations": {
+            "type": "array",
+            "items": {
+                "$ref": "CaseCorrelation.json"
+            },
+            "description": "Optional pinned **correlation ids injected** on each `external-task` submit (doc 04 §2.8, doc 05 §11.1) — proves the correlation contract binds the reply to the waiting instance."
         }
     },
     "required": [

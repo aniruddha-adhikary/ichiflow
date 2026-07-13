@@ -124,6 +124,9 @@ jobs:
       - name: Adapters — pure Message-Translator mapping goldens + REST/broker/webhook contract round-trips + idempotency/DLQ vectors (chunk 5.1)
         run: pnpm adapters:preview
 
+      - name: Document issuance — deterministic Typst binding + numbering/replay + lifecycle + public verification vectors (chunk 5.3)
+        run: pnpm issuance:preview
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

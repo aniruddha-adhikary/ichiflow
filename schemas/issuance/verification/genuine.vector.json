@@ -1,0 +1,12 @@
+{
+  "name": "genuine reference returns current status and matching hash",
+  "scenario": "genuine",
+  "reference": "$issued",
+  "expect": {
+    "authentic": true,
+    "hashMatch": true,
+    "status": "issued",
+    "rejected": false,
+    "dataMinimal": true
+  }
+}

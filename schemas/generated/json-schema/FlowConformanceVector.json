@@ -17,6 +17,13 @@
             },
             "description": "Resolution signals delivered to `human-task` steps during interpretation; omit to exercise the SLA-escalation path."
         },
+        "replies": {
+            "type": "array",
+            "items": {
+                "$ref": "ExternalReply.json"
+            },
+            "description": "Correlated inbound replies delivered to `external-task` steps during interpretation (doc 04 §2.8); omit to exercise the delegation timeout/escalation path."
+        },
         "expect": {
             "$ref": "FlowExpectation.json"
         }

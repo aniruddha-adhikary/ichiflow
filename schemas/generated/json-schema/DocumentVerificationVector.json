@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DocumentVerificationVector.json",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "scenario": {
+            "$ref": "VerificationScenario.json"
+        },
+        "reference": {
+            "type": "string"
+        },
+        "presentedHash": {
+            "$ref": "Sha256Hash.json"
+        },
+        "expect": {
+            "$ref": "VerificationExpectation.json"
+        }
+    },
+    "required": [
+        "name",
+        "scenario",
+        "reference",
+        "expect"
+    ],
+    "description": "Public verification vector: genuine, tampered, and unknown references, with no Case-data response."
+}

@@ -969,12 +969,30 @@ describe("flow-layer scope (Phase 3.2)", () => {
     ],
     replayClean: true,
     fastForwarded: true,
+    delegation: false,
+    correlations: [],
+    expectedCorrelations: null,
+    correlationsMatch: true,
+  };
+  const delegationOutcome = {
+    ...outcome,
+    name: "vec-d",
+    flowId: "vec-d",
+    traceStepIds: ["screen"],
+    expectedSteps: 1,
+    steps: 1,
+    delegation: true,
+    correlations: [{ stepId: "screen", correlationId: "conformance-vec-d/screen" }],
+    expectedCorrelations: [{ stepId: "screen", correlationId: "conformance-vec-d/screen" }],
+    correlationsMatch: true,
   };
   const conformance = {
     sdk: "@temporalio",
     sdkVersion: "1.11.7",
     vectors: [outcome],
     vectorsGreen: 1,
+    delegationVectorsGreen: 0,
+    delegationVectorsTotal: 0,
     determinismClean: true,
   };
   const setup = (root: string, opts: { vectors?: unknown[]; results?: unknown | null } = {}) => {
@@ -1143,6 +1161,50 @@ describe("flow-layer scope (Phase 3.2)", () => {
       const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
       const dr = checks.find((c) => c.id === "flow-layer.decisionrecord.vec-a")!;
       expect(dr.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("gates the external-task delegation family (delegation_vectors_green == total, Phase 5.2)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...conformance,
+          vectors: [outcome, delegationOutcome],
+          vectorsGreen: 2,
+          delegationVectorsGreen: 1,
+          delegationVectorsTotal: 1,
+        },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const gate = checks.find((c) => c.id === "flow-layer.delegation-vectors-green")!;
+      expect(gate.status).toBe("pass");
+      expect(gate.metric).toBe("delegation_vectors_green");
+      expect(gate.value).toBe(1);
+      expect(gate.threshold).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails the delegation gate when a delegation vector misses its correlation oracle (Phase 5.2)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-flowlayer-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...conformance,
+          vectors: [{ ...delegationOutcome, correlationsMatch: false }],
+          vectorsGreen: 0,
+          delegationVectorsGreen: 0,
+          delegationVectorsTotal: 1,
+        },
+      });
+      const checks = flowLayerScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("flow-layer.vector.vec-d");
+      expect(failed).toContain("flow-layer.delegation-vectors-green");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

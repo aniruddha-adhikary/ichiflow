@@ -1,0 +1,11 @@
+{
+  "name": "unknown reference is rejected",
+  "scenario": "unknown",
+  "reference": "UNKNOWN-999999",
+  "expect": {
+    "authentic": false,
+    "hashMatch": false,
+    "rejected": true,
+    "dataMinimal": true
+  }
+}

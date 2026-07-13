@@ -1,0 +1,31 @@
+{
+  "name": "cancellation revokes the issued document",
+  "scenario": "revoke",
+  "caseId": "case-revoke",
+  "stepId": "issue-permit",
+  "documentType": "customs-permit",
+  "issuedAt": "2030-01-01T00:00:00Z",
+  "template": "customs-permit@1.0.0",
+  "snapshot": {
+    "applicant": { "fullName": "Revoked Holder" },
+    "outcome": { "amount": 250 },
+    "issue": { "referenceNumber": "RVK-000001" }
+  },
+  "allocation": {
+    "id": "allocation://customs/revoke",
+    "version": "1.0.0",
+    "semantics": "gapped",
+    "prefix": "RVK-",
+    "width": 6,
+    "startsAt": 1
+  },
+  "acceptance": "none",
+  "delivery": [{ "portal": "customer" }],
+  "expect": {
+    "documents": 1,
+    "allocations": 1,
+    "issuedEvents": 1,
+    "deliveredEvents": 1,
+    "status": "revoked"
+  }
+}

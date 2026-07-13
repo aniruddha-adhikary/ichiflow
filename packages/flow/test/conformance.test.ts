@@ -11,7 +11,7 @@ describe("Phase 3.2–3.3 — flow-layer conformance (core step types + Case/Tas
 
   it("interprets every committed conformance vector on the time-skipping test env", async () => {
     result = await runConformance({ workflowsPath, vectors: loadVectors() });
-    expect(result.vectors.length).toBeGreaterThanOrEqual(9);
+    expect(result.vectors.length).toBeGreaterThanOrEqual(11);
   }, 120_000);
 
   it("hits each vector's pinned oracle (blackboard, steps, SLA, trace, events, fast-forward)", () => {
@@ -38,6 +38,8 @@ describe("Phase 3.2–3.3 — flow-layer conformance (core step types + Case/Tas
       "case-assignment",
       "case-pausable-sla",
       "case-escalation",
+      "issue-document",
+      "issue-document-offer",
     ]) {
       expect(ids, `vector ${id} present`).toContain(id);
     }
@@ -54,6 +56,15 @@ describe("Phase 3.2–3.3 — flow-layer conformance (core step types + Case/Tas
       "task.resolved",
       "case.resolved",
     ]);
+  });
+
+  it("issues and accepts an offer Document under time-skip", () => {
+    const issued = result.vectors.find((v) => v.flowId === "issue-document")!;
+    expect(issued.events).toContain("document.issued");
+    expect(issued.events).toContain("document.delivered");
+    const offer = result.vectors.find((v) => v.flowId === "issue-document-offer")!;
+    expect(offer.events).toContain("document.accepted");
+    expect(offer.fastForwarded).toBe(true);
   });
 
   it("assembles a complete DecisionRecord with no orphan for every real vector (3.4, doc 13 §2.g)", () => {

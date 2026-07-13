@@ -14,6 +14,8 @@
     "decisionrecord": "node dist/decisionrecord-run.js"
   },
   "dependencies": {
+    "@ichiflow/adapters": "workspace:*",
+    "@ichiflow/issuance": "workspace:*",
     "@temporalio/workflow": "1.11.7"
   },
   "devDependencies": {
