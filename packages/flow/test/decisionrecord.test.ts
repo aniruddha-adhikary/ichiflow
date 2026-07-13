@@ -15,8 +15,22 @@ describe("Phase 3.4 — DecisionRecord assembly + orphan detector", () => {
     vars: { gate: 1, signoff: 5 },
     slaMs: 0,
     trace: [
-      { stepId: "s1", type: "decision-eval", decision: "threshold-approval", out: "gate", value: 1, outcomeType: "APPROVE" },
-      { stepId: "s2", type: "human-task", out: "signoff", value: 5, resolution: "resolved", assignee: "ops-queue" },
+      {
+        stepId: "s1",
+        type: "decision-eval",
+        decision: "threshold-approval",
+        out: "gate",
+        value: 1,
+        outcomeType: "APPROVE",
+      },
+      {
+        stepId: "s2",
+        type: "human-task",
+        out: "signoff",
+        value: 5,
+        resolution: "resolved",
+        assignee: "ops-queue",
+      },
     ],
     events: [
       { seq: 0, type: "case.created" },
@@ -32,8 +46,12 @@ describe("Phase 3.4 — DecisionRecord assembly + orphan detector", () => {
     expect(r.caseId).toBe("c-1");
     expect(r.chainComplete).toBe(true);
     expect(r.orphans).toEqual([]);
-    expect(r.decisions).toEqual([{ stepId: "s1", decision: "threshold-approval", outcomeType: "APPROVE", value: 1 }]);
-    expect(r.tasks).toEqual([{ stepId: "s2", assignee: "ops-queue", resolution: "resolved", value: 5 }]);
+    expect(r.decisions).toEqual([
+      { stepId: "s1", decision: "threshold-approval", outcomeType: "APPROVE", value: 1 },
+    ]);
+    expect(r.tasks).toEqual([
+      { stepId: "s2", assignee: "ops-queue", resolution: "resolved", value: 5 },
+    ]);
     expect(r.outcome).toEqual({ gate: 1, signoff: 5 });
   });
 
@@ -47,7 +65,9 @@ describe("Phase 3.4 — DecisionRecord assembly + orphan detector", () => {
       ],
     });
     expect(r.chainComplete).toBe(false);
-    expect(r.orphans).toContain("task.resolved@seq:1 for step ghost has no originating task.created");
+    expect(r.orphans).toContain(
+      "task.resolved@seq:1 for step ghost has no originating task.created",
+    );
   });
 
   it("flags a task.created with no terminal resolution as a dangling Task", () => {

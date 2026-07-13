@@ -1126,7 +1126,11 @@ describe("flow-layer scope (Phase 3.2)", () => {
         results: {
           ...conformance,
           vectors: [
-            { ...outcome, chainComplete: false, orphans: ["task.resolved@seq:3 for step s3 has no originating task.created"] },
+            {
+              ...outcome,
+              chainComplete: false,
+              orphans: ["task.resolved@seq:3 for step s3 has no originating task.created"],
+            },
           ],
         },
       });
@@ -1149,7 +1153,14 @@ describe("decisionrecord scope (Phase 3.4)", () => {
       vars: { approved: 5 },
       slaMs: 0,
       trace: [
-        { stepId: "review", type: "human-task", out: "approved", value: 5, resolution: "resolved", assignee: "ops-queue" },
+        {
+          stepId: "review",
+          type: "human-task",
+          out: "approved",
+          value: 5,
+          resolution: "resolved",
+          assignee: "ops-queue",
+        },
       ],
       events: [
         { seq: 0, type: "case.created" },
