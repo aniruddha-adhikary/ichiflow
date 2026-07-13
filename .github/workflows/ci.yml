@@ -115,6 +115,9 @@ jobs:
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 
+      - name: UI — render PDP-state stories + axe-core AA + preview snapshots (uischema, chunk 4.5)
+        run: pnpm ui:preview
+
       - name: Portal — PDP-filtered SLA-ordered inbox + Case/review view harness (action form signals the Flow, chunk 4.4)
         run: pnpm portal:preview
 

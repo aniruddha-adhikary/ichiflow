@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DataSchemaRef.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "The `$id` of the emitted data JSON Schema this uischema targets (e.g. `LoanApplication.json`)."
+        },
+        "version": {
+            "type": "string",
+            "description": "A deterministic content digest of the target data schema (`sha256:<hex>`) — the drift signal."
+        }
+    },
+    "required": [
+        "id",
+        "version"
+    ],
+    "description": "The data schema a uischema targets, by `$id` and a content `version` (doc 07 §2 rule 2). `version`\nis a deterministic content digest (`sha256:…`) of the emitted data schema, so the harness can detect\nwhen the generated-once baseline has drifted from an evolved data schema and must be regenerated."
+}

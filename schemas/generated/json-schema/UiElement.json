@@ -1,0 +1,33 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "UiElement.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "$ref": "UiElementType.json"
+        },
+        "scope": {
+            "type": "string",
+            "description": "For a `Control`: the JSON Pointer into the data schema this control renders (doc 07 §3 lint)."
+        },
+        "label": {
+            "type": "string",
+            "description": "Human label for a `Control` or the heading of a `Group`."
+        },
+        "options": {
+            "$ref": "UiControlOptions.json",
+            "description": "Renderer options for a `Control`."
+        },
+        "elements": {
+            "type": "array",
+            "items": {
+                "$ref": "UiElement.json"
+            },
+            "description": "For a layout/group: the child elements, in render order."
+        }
+    },
+    "required": [
+        "type"
+    ],
+    "description": "One node of the JSON Forms layout tree (doc 07 §2). A layout/group node nests `elements`; a\n`Control` node binds a `scope` (a JSON Pointer into the data schema, e.g. `#/properties/amount`)\nplus an optional `label` and renderer `options`. Exactly the fields for the variant in play are set."
+}

@@ -10,3 +10,4 @@ import "./entity.tsp";
 import "./service.tsp";
 import "./entity-api.tsp";
 import "./authz.tsp";
+import "./ui.tsp";

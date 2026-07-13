@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "UiControlOptions.json",
+    "type": "object",
+    "properties": {
+        "format": {
+            "type": "string",
+            "description": "A renderer hint mirroring the data schema's `format` (e.g. `currency`), driving tester priority."
+        },
+        "readOnly": {
+            "type": "boolean",
+            "description": "Render the control read-only regardless of PDP state (a design-time affordance, doc 07 §11.2)."
+        },
+        "multi": {
+            "type": "boolean",
+            "description": "Multi-line text affordance for long string fields."
+        }
+    },
+    "description": "Renderer options on a `Control` — the small, typed subset the baseline generator emits and the\nrenderer registry (doc 07 §4) understands. Kept closed (no free-form map) so the emitted contract\nstays a stable boundary the harness can validate."
+}

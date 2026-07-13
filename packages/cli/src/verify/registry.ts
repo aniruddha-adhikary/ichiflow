@@ -14,6 +14,7 @@ import { decisionRecordScope } from "./scopes/decisionrecord.js";
 import { entityStoreScope } from "./scopes/entity-store.js";
 import { entityApiScope } from "./scopes/entity-api.js";
 import { authzScope } from "./scopes/authz.js";
+import { uiScope } from "./scopes/ui.js";
 import { portalScope } from "./scopes/portal.js";
 import { codeQualityScope } from "./scopes/code-quality.js";
 import { contractGateScope } from "./scopes/contract-gate.js";
@@ -39,6 +40,7 @@ const SCOPES: Scope[] = [
   entityStoreScope,
   entityApiScope,
   authzScope,
+  uiScope,
   portalScope,
   codeQualityScope,
 ];
