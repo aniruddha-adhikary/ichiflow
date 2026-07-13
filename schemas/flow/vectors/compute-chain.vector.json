@@ -1,0 +1,14 @@
+{
+  "name": "timer-free compute chain — double → double → inc (step ordering)",
+  "flow": {
+    "id": "compute-chain",
+    "schemaVersion": "flow/v1",
+    "input": { "value": 5 },
+    "steps": [
+      { "id": "s1", "type": "compute", "op": "double" },
+      { "id": "s2", "type": "compute", "op": "double" },
+      { "id": "s3", "type": "compute", "op": "inc" }
+    ]
+  },
+  "expect": { "result": 21, "steps": 3, "slaMs": 0 }
+}

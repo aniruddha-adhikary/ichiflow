@@ -97,6 +97,9 @@ jobs:
       - name: Flow layer — interpreter determinism spike (Temporal time-skip, chunk 3.0)
         run: pnpm interpreter:spike
 
+      - name: Flow layer — flow-JSON DSL conformance vectors (Temporal time-skip, chunk 3.1)
+        run: pnpm flow:conformance
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

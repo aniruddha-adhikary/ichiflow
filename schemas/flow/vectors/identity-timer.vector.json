@@ -1,0 +1,13 @@
+{
+  "name": "identity around a 7-day timer — value preserved across a durable wait",
+  "flow": {
+    "id": "identity-timer",
+    "schemaVersion": "flow/v1",
+    "input": { "value": 100 },
+    "steps": [
+      { "id": "s1", "type": "compute", "op": "identity" },
+      { "id": "s2", "type": "timer", "durationMs": 604800000 }
+    ]
+  },
+  "expect": { "result": 100, "steps": 2, "slaMs": 604800000 }
+}

@@ -1,0 +1,14 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FlowInput.json",
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "number"
+        }
+    },
+    "required": [
+        "value"
+    ],
+    "description": "The initial data a Flow is started with. Skeleton flows carry a single numeric accumulator the compute steps fold over."
+}

@@ -1,0 +1,38 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Flow.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Flow definition identifier."
+        },
+        "schemaVersion": {
+            "$ref": "FlowSchemaVersion.json"
+        },
+        "input": {
+            "$ref": "FlowInput.json"
+        },
+        "steps": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "$ref": "ComputeStep.json"
+                    },
+                    {
+                        "$ref": "TimerStep.json"
+                    }
+                ]
+            },
+            "minItems": 1
+        }
+    },
+    "required": [
+        "id",
+        "schemaVersion",
+        "input",
+        "steps"
+    ],
+    "description": "A canonical Flow document (doc 04 §2). Ordered `steps` are walked in sequence by the generic\ninterpreter; the closed step set is what makes deterministic replay tractable."
+}

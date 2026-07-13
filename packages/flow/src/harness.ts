@@ -1,8 +1,9 @@
 import { createRequire } from "node:module";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
-import { DefaultLogger, Runtime, Worker } from "@temporalio/worker";
+import { Worker } from "@temporalio/worker";
 import { activities, applyCompute } from "./activities.js";
 import type { Flow } from "./dsl.js";
+import { ensureRuntime } from "./runtime.js";
 
 const require = createRequire(import.meta.url);
 const SDK_VERSION: string = (require("@temporalio/worker/package.json") as { version: string })
@@ -40,7 +41,7 @@ function expectedResult(flow: Flow): number {
 }
 
 function scheduledSlaMs(flow: Flow): number {
-  return flow.steps.reduce((ms, s) => (s.type === "sla" ? ms + s.durationMs : ms), 0);
+  return flow.steps.reduce((ms, s) => (s.type === "timer" ? ms + s.durationMs : ms), 0);
 }
 
 /**
@@ -56,7 +57,7 @@ export async function runInterpreterSpike(opts: {
   flow: Flow;
 }): Promise<SpikeResult> {
   const { workflowsPath, flow } = opts;
-  Runtime.install({ logger: new DefaultLogger("WARN") });
+  ensureRuntime();
   const env = await TestWorkflowEnvironment.createTimeSkipping();
   try {
     const worker = await Worker.create({
