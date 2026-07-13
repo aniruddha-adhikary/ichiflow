@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "OutcomeType.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "approve"
+        },
+        {
+            "type": "string",
+            "const": "deny"
+        },
+        {
+            "type": "string",
+            "const": "refer"
+        },
+        {
+            "type": "string",
+            "const": "conditional-approve"
+        },
+        {
+            "type": "string",
+            "const": "partial"
+        },
+        {
+            "type": "string",
+            "description": "A declared `x-<org>/<type>` extension outcome kind."
+        }
+    ],
+    "description": "The typed result kind of a Decision. The reserved canonical types are closed-vocabulary and\nunderstood by every consumer; a domain needing a new kind declares it under an `x-<org>/<type>`\nextension namespace (BRIEF §21, doc 02 §9.3) — enumerable, never an ad-hoc string. Unknown types\nroll up as `refer`-equivalent (never silently `approve`)."
+}

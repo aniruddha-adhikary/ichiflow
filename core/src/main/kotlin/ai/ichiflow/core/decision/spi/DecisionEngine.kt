@@ -18,6 +18,17 @@ interface DecisionEngine {
 
     /** Evaluate every decision in the model against `inputs`; never throws for decision-level errors. */
     fun evaluate(model: LoadedModel, inputs: Map<String, Any?>): DecisionEvaluation
+
+    /**
+     * Emit the typed [DecisionTrace] for an evaluation (doc 03 §7, build plan 2.3) — model identity,
+     * input snapshot, fired decisions, and outputs. Assembled engine-neutrally from [evaluate] by
+     * default so the trace shape is uniform across engines; an engine with richer fired-rule detail
+     * (matched rows, agenda order) may override.
+     */
+    fun trace(model: LoadedModel, inputs: Map<String, Any?>): DecisionTrace {
+        val evaluation = evaluate(model, inputs)
+        return DecisionTrace.from(capabilities, model.name, inputs, evaluation)
+    }
 }
 
 /** Opaque compiled-model handle; each engine defines its own concrete subtype. */
@@ -36,7 +47,16 @@ data class EngineCapabilities(
     val businessKnowledgeModel: Boolean,
     val context: Boolean,
     val invocation: Boolean,
-)
+) {
+    /** The enabled capability names, for the DecisionTrace model-identity capability set (§7). */
+    fun enabled(): List<String> = buildList {
+        if (feel) add("feel")
+        if (decisionTable) add("decisionTable")
+        if (businessKnowledgeModel) add("businessKnowledgeModel")
+        if (context) add("context")
+        if (invocation) add("invocation")
+    }
+}
 
 /** One decision's contribution to the evaluation trace. */
 data class DecisionTraceEntry(

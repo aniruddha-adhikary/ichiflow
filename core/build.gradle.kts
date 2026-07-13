@@ -126,6 +126,16 @@ tasks.register<JavaExec>("runProjectionCoverage") {
     mainClass.set("ai.ichiflow.core.decision.projection.ProjectionCoverageRunner")
 }
 
+// Emit the typed DecisionTrace each evaluate() produces across the feature matrix (build plan 2.3,
+// doc 03 §7). Writes core/build/decision-trace-results.json, consumed by the TS `decision-layer`
+// scope for the trace-shape conformance assertion against the frozen DecisionTrace JSON Schema.
+tasks.register<JavaExec>("runDecisionTrace") {
+    group = "verification"
+    description = "Emit DecisionTrace objects across the feature matrix and write core/build/decision-trace-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.decision.trace.DecisionTraceRunner")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

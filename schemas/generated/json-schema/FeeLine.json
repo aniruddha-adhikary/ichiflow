@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FeeLine.json",
+    "type": "object",
+    "properties": {
+        "component": {
+            "type": "string",
+            "description": "The fee component (duty, GST, processing fee, …)."
+        },
+        "base": {
+            "type": "number",
+            "description": "The base amount the rate applies to."
+        },
+        "rateRef": {
+            "$ref": "CodeRef.json",
+            "description": "CodeRef into the governed rate table used (§2.2, §9.4)."
+        },
+        "amount": {
+            "type": "number",
+            "description": "The computed amount for this component."
+        }
+    },
+    "required": [
+        "component",
+        "base",
+        "rateRef",
+        "amount"
+    ],
+    "description": "One itemized fee/duty component — first-class contract that travels as data (§9.3)."
+}

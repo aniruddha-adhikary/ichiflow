@@ -1,0 +1,27 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "FiredDecision.json",
+    "type": "object",
+    "properties": {
+        "decisionId": {
+            "type": "string",
+            "description": "DMN decision id, when the engine exposes it."
+        },
+        "decisionName": {
+            "type": "string",
+            "description": "DMN decision name."
+        },
+        "result": {
+            "description": "The decision's evaluated result."
+        },
+        "succeeded": {
+            "type": "boolean",
+            "description": "False when the decision produced an evaluation error."
+        }
+    },
+    "required": [
+        "decisionName",
+        "succeeded"
+    ],
+    "description": "One DMN decision that evaluated during a trace (doc 03 §7)."
+}

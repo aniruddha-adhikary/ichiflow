@@ -1,12 +1,21 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { assert, fail } from "../check.js";
+import { generatedSchemaDir } from "../envelope.js";
 import type { CheckResult, Scope, ScopeContext } from "../types.js";
+
+const require = createRequire(import.meta.url);
+const addFormats = require("ajv-formats") as (ajv: Ajv2020) => void;
 
 const RESULTS_REL = "core/build/decision-tck-results.json";
 const JVM_COMMAND = "cd core && ./gradlew runDecisionTck";
 const COVERAGE_REL = "core/build/projection-coverage-results.json";
 const COVERAGE_COMMAND = "cd core && ./gradlew runProjectionCoverage";
+const TRACE_REL = "core/build/decision-trace-results.json";
+const TRACE_COMMAND = "cd core && ./gradlew runDecisionTrace";
+const TRACE_SCHEMA = "DecisionTrace.json";
 
 interface Capabilities {
   engineId: string;
@@ -53,6 +62,22 @@ interface CoverageResults {
   engineVersion: string;
   suite: string;
   constructs: ConstructResult[];
+}
+
+interface TraceEntry {
+  construct: string;
+  trace: {
+    model?: { engine?: string; engineVersion?: string; capabilities?: string[] };
+    inputSnapshot?: Record<string, unknown>;
+    firedDecisions?: unknown[];
+    outputs?: Record<string, unknown>;
+  };
+}
+
+interface TraceResults {
+  engine: string;
+  engineVersion: string;
+  traces: TraceEntry[];
 }
 
 /** Numeric-tolerant equality for `kind: "number"` cases so FEEL scale (`80` vs `80.0`) is not a mismatch. */
@@ -147,10 +172,84 @@ export const decisionLayerScope: Scope = {
     });
 
     checks.push(...coverageChecks(repoRoot));
+    checks.push(...traceShapeChecks(repoRoot));
 
     return checks;
   },
 };
+
+function buildAjv(): Ajv2020 {
+  const ajv = new Ajv2020({ allErrors: true, strict: false, validateFormats: true });
+  addFormats(ajv);
+  const dir = generatedSchemaDir();
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith(".json")) continue;
+    ajv.addSchema(JSON.parse(readFileSync(join(dir, file), "utf8")));
+  }
+  return ajv;
+}
+
+/**
+ * Trace-shape conformance (build plan 2.3, doc 03 §7): every `evaluate` must emit a valid
+ * `DecisionTrace`. Validates each emitted trace against the frozen `DecisionTrace` JSON Schema and
+ * asserts the DecisionRecord-critical fields are populated (model identity, input snapshot, fired
+ * decisions). A malformed or absent trace is a failed check — the why API depends on this contract.
+ */
+function traceShapeChecks(repoRoot: string): CheckResult[] {
+  const tracePath = join(repoRoot, TRACE_REL);
+  if (!existsSync(tracePath)) {
+    return [
+      fail("decision-layer.trace-present", {
+        diff: `missing ${TRACE_REL}; run \`${TRACE_COMMAND}\` to emit DecisionTrace objects`,
+      }),
+    ];
+  }
+
+  const ajv = buildAjv();
+  const validate = ajv.getSchema(TRACE_SCHEMA);
+  if (!validate) {
+    return [
+      fail("decision-layer.trace-schema-present", {
+        diff: `emitted ${TRACE_SCHEMA} not found; run pnpm --filter @ichiflow/schemas build`,
+      }),
+    ];
+  }
+
+  const results = JSON.parse(readFileSync(tracePath, "utf8")) as TraceResults;
+  const checks: CheckResult[] = [];
+  let valid = 0;
+  for (const entry of results.traces) {
+    const t = entry.trace;
+    const schemaValid = validate(t) === true;
+    const fieldsPopulated =
+      !!t.model?.engine &&
+      !!t.model?.engineVersion &&
+      (t.model?.capabilities?.length ?? 0) > 0 &&
+      !!t.inputSnapshot &&
+      (t.firedDecisions?.length ?? 0) > 0 &&
+      !!t.outputs;
+    const ok = schemaValid && fieldsPopulated;
+    if (ok) valid += 1;
+    checks.push(
+      assert(`decision-layer.trace-shape.${entry.construct}`, ok, {
+        expected: `valid DecisionTrace with model identity, input snapshot, fired decisions`,
+        actual: schemaValid
+          ? "schema-valid but a required field is empty"
+          : ajv.errorsText(validate.errors),
+      }),
+    );
+  }
+
+  checks.push({
+    id: "decision-layer.traces-valid",
+    status: valid === results.traces.length ? "pass" : "fail",
+    metric: "traces_valid",
+    value: valid,
+    threshold: results.traces.length,
+  });
+
+  return checks;
+}
 
 /**
  * Projection-coverage checks (build plan 2.2): every construct in the DMN feature matrix must

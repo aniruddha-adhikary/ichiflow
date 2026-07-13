@@ -63,7 +63,10 @@ deliberate contract change.
 also asserts **projection coverage** — every construct in the DMN feature matrix
 (`schemas/decision-source/projection/matrix.json`) projects from `decision-source` to DMN 1.6 and
 executes correctly on the SPI engine (`constructs_covered == total`); run `pnpm projection:jvm` first
-to produce `core/build/projection-coverage-results.json`.
+to produce `core/build/projection-coverage-results.json`. It also asserts **trace-shape conformance**
+— every `evaluate` emits a typed `DecisionTrace` (doc 03 §7) that must validate against the frozen
+`DecisionTrace` JSON Schema (`traces_valid == total`); run `pnpm trace:jvm` first to produce
+`core/build/decision-trace-results.json`.
 
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce

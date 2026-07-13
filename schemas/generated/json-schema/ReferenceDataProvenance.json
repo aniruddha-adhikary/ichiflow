@@ -1,0 +1,28 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ReferenceDataProvenance.json",
+    "type": "object",
+    "properties": {
+        "decisionName": {
+            "type": "string",
+            "description": "The fired decision that read the reference data."
+        },
+        "codeSet": {
+            "type": "string",
+            "description": "The CodeSet as `id@version`."
+        },
+        "rows": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The specific reason/condition/rate row `code`s selected."
+        }
+    },
+    "required": [
+        "decisionName",
+        "codeSet",
+        "rows"
+    ],
+    "description": "Reference-data provenance for one fired decision: which CodeSet"
+}
