@@ -184,7 +184,12 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
     **and** an LLM-first bet. The **capability to add builder-style surfaces later is preserved**: the
     underlying typed APIs / MCP tools **are** the seam, so a post-v1 UI is just another client of a
     contract v1 already ships — **only the v1 phasing of surfaces changes, never a seam or contract**
-    (ADR-0024; surface inventory in doc 12).
+    (ADR-0024; surface inventory in doc 12). Those read-only previews are **deterministic visual
+    projections** — every canonical artifact renders one-way to a **JSON graph + Mermaid** view that
+    is *both* the human picture (`ichiflow preview`) and the agent's text projection (`ichiflow-mcp`),
+    with layout/annotation freedom held in a separate non-semantic **`viewhints`** overlay and a
+    Workspace-wide **connection map** answering "how it all connects"; the interactive explorer is a
+    post-v1 builder surface (ADR-0034, doc 15).
 20. **Harness-first construction**: every subsystem ships a deterministic verification harness
     (fixtures/golden data + executable checks + machine-readable JSON verdict + enumerable progress
     metric) BEFORE its implementation — the agent-era analog of TDD. `ichiflow verify --scope … --json`
@@ -344,6 +349,26 @@ purpose-built so AI coding agents (Claude Code first) are productive at build ti
   **run time** (Cases, Tasks, entity rows), through the **same PDP** (§8). Every governed artifact
   (CodeSets, Schemas, DecisionModels, Flows, uischemas, policies) is **owned by a Team** with named
   stewards (ADR-0025).
+- **visual projection** — a **deterministic, read-only** view rendered *from* a canonical artifact
+  (or, at run time, the DecisionRecord): Flow JSON → **flow graph**, DMN → **DRD** + decision-table
+  view, Workspace → the **connection map**, a runtime Case → the **journey view**. Emitted as **one
+  source for two audiences** — a machine-canonical **JSON graph** (every node/edge carries its
+  artifact ref) that renders deterministically to a **Mermaid** text graph (the shared human + LLM
+  form) and thence to SVG; an agent asks `ichiflow-mcp` (`get_flow_graph` / `get_workspace_map` /
+  `get_case_journey`) and gets the **same** projection a human sees rendered in `ichiflow preview`.
+  Same artifact version → same picture is a harness property. Never a second editable representation
+  (doc 15, ADR-0034).
+- **connection map** — the Workspace-level visual projection: the **cross-artifact dependency graph**
+  (schemas ↔ decisions ↔ flows ↔ adapters ↔ portals ↔ CodeSets ↔ doctemplates ↔ QuotaLedgers ↔
+  CaseTypes), derived entirely from artifact refs + the artifact catalog (doc 02 §10) + the CodeSet
+  dependency graph (ADR-0025). The "how it all connects" orientation surface for humans and agents
+  (doc 15 §3).
+- **viewhints** — an **optional, governance-light layout/annotation overlay** artifact beside a
+  canonical artifact (pinned positions, groupings, collapse, notes, filters, saved viewpoints): the
+  renderer composes canonical projection + `viewhints`, and `viewhints` **can never alter semantics**
+  (it has no field to add/remove/reconnect a node); stale entries **degrade gracefully** with a
+  drift-lint (the uischema-scope-lint pattern). The **uischema ⁄ data-schema** split (§6) applied to
+  graphs — "deterministic guidance + freedom" (doc 15 §5, ADR-0034).
 - **Design Kit** — the first-party UX-designer toolchain (parallel to the AI-native agent kit):
   a DTCG design-token pipeline, a component workbench, a live playground (real screens over
   schema-driven mocks), and a designer-facing safety contract (see doc 07). uischema/viewschema

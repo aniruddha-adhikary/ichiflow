@@ -93,7 +93,11 @@ For each, the **v1 LLM path is stated exactly.** The surface's mechanism, contra
 unchanged from the owning doc — only its *v1 human form* is LLM interaction plus a read-only rendered
 artifact. Read-only preview means an `ichiflow preview` dev-server URL that **renders** the canonical
 artifact (flow diagram, decision-table view, rendered screen, simulation trace) — a projection to
-judge, never a second editable app (ADR-0019; 00 "Chat to author, preview to judge").
+judge, never a second editable app (ADR-0019; 00 "Chat to author, preview to judge"). The
+**deterministic visual projections** these render — flow graph, DRD, the Workspace **connection map**,
+and the runtime **journey view**, each also an `ichiflow-mcp` text projection — are owned by
+[`15-visualization.md`](15-visualization.md) (ADR-0034); their interactive Workspace explorer is a
+post-v1 builder surface (a class-D sibling of D1/D3, doc 15 §7).
 
 | # | Surface (as documented) | Who used it | Defined in | **v1 LLM path** |
 |---|---|---|---|---|

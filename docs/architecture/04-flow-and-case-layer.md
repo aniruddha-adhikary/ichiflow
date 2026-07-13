@@ -187,7 +187,10 @@ governance, simulation, versioning, and the interpreter all key off the canonica
 
 **A visual/drag-and-drop flow builder is a non-goal** (doc 00 non-goals; ADR-0019). The Mermaid flow
 diagram (§6) is a **read-only projection** rendered *from* the canonical Flow, the surface a human
-*judges* a change on — never a second editable canvas that could drift from the artifact.
+*judges* a change on — never a second editable canvas that could drift from the artifact. The
+projection is deterministic (same Flow version → same graph) and is also the runtime **journey view**
+(the path actually walked) and an `ichiflow-mcp` `get_flow_graph`/`get_case_journey` text projection
+— see [`15-visualization.md`](15-visualization.md) (ADR-0034).
 
 ### 2.6 The `compute` step — first-class typed code activity
 

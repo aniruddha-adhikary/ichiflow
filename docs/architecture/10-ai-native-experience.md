@@ -274,6 +274,14 @@ Following the Temporal-MCP pattern (small default set, opt-in for power; researc
   `decision-layer` returns the version-matched Drools/DMN/DMN-TCK/FEEL/decision-source pointers (or
   their vendored offline copies in an air-gapped install), so a runtime agent reasons from the same
   references a build-time agent authored against.
+- **Visual projections** ([15-visualization.md](15-visualization.md) §4.3; ADR-0034) → each returns
+  the **same** JSON-graph + Mermaid text a human sees rendered in `ichiflow preview`, PDP-scoped:
+  `get_flow_graph(flow_ref, as_of?)` (the flow graph), `get_decision_drd(decision_ref)` (the DRD +
+  boxed-expression/table view), `get_workspace_map(focus?, team?, case_type?, hops?)` (the
+  **connection map** — how artifacts depend on each other, §3), `get_case_journey(case_id, as_of?)`
+  (the per-Case **journey view** — path walked, current position, waiting-on state, from the
+  DecisionRecord + event history), and `get_set_journey(cohort_id | bundle_case_id)` (cohort/bundle
+  roll-up). Pure reads over artifacts + the DecisionRecord, so Tier-0 by construction.
 - (+ `query_workflow_state`, `find_cases(filter)`, deeplink generators, `get_otel_trace` — the
   `case_id`↔`trace_id` join is ichiflow's value-add over a generic OTel MCP.)
 

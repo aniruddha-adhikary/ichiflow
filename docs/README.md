@@ -46,6 +46,7 @@ present tense and mark phasing (v1 vs later) where it matters.
 | [12 — System Map & v1 Surfaces](architecture/12-system-map-and-v1-surfaces.md) | Complete inventory of every human-facing surface (build / LLM-only / integrated third-party / post-v1), the system map, and the per-capability placement classification table (ADR-0033 §6). |
 | [13 — Agent Harness Loops](architecture/13-agent-harness-loops.md) | Harness-first construction: how every subsystem ships a deterministic verification harness before its implementation; `ichiflow verify`, the verdict schema, and the per-subsystem harness catalogue. |
 | [14 — The Build Plan](architecture/14-build-plan.md) | The concrete harness-first construction plan for v1: the chunking doctrine, ten ordered phases with per-chunk tables (deliverable / harness exit / depends-on / effort / risk), the critical path and parallelizable work, de-risking spikes, the first-week chunks with verify commands, and what is deliberately deferred to post-v1 (with triggers). |
+| [15 — Visualization](architecture/15-visualization.md) | Deterministic visual projections of every artifact (flow graph, DRD, the Workspace **connection map**, runtime **journey view**); one source two audiences (JSON graph + Mermaid text + SVG, same view for humans and agents); the `viewhints` layout overlay (freedom without forking truth); v1 = `ichiflow preview` + `ichiflow-mcp` text projections. |
 
 ## Architecture Decision Records
 
@@ -86,6 +87,7 @@ Full list with one-line summaries in [`adr/README.md`](adr/README.md).
 | [0031](adr/0031-set-level-cases.md) | Set-level Cases: **`cohort`** (gather-barrier → one set-level decision → scatter) and **`bundle`** (heterogeneous sub-Case fan-out with partial-tolerant roll-up); the CaseType catalog. |
 | [0032](adr/0032-case-association.md) | **`Case association`** — first-class many-to-many peer links between independent Cases; typed link kinds, PDP-scoped visibility, cross-Case invariant checks; distinct from correlation and bundles. |
 | [0033](adr/0033-packaging-and-placement.md) | Packaging & placement doctrine: a decision tree (core / first-party optional / SPI+thin default / external-delegation) classifying semantics not product areas; a living classification table in doc 12 §6. |
+| [0034](adr/0034-deterministic-visual-projections.md) | Deterministic visual projections: every artifact → a JSON graph + Mermaid text + SVG (one source, two audiences); the Workspace connection map + runtime journey view; layout in a separate `viewhints` overlay (never semantics); Mermaid chosen for LLM legibility + MIT; explorer post-v1. |
 
 ## Examples
 

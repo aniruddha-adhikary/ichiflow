@@ -543,6 +543,40 @@ commit→freeze→reveal→derive ordering by hand (getting that ordering wrong 
 breaking replay — the exact failure this harness catches). **Progress metric:**
 `fairness_vectors_green / total` across the commitment, roster-hash, and reproduction families.
 
+### 2.o Visual projections — determinism, truthfulness, journey correctness
+
+The deterministic visual projections ([15](15-visualization.md); ADR-0034) are read paths over
+existing artifacts + the DecisionRecord, so their harness proves the pictures are **reproducible**
+and **truthful** — same artifact version → same graph, and every node/edge in the picture exists in
+the artifact (and vice versa). It runs under `ichiflow verify --scope visualization`.
+
+- **Projection determinism vectors.** Re-run a projection over a fixed artifact version and require
+  **byte-identical** JSON graph *and* Mermaid output — the check that pins the layout engine (dagre,
+  or ELK with a fixed non-zero seed), `deterministicIds`, canonical node ordering, and pinned
+  Mermaid/engine versions ([15](15-visualization.md) §2.2). Any drift is a hard failure. Fixtures:
+  golden `(artifact version → JSON graph + Mermaid)` pairs per projection kind (flow graph, DRD,
+  connection map).
+- **Truthfulness — a bijection (no orphans, no omissions).** Every node/edge in the picture must
+  resolve to a real element in the source artifact (no invented node — an *orphan*), **and** every
+  step/transition/DMN-node/artifact-ref must appear in the picture (nothing silently dropped — an
+  *omission*): connection-map edges each correspond to a real artifact ref; DRD nodes to real DMN
+  elements. Verdict: `orphans: [...]`, `omissions: [...]`, both empty to pass. (The visual sibling of
+  the DecisionRecord orphan-event detector, §2.g.)
+- **Journey-view correctness against event-history fixtures.** Given a fixture Case's DecisionRecord
+  + event history, the journey projection's **walked path, current position, and waiting-on
+  annotation must match the record exactly** — no untaken path shown, no mislabelled current step, no
+  invented waiting-on cause ([15](15-visualization.md) §4.1). Cohort/bundle roll-ups assert
+  fan-in-to-one-record and referenced-not-merged children (ADR-0031). Fixtures: sample
+  Cases/cohorts/bundles + their expected journey graphs.
+- **`viewhints` degradation.** A stale `viewhints` overlay (pin/group/note referencing a removed
+  node) must render the **truthful** graph and emit a **drift-lint** warning — never fail the render,
+  never alter the graph (the uischema-scope-lint pattern, §2.e; [15](15-visualization.md) §5).
+  Fixtures: artifact-evolution pairs + a stale overlay.
+
+**Progress metric:** `projection_vectors_green / total` across the determinism, truthfulness,
+journey-correctness, and `viewhints`-degradation families. Like the other harnesses this ships as a
+**product feature** (§4.3): app-builders' own Flows/Decisions get the same projection verification.
+
 ---
 
 ## 3. The loop mechanics
@@ -556,8 +590,9 @@ ichiflow verify [--scope <subsystem|artifact>] [--json] [--since <ref>]
 ```
 
 - `--scope schema-pipeline` · `--scope decision-layer` · `--scope flow-layer` · `--scope adapters` ·
-  `--scope ui` · `--scope authz` · `--scope decisionrecord` · `--scope migration` · `--scope mcp` ·
-  `--scope reference-product` · `--scope migration-exercise` — the catalog (§2).
+  `--scope ui` · `--scope authz` · `--scope decisionrecord` · `--scope visualization` ·
+  `--scope migration` · `--scope mcp` · `--scope reference-product` · `--scope migration-exercise` —
+  the catalog (§2).
 - `--scope <artifact>` narrows to one artifact by id (`--scope decision:loan-eligibility@3.2.0`,
   `--scope flow:permit-intake`, `--scope adapter:mq-xml-to-canonical`), running only the checks that
   artifact participates in — the tight loop an agent uses while editing one thing.
@@ -725,7 +760,7 @@ flowchart TB
 | **3 — Flow interpreter vectors** | §2.c green: interpreter conformance vectors pass under time-skip; determinism harness clean; compute-step contracts hold. | **v1** |
 | **4 — Adapters + AuthZ** | §2.d + §2.f green: contract tests against mock broker, mapping goldens stable, idempotency/DLQ vectors pass; policy vectors pass **and** design-time=runtime parity holds. | **v1** (Cedar/OPA vectors: later) |
 | **5 — DecisionRecord completeness** | §2.g green: orphan-event detector clean on sample Cases; why-answer conformance holds. | **v1** |
-| **6 — UI + ichiflow-mcp** | §2.e + §2.i green: scope lint clean, preview snapshots produced, a11y AA, PDP-state coverage complete; MCP tool-contracts pass and **tier-enforcement negative tests pass** (Tier-2-without-approval fails). | **v1** |
+| **6 — UI + ichiflow-mcp** | §2.e + §2.i + §2.o green: scope lint clean, preview snapshots produced, a11y AA, PDP-state coverage complete; **visual projections deterministic + truthful** (no orphans/omissions, journey-view matches history); MCP tool-contracts pass and **tier-enforcement negative tests pass** (Tier-2-without-approval fails). | **v1** |
 | **7 — Migration** | §2.h green: decision parity on the golden dataset, reconciliation clean, exit-story exports re-consumable. | **v1** |
 | **8 — Top-level acceptance** | §2.j green: **both** the reference-product harness and the migration-exercise harness pass in CI — the v1 definition of done. | **v1** |
 

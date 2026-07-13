@@ -561,7 +561,9 @@ governed artifact for developers/analysts who need it (§4.3).
 - **The decision-table view is a read-only projection.** Boxed DMN with hit-policy, completeness/
   overlap checking (via `validate`), and FEEL cells — rendered *from* the canonical DMN as the artifact
   the user reads and diffs, **not a second editable representation** (a rendered view may reuse
-  **dmn-js** for display, but read-only, not as an editable canvas).
+  **dmn-js** for display, but read-only, not as an editable canvas). It is one of the model's
+  deterministic **visual projections** alongside the **DRD diagram** — see
+  [`15-visualization.md`](15-visualization.md) (`get_decision_drd`; ADR-0034).
 - **Live what-if simulation is how the user judges** (§5.4): run the draft over sample or golden inputs
   and see outputs + a human-readable trace before release. Simulation results are projections, the
   business user's judgement surface.
