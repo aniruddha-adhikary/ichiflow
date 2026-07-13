@@ -26,6 +26,7 @@ import { decisionRecordScope } from "../src/verify/scopes/decisionrecord.js";
 import { entityStoreScope } from "../src/verify/scopes/entity-store.js";
 import { entityApiScope } from "../src/verify/scopes/entity-api.js";
 import { authzScope } from "../src/verify/scopes/authz.js";
+import { uiScope } from "../src/verify/scopes/ui.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -1603,6 +1604,172 @@ describe("entity-api scope (Phase 4.2)", () => {
       const checks = entityApiScope.run({ repoRoot: tmp, seed: deriveSeed("a") });
       const present = checks.find((c) => c.id === "entity-api.results-present")!;
       expect(present.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ui scope (Phase 4.5 — uischema)", () => {
+  const validUi = {
+    dataSchema: { id: "LoanApplication.json", version: "sha256:pinned" },
+    layout: {
+      type: "VerticalLayout",
+      elements: [{ type: "Control", scope: "#/properties/applicant", label: "Applicant" }],
+    },
+  };
+  const results = {
+    dataSchemaId: "LoanApplication.json",
+    dataSchemaVersion: "sha256:pinned",
+    provenanceCurrent: true,
+    scopeLint: { clean: true, controls: 1, dangling: [] },
+    states: { required: 4, covered: 4 },
+    axe: { storiesRun: 4, aaPass: 4, violations: [] },
+    contrast: {
+      total: 1,
+      pass: 1,
+      checks: [{ token: "text-body", kind: "text", ratio: 14.76, min: 4.5, pass: true }],
+    },
+    snapshots: { produced: 4, matched: 4, drift: [] },
+  };
+  const setup = (root: string, opts: { uiDoc?: unknown; results?: unknown | null } = {}): void => {
+    const bdir = join(root, "schemas/ui/baseline");
+    mkdirSync(bdir, { recursive: true });
+    writeFileSync(
+      join(bdir, "loan-application.uischema.json"),
+      JSON.stringify(opts.uiDoc ?? validUi),
+    );
+    if (opts.results !== null) {
+      const rp = join(root, "packages/uischema/build/ui-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when the baseline is DSL-valid and every check family is green", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp);
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const states = checks.find((c) => c.id === "ui.states-covered")!;
+      expect(states.value).toBe(4);
+      expect(states.threshold).toBe(4);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed baseline via the UiSchema contract", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      // layout is required — a document without it is not a valid uischema.
+      setup(tmp, { uiDoc: { dataSchema: { id: "LoanApplication.json", version: "x" } } });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      expect(checks.some((c) => c.id.startsWith("ui.dsl-valid.") && c.status === "fail")).toBe(
+        true,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("catches a dangling Control scope surfaced by the producer, with a fix-it hint", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          scopeLint: {
+            clean: false,
+            controls: 1,
+            dangling: [
+              {
+                pointer: "#/properties/gone",
+                file: "schemas/ui/baseline/loan-application.uischema.json",
+                hint: "scope '#/properties/gone' does not resolve",
+              },
+            ],
+          },
+        },
+      });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("ui.scope-lint.#/properties/gone");
+      expect(failed).toContain("ui.scope-lint-clean");
+      const dangling = checks.find((c) => c.id === "ui.scope-lint.#/properties/gone")!;
+      expect(dangling.artifact).toContain("loan-application.uischema.json");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails states-covered when a placed control is missing PDP-state stories", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp, { results: { ...results, states: { required: 4, covered: 3 } } });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      const states = checks.find((c) => c.id === "ui.states-covered")!;
+      expect(states.status).toBe("fail");
+      expect(states.value).toBe(3);
+      expect(states.threshold).toBe(4);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails axe-aa and names the offending story on a WCAG AA violation", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          axe: {
+            storiesRun: 4,
+            aaPass: 3,
+            violations: [{ story: "applicant--error", ruleId: "label", impact: "critical" }],
+          },
+        },
+      });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("ui.a11y.applicant--error");
+      expect(failed).toContain("ui.axe-aa");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails snapshots-matched when a regenerated snapshot drifts from its baseline", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          snapshots: {
+            produced: 4,
+            matched: 3,
+            drift: [{ story: "amount--read-only", detail: "differs from committed baseline" }],
+          },
+        },
+      });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("ui.snapshot.amount--read-only");
+      expect(failed).toContain("ui.snapshots-matched");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly with an actionable message when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-ui-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = uiScope.run({ repoRoot: tmp, seed: deriveSeed("ui") });
+      const present = checks.find((c) => c.id === "ui.results-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("pnpm ui:preview");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

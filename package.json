@@ -33,6 +33,8 @@
     "feel:jvm": "cd core && ./gradlew -q runFeelVectors",
     "entity:jvm": "cd core && ./gradlew -q runEntityStore",
     "authz:jvm": "cd core && ./gradlew -q runAuthz",
+    "ui:generate": "pnpm --filter @ichiflow/uischema build && pnpm --filter @ichiflow/uischema exec node dist/generate.js",
+    "ui:preview": "pnpm --filter @ichiflow/uischema build && pnpm --filter @ichiflow/uischema preview",
     "api:contract": "pnpm --filter @ichiflow/api build && pnpm --filter @ichiflow/api contract",
     "interpreter:spike": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow spike",
     "flow:conformance": "pnpm --filter @ichiflow/flow build && pnpm --filter @ichiflow/flow conformance",

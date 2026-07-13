@@ -115,6 +115,9 @@ jobs:
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 
+      - name: UI — render PDP-state stories + axe-core AA + preview snapshots (uischema, chunk 4.5)
+        run: pnpm ui:preview
+
       - name: ichiflow verify — full loop (every registered scope green)
         run: node packages/cli/dist/cli.js verify --json
 

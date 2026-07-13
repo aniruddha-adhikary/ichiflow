@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "UiElementType.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "VerticalLayout"
+        },
+        {
+            "type": "string",
+            "const": "HorizontalLayout"
+        },
+        {
+            "type": "string",
+            "const": "Group"
+        },
+        {
+            "type": "string",
+            "const": "Control"
+        }
+    ],
+    "description": "The JSON Forms element kinds the v1 generator + harness support (doc 07 §2)."
+}

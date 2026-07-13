@@ -151,6 +151,8 @@ vite.config.ts.timestamp-*
 packages/flow/build/
 # Generated-BFF contract-conformance results — derived state produced by `pnpm api:contract` (chunk 4.2).
 packages/api/build/
+# UI harness preview results — derived state produced by `pnpm ui:preview` (chunk 4.5).
+packages/uischema/build/
 
 # Gradle / Kotlin core
 core/.gradle/
