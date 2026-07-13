@@ -1,0 +1,22 @@
+[
+  {
+    "principal": "user:eve",
+    "caseId": "case:c-100",
+    "note": "trade editor → can_modify the case: every entitled field is editable",
+    "expected": {
+      "applicantName": "read-only",
+      "decision": "editable",
+      "reviewerNote": "editable"
+    }
+  },
+  {
+    "principal": "user:iris",
+    "caseId": "case:c-100",
+    "note": "association reader → can_view but not can_modify: action field read-only, internal note hidden",
+    "expected": {
+      "applicantName": "read-only",
+      "decision": "read-only",
+      "reviewerNote": "hidden"
+    }
+  }
+]

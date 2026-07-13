@@ -1,0 +1,37 @@
+[
+  {
+    "taskId": "t-500",
+    "caseId": "case:c-200",
+    "stepId": "review",
+    "title": "Review Cedar Exports permit",
+    "dueAtMs": 500
+  },
+  {
+    "taskId": "t-1000",
+    "caseId": "case:c-100",
+    "stepId": "signoff",
+    "title": "Sign off Acme duty calc",
+    "dueAtMs": 1000
+  },
+  {
+    "taskId": "t-2000",
+    "caseId": "case:c-101",
+    "stepId": "review",
+    "title": "Review Beacon licence",
+    "dueAtMs": 2000
+  },
+  {
+    "taskId": "t-3000",
+    "caseId": "case:c-100",
+    "stepId": "review",
+    "title": "Review Acme permit",
+    "dueAtMs": 3000
+  },
+  {
+    "taskId": "t-4000",
+    "caseId": "case:c-101",
+    "stepId": "signoff",
+    "title": "Sign off Beacon licence",
+    "dueAtMs": 4000
+  }
+]

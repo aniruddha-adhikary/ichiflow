@@ -7,6 +7,7 @@ schemas/contract/**
 packages/contracts-ts/src/gen/**
 **/.ichiflow/ledger/**
 core/**/build/**
+packages/*/build/**
 docs/**
 archive/**
 LICENSE

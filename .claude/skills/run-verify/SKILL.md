@@ -27,7 +27,7 @@ The single verification entry point. Done-ness is a JSON verdict, never a prose 
 
 `self-check` (the meta-harness), `agent-kit`, `schema-fidelity-spike`, `schema-pipeline`, `codegen`,
 `contract-vectors`, `reference-data`, `decision-projection-spike`, `contract-gate`, `decision-layer`,
-`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `code-quality`. More come online phase by phase (doc 14).
+`interpreter-determinism-spike`, `flow-layer`, `decisionrecord`, `entity-store`, `entity-api`, `authz`, `portal`, `code-quality`. More come online phase by phase (doc 14).
 
 `schema-fidelity-spike` cross-checks Ajv (TS) against networknt (JVM) on a hard probe corpus, so it
 needs the JVM verdicts on disk first: run `pnpm spike:jvm` before `pnpm verify` (or the full loop).
@@ -142,3 +142,16 @@ wall-clock/RNG), so run `pnpm authz:jvm` before `pnpm verify` to produce `core/b
 `code-quality` consumes detekt (SARIF, zero findings) + ArchUnit rule results (SPI boundary etc.),
 both build-failing in Gradle; run `pnpm quality:jvm` before `pnpm verify` to produce
 `core/build/reports/detekt/detekt.sarif` and `core/build/arch-rules-results.json`.
+
+`portal` is the Phase 4.4 gate (doc 07 §5/§7/§11, doc 13 §2.e/§2.f): the first back-office **Portal**
+(`packages/portal/`, React under jsdom). Its deterministic preview harness renders a **PDP-filtered,
+SLA-ordered Task inbox** (each seeded principal sees exactly the id set the SAME authz relation model —
+`schemas/authz/model.json` — permits, incl. a cross-team principal who sees strictly fewer rows;
+ordered soonest-due first) and a **Case/review view**: an action form whose submit emits a **Flow
+signal** (validates against the emitted `FlowSignal.json`, never a direct mutation), the assembled
+`DecisionRecord` trace (validates against emitted `DecisionRecord.json`) rendered as nodes, an
+obligation checklist, and **field-level entitlements** (≥1 hidden with a "why?" affordance + ≥1
+read-only for a lower-privilege principal, doc 07 §6/§11). Deterministic (seeded data + integer SLA, no
+wall-clock/RNG), so run `pnpm portal:preview` before `pnpm verify` to produce
+`packages/portal/build/portal-results.json`. The action-form uischema fixture is INTERIM (hand-authored
+locally); wiring the generated `packages/uischema` (Phase 4.5) is a later follow-up.

@@ -1,0 +1,10 @@
+{
+  "_interim": true,
+  "_note": "INTERIM hand-authored uischema fixture (Phase 4.4). Kept deliberately small. The generated uischema from packages/uischema (Phase 4.5) is not wired in here; doing so is an explicit later follow-up. Every Control scope must resolve against action.dataschema.json (doc 07 §3 drift lint).",
+  "type": "VerticalLayout",
+  "elements": [
+    { "type": "Control", "scope": "#/properties/applicantName" },
+    { "type": "Control", "scope": "#/properties/decision" },
+    { "type": "Control", "scope": "#/properties/reviewerNote", "options": { "multi": true } }
+  ]
+}
