@@ -1,0 +1,19 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ConditionKind.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "blocking"
+        },
+        {
+            "type": "string",
+            "const": "post-approval-obligation"
+        },
+        {
+            "type": "string",
+            "const": "informational"
+        }
+    ],
+    "description": "Behavioural class of a Condition (doc 04 §5.5; the CodeSet `kind` column, §9.1)."
+}

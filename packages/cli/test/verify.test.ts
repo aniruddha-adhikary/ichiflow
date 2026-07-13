@@ -271,6 +271,34 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, JSON.stringify(body));
   };
+  const writeTrace = (root: string, body: unknown) => {
+    const p = join(root, "core/build/decision-trace-results.json");
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(body));
+  };
+  const validTrace = {
+    model: {
+      id: "literal",
+      engine: "drools",
+      engineVersion: "10.2.0",
+      capabilities: ["feel", "decisionTable"],
+    },
+    inputSnapshot: { N: 21 },
+    firedDecisions: [
+      { decisionId: "decResult", decisionName: "Result", result: 42, succeeded: true },
+    ],
+    intermediateValues: {},
+    outputs: { Result: 42 },
+    referenceData: [],
+    authorityAttribution: {},
+    hasErrors: false,
+    messages: [],
+  };
+  const goodTrace = {
+    engine: "drools",
+    engineVersion: "10.2.0",
+    traces: [{ construct: "literalExpression", trace: validTrace }],
+  };
   const goodCoverage = {
     engine: "drools",
     engineVersion: "10.2.0",
@@ -327,6 +355,7 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
         ],
       });
       writeCoverage(tmp, goodCoverage);
+      writeTrace(tmp, goodTrace);
       const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
       expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
       const green = checks.find((c) => c.id === "decision-layer.tck-cases-green")!;
@@ -335,6 +364,9 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
       const covered = checks.find((c) => c.id === "decision-layer.constructs-covered")!;
       expect(covered.value).toBe(2);
       expect(covered.threshold).toBe(2);
+      const traces = checks.find((c) => c.id === "decision-layer.traces-valid")!;
+      expect(traces.value).toBe(1);
+      expect(traces.threshold).toBe(1);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -442,6 +474,85 @@ describe("decision-layer scope (DMN-TCK subset conformance)", () => {
       expect(checks).toHaveLength(1);
       expect(checks[0].id).toBe("decision-layer.results-present");
       expect(String(checks[0].diff)).toContain("runDecisionTck");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  const seedForTrace = (root: string) => {
+    writeResults(root, {
+      engine: "drools",
+      engineVersion: "10.2.0",
+      suite: "s",
+      capabilities: goodCaps,
+      cases: [],
+    });
+    writeCoverage(root, { ...goodCoverage, constructs: [] });
+  };
+
+  it("passes trace-shape and the traces-valid aggregate when every emitted trace is well-formed", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeTrace(tmp, goodTrace);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const shape = checks.find((c) => c.id === "decision-layer.trace-shape.literalExpression")!;
+      expect(shape.status).toBe("pass");
+      const agg = checks.find((c) => c.id === "decision-layer.traces-valid")!;
+      expect(agg.status).toBe("pass");
+      expect(agg.value).toBe(1);
+      expect(agg.threshold).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a schema-invalid trace (missing model identity) and the traces-valid aggregate", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      const noModel: Partial<typeof validTrace> = { ...validTrace };
+      delete noModel.model;
+      writeTrace(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        traces: [{ construct: "literalExpression", trace: noModel }],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("decision-layer.trace-shape.literalExpression");
+      expect(failed).toContain("decision-layer.traces-valid");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a schema-valid trace that is missing DecisionRecord-critical fields (no fired decisions)", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      writeTrace(tmp, {
+        engine: "drools",
+        engineVersion: "10.2.0",
+        traces: [{ construct: "empty", trace: { ...validTrace, firedDecisions: [] } }],
+      });
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const shape = checks.find((c) => c.id === "decision-layer.trace-shape.empty")!;
+      expect(shape.status).toBe("fail");
+      expect(String(shape.actual)).toContain("required field is empty");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the decision-trace artifact is missing", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-dl-"));
+    try {
+      seedForTrace(tmp);
+      const checks = await decisionLayerScope.run({ repoRoot: tmp, seed: deriveSeed("dl") });
+      const present = checks.find((c) => c.id === "decision-layer.trace-present")!;
+      expect(present.status).toBe("fail");
+      expect(String(present.diff)).toContain("runDecisionTrace");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

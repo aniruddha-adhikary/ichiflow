@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ConditionState.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "pending"
+        },
+        {
+            "type": "string",
+            "const": "satisfied"
+        },
+        {
+            "type": "string",
+            "const": "breached"
+        },
+        {
+            "type": "string",
+            "const": "waived"
+        }
+    ],
+    "description": "Individually-stateful Condition lifecycle (doc 04 §5.5)."
+}

@@ -1,0 +1,77 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "DecisionTrace.json",
+    "type": "object",
+    "properties": {
+        "model": {
+            "$ref": "ModelIdentity.json"
+        },
+        "inputSnapshot": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "The exact inputs the decision saw, as-of evaluation time."
+        },
+        "firedDecisions": {
+            "type": "array",
+            "items": {
+                "$ref": "FiredDecision.json"
+            },
+            "description": "Which decisions evaluated, in what order."
+        },
+        "intermediateValues": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "Outputs of upstream DRD decisions and named FEEL sub-expressions."
+        },
+        "outputs": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "The final decision outputs (the leaf decisions' results)."
+        },
+        "referenceData": {
+            "type": "array",
+            "items": {
+                "$ref": "ReferenceDataProvenance.json"
+            },
+            "description": "Per-fired-decision CodeSet id+version + selected rows."
+        },
+        "authorityAttribution": {
+            "$ref": "#/$defs/RecordString",
+            "description": "Member-outcome → emitting authority, carried through composite decisions."
+        },
+        "hasErrors": {
+            "type": "boolean",
+            "description": "True when any fired decision produced an evaluation error."
+        },
+        "messages": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Engine-surfaced messages (errors/warnings) for the evaluation."
+        }
+    },
+    "required": [
+        "model",
+        "inputSnapshot",
+        "firedDecisions",
+        "intermediateValues",
+        "outputs",
+        "referenceData",
+        "authorityAttribution",
+        "hasErrors",
+        "messages"
+    ],
+    "description": "The typed evaluation trace every `evaluate` emits (doc 03 §7) — not a log line, a typed domain\nobject. It flows into the per-Case DecisionRecord and the why API, so this shape is **frozen**:\nthe `decision-layer` trace-shape harness validates every emitted trace against it.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        },
+        "RecordString": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {
+                "type": "string"
+            }
+        }
+    }
+}

@@ -1,0 +1,48 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "Outcome.json",
+    "type": "object",
+    "properties": {
+        "type": {
+            "$ref": "OutcomeType.json"
+        },
+        "reasons": {
+            "type": "array",
+            "items": {
+                "$ref": "CodeRef.json"
+            },
+            "description": "Machine-readable reasons drawn from governed CodeSets."
+        },
+        "conditions": {
+            "type": "array",
+            "items": {
+                "$ref": "Condition.json"
+            },
+            "description": "Attached, individually-stateful conditions (doc 04 §5.5)."
+        },
+        "authority": {
+            "type": "string",
+            "description": "Set when this Outcome is a member of a CompositeOutcome — its originating authority."
+        },
+        "scoreBreakdown": {
+            "type": "array",
+            "items": {
+                "$ref": "ScoreLine.json"
+            },
+            "description": "Itemized per-criterion points tally (points-based decisions)."
+        },
+        "feeBreakdown": {
+            "type": "array",
+            "items": {
+                "$ref": "FeeLine.json"
+            },
+            "description": "Itemized fee/duty breakdown (fee-computing decisions)."
+        }
+    },
+    "required": [
+        "type",
+        "reasons",
+        "conditions"
+    ],
+    "description": "The typed result of a Decision (doc 02 §9.3). Every Decision output and outbound decision event\nreferences this instead of ad-hoc `{outcome, reasonCodes}` pairs. `scoreBreakdown`/`feeBreakdown`\nare optional first-class facets, so a plain approve/deny Outcome carries neither."
+}

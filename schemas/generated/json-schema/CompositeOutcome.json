@@ -1,0 +1,27 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CompositeOutcome.json",
+    "type": "object",
+    "properties": {
+        "policy": {
+            "$ref": "CompositionPolicy.json"
+        },
+        "members": {
+            "type": "array",
+            "items": {
+                "$ref": "Outcome.json"
+            },
+            "description": "One per authority; each attributed via `Outcome.authority`."
+        },
+        "rolledUp": {
+            "$ref": "OutcomeType.json",
+            "description": "Rolled-up result computed from `policy` over `members`."
+        }
+    },
+    "required": [
+        "policy",
+        "members",
+        "rolledUp"
+    ],
+    "description": "N independent authority Outcomes composed into one result (doc 02 §9.3, doc 03 §2.3). Each member\nstays attributed to its originating authority; an unrecognised member type rolls up as `refer`."
+}

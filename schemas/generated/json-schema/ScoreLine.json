@@ -1,0 +1,28 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ScoreLine.json",
+    "type": "object",
+    "properties": {
+        "criterion": {
+            "type": "string",
+            "description": "The scored criterion."
+        },
+        "points": {
+            "type": "number",
+            "description": "Points awarded for this criterion."
+        },
+        "band": {
+            "type": "string",
+            "description": "Optional band/label the points fall into."
+        },
+        "whyRef": {
+            "$ref": "CodeRef.json",
+            "description": "CodeRef into the governed rationale/criterion CodeSet."
+        }
+    },
+    "required": [
+        "criterion",
+        "points"
+    ],
+    "description": "One line of a points-based tally — first-class contract, not an audit-time reconstruction (§9.3)."
+}

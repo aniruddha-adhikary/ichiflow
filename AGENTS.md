@@ -31,6 +31,7 @@ edit an artifact → ichiflow verify --scope <subsystem|artifact> --json → rea
 | `pnpm decision:jvm`                     | Compile decision-source → DMN 1.6 and execute on KIE/Drools.           |
 | `pnpm decision-tck:jvm`                 | Run the DMN-TCK subset on the Decision Engine SPI (Drools).            |
 | `pnpm projection:jvm`                   | Project the decision-source feature matrix to DMN 1.6 and execute it.  |
+| `pnpm trace:jvm`                        | Emit the typed DecisionTrace each evaluate() produces (doc 03 §7).     |
 | `pnpm quality:jvm`                      | Produce detekt (SARIF) + ArchUnit rule-result artifacts.               |
 | `pnpm codegen:ts` / `codegen:drift`     | Regenerate / drift-check the TS contract types (hey-api).              |
 | `(cd core && ./gradlew generateModels)` | Regenerate the Kotlin contract models (Fabrikt).                       |
@@ -68,7 +69,11 @@ the Phase 2.1 proof that a capability-declared, engine-neutral SPI executes cano
 construct in the DMN feature matrix (`schemas/decision-source/projection/matrix.json` — literal, decision
 tables w/ UNIQUE/FIRST/COLLECT, BKM, invocation, context, information-requirement graph, list,
 relation) compiles one-way from `decision-source` to DMN 1.6 and executes correctly on the SPI engine
-(`constructs_covered == total`); run `pnpm projection:jvm` first. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
+(`constructs_covered == total`); run `pnpm projection:jvm` first. It also asserts **trace-shape
+conformance** (build plan 2.3, doc 03 §7): every `evaluate` emits a typed **`DecisionTrace`** (model
+identity, input snapshot, fired decisions, outputs) that must validate against the frozen
+`DecisionTrace` JSON Schema (`traces_valid == total`); run `pnpm trace:jvm` first to write
+`core/build/decision-trace-results.json`. `code-quality` is the non-negotiable Kotlin quality gate: it consumes
 **detekt** (zero findings, from SARIF) and **ArchUnit** rule results (notably the SPI boundary — only
 `…decision.spi` may depend on `org.kie..`), both of which also fail `./gradlew check`/`test`; run
 `pnpm quality:jvm` first.

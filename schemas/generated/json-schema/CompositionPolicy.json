@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CompositionPolicy.json",
+    "anyOf": [
+        {
+            "type": "string",
+            "const": "all-must-approve"
+        },
+        {
+            "type": "string",
+            "const": "any-blocks"
+        },
+        {
+            "type": "string",
+            "const": "quorum"
+        },
+        {
+            "type": "string",
+            "const": "weighted"
+        }
+    ],
+    "description": "Declared composition policy over N authority Outcomes (doc 02 §9.3, doc 03 §2.3)."
+}

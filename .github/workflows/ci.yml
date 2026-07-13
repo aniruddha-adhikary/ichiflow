@@ -85,6 +85,9 @@ jobs:
       - name: Decision layer — decision-source→DMN projection coverage (feature matrix)
         run: pnpm projection:jvm
 
+      - name: Decision layer — emit DecisionTrace objects (trace-shape conformance)
+        run: pnpm trace:jvm
+
       - name: Code quality — detekt + ArchUnit artifacts (SARIF + rule results)
         run: pnpm quality:jvm
 

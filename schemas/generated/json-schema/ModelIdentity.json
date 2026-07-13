@@ -1,0 +1,41 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ModelIdentity.json",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "DecisionModel id (v1: the loaded DMN model name)."
+        },
+        "version": {
+            "type": "string",
+            "description": "DecisionModel semver, when governed."
+        },
+        "effective": {
+            "$ref": "EffectiveWindow.json",
+            "description": "Effective window of the released model version."
+        },
+        "engine": {
+            "type": "string",
+            "description": "The engine that evaluated the model (e.g. `drools`)."
+        },
+        "engineVersion": {
+            "type": "string",
+            "description": "The pinned engine version (e.g. `10.2.0`)."
+        },
+        "capabilities": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The engine capability set exercised (e.g. `feel`, `decisionTable`, `businessKnowledgeModel`)."
+        }
+    },
+    "required": [
+        "id",
+        "engine",
+        "engineVersion",
+        "capabilities"
+    ],
+    "description": "DecisionModel identity + engine/capability set that produced a trace (doc 03 §7)."
+}
