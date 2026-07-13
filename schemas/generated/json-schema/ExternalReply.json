@@ -1,0 +1,39 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "ExternalReply.json",
+    "type": "object",
+    "properties": {
+        "afterMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Test-clock offset (ms from flow start) at which the reply is delivered (time-skip advances between offsets)."
+        },
+        "stepId": {
+            "type": "string",
+            "description": "The `external-task` step id this reply targets."
+        },
+        "correlationId": {
+            "type": "string",
+            "description": "The correlation id the reply carries; it correlates only when it equals the id injected on submit (`case_id '/' step.id`, §11.1)."
+        },
+        "messageId": {
+            "type": "string",
+            "description": "The reply's own message id; `(correlationId, messageId)` is the Idempotent-Receiver dedup key (§11.1)."
+        },
+        "value": {
+            "type": "number",
+            "description": "The validated response value written to the step's `out` variable (ignored for a `malformed` reply)."
+        },
+        "malformed": {
+            "type": "boolean",
+            "description": "When true, the reply fails response-schema validation → **DLQ + Case surfacing**, never resume (doc 04 §2.8 taxonomy)."
+        }
+    },
+    "required": [
+        "afterMs",
+        "stepId",
+        "correlationId",
+        "messageId"
+    ],
+    "description": "A scripted **inbound correlated reply** a conformance vector delivers to an `external-task` step\n(doc 04 §2.8, doc 05 §11.1) — the machine analog of a `FlowSignal.resolve`. Stands in for the mock\nexternal system's response (no live system, doc 13 §2.d): it is routed to the waiting delegation by\n`correlationId`, **deduped** on `(correlationId, messageId)`, and validated — a `malformed` reply is\na schema-invalid response the delegation quarantines to the **DLQ** and surfaces on the Case."
+}

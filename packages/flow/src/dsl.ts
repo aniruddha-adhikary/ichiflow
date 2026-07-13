@@ -47,7 +47,37 @@ export interface TimerStep {
   durationMs: number;
 }
 
-export type FlowStep = ComputeStep | DecisionEvalStep | HumanTaskStep | TimerStep;
+/**
+ * An `external-task` (delegation) step (doc 04 §2.8, ADR-0028) — the machine analog of `human-task`:
+ * submit a schema'd request through an outbound Adapter, durably await a **correlated** inbound reply,
+ * validate it, and resume — racing the same pausable SLA + escalation machinery (§5.7/§5.2) and the
+ * adapters' Idempotent Receiver / DLQ (doc 05 §11.1). Transport is a pluggable Adapter binding beneath.
+ */
+export interface ExternalTaskStep {
+  id: string;
+  type: "external-task";
+  /** The outbound submit Adapter / canonical request ref the delegation submits through. */
+  requestRef: string;
+  /** The canonical response schema id the correlated reply is validated against before resume (§11.1). */
+  responseSchema: string;
+  in: string[];
+  out: string;
+  /** The target external system/provider (static in v1). */
+  provider?: string;
+  /** Pausable SLA budget (ms); paused intervals are excluded, exactly as for `human-task` (§5.7). */
+  slaMs: number;
+  /** Auto-decide fallback written to `out` when the SLA is exhausted with no correlated reply (§5.2). */
+  onTimeout: number;
+  /** Supervisor/alternate-provider queue the delegation escalates to on SLA expiry; defaults to `supervisor`. */
+  escalationQueue?: string;
+}
+
+export type FlowStep =
+  | ComputeStep
+  | DecisionEvalStep
+  | HumanTaskStep
+  | TimerStep
+  | ExternalTaskStep;
 
 export interface Flow {
   id: string;
@@ -69,11 +99,40 @@ export interface FlowSignal {
   value?: number;
 }
 
-/** A conformance vector — a DSL-valid Flow (+ optional signals) paired with the observations it must produce. */
+/**
+ * A scripted **correlated inbound reply** delivered to an `external-task` step (doc 04 §2.8, doc 05 §11.1) —
+ * the machine analog of `FlowSignal.resolve`, standing in for the mock external system's response. It
+ * correlates only when `correlationId` matches the injected id; `(correlationId, messageId)` is the
+ * Idempotent-Receiver dedup key; `malformed` marks a schema-invalid reply → DLQ + Case surfacing.
+ */
+export interface ExternalReply {
+  afterMs: number;
+  stepId: string;
+  correlationId: string;
+  messageId: string;
+  value?: number;
+  malformed?: boolean;
+}
+
+/** The correlation id injected onto one `external-task` submit (doc 05 §11.1) — the key a reply must carry. */
+export interface CaseCorrelation {
+  stepId: string;
+  correlationId: string;
+}
+
+/** A conformance vector — a DSL-valid Flow (+ optional signals/replies) paired with the observations it must produce. */
 export interface FlowConformanceVector {
   name: string;
   flow: Flow;
   signals?: FlowSignal[];
-  /** `events` optionally pins the Case/Task event-history type sequence (§5.1/§5.2). */
-  expect: { vars: Vars; steps: number; slaMs: number; events?: string[] };
+  /** Correlated inbound replies delivered to `external-task` steps (doc 04 §2.8); omit to exercise the timeout path. */
+  replies?: ExternalReply[];
+  /** `events` pins the Case/Task event-history type sequence (§5.1/§5.2); `correlations` pins the injected correlation ids (§11.1). */
+  expect: {
+    vars: Vars;
+    steps: number;
+    slaMs: number;
+    events?: string[];
+    correlations?: CaseCorrelation[];
+  };
 }

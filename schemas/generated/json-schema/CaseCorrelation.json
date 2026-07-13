@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "CaseCorrelation.json",
+    "type": "object",
+    "properties": {
+        "stepId": {
+            "type": "string",
+            "description": "The `external-task` step the correlation id was injected for."
+        },
+        "correlationId": {
+            "type": "string",
+            "description": "The injected correlation id (`case_id '/' step.id`)."
+        }
+    },
+    "required": [
+        "stepId",
+        "correlationId"
+    ],
+    "description": "The correlation id injected onto one `external-task`'s outbound request (doc 05 §11.1) — the key a reply must carry to correlate."
+}
