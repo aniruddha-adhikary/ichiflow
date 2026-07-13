@@ -1,0 +1,59 @@
+{
+  "name": "crud-lifecycle",
+  "entityType": "LoanApplication",
+  "ops": [
+    {
+      "operation": "create",
+      "id": "app-1",
+      "caseId": "case-100",
+      "data": {
+        "applicant": "Alice Tan",
+        "amount": 1200,
+        "productCode": "PERMIT-A",
+        "status": "submitted"
+      }
+    },
+    {
+      "operation": "get",
+      "id": "app-1",
+      "expectVersion": 1,
+      "expect": {
+        "applicant": "Alice Tan",
+        "amount": 1200,
+        "productCode": "PERMIT-A",
+        "status": "submitted"
+      }
+    },
+    {
+      "operation": "update",
+      "id": "app-1",
+      "data": {
+        "applicant": "Alice Tan",
+        "amount": 1200,
+        "productCode": "PERMIT-A",
+        "status": "approved"
+      }
+    },
+    {
+      "operation": "get",
+      "id": "app-1",
+      "expectVersion": 2,
+      "expect": { "status": "approved" }
+    },
+    { "operation": "delete", "id": "app-1" },
+    { "operation": "get", "id": "app-1", "expectMissing": true }
+  ],
+  "expect": {
+    "audit": [
+      { "operation": "create", "id": "app-1", "version": 1 },
+      { "operation": "update", "id": "app-1", "version": 2 },
+      { "operation": "delete", "id": "app-1", "version": 3 }
+    ],
+    "outbox": [
+      { "operation": "create", "id": "app-1" },
+      { "operation": "update", "id": "app-1" },
+      { "operation": "delete", "id": "app-1" }
+    ],
+    "outboxDeliveredAll": true
+  }
+}

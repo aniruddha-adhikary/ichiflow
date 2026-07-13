@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityStoreOp.json",
+    "type": "object",
+    "properties": {
+        "operation": {
+            "$ref": "EntityStoreOpKind.json"
+        },
+        "id": {
+            "type": "string",
+            "description": "Target record id (create/update/delete/get)."
+        },
+        "caseId": {
+            "type": "string",
+            "description": "Correlating `case_id` stamped on create."
+        },
+        "data": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "The entity payload for create/update. Entity-agnostic at the DSL level (an opaque field map); the\nharness validates it against the *specific* entity's schema (`LoanApplication`) at the boundary."
+        },
+        "query": {
+            "$ref": "EntityQuery.json",
+            "description": "The query for a `list` step."
+        },
+        "expect": {
+            "$ref": "#/$defs/RecordUnknown",
+            "description": "For `get`: the expected persisted field values (a partial assertion — only the named fields are\nchecked; omit with `expectMissing` for a not-found assertion)."
+        },
+        "expectMissing": {
+            "type": "boolean",
+            "description": "For `get`: assert the record is absent (never created, or soft-deleted)."
+        },
+        "expectVersion": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "For `get`: the expected version after the round-trip."
+        },
+        "expectIds": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "For `list`: the expected page ids in deterministic order."
+        },
+        "expectTotal": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "For `list`: the expected total match count."
+        }
+    },
+    "required": [
+        "operation"
+    ],
+    "description": "One step of an entity-store **conformance vector** (build plan 4.1, harness-first). `create`/`update`\ncarry the entity `data` (validated against `LoanApplication.json` at the boundary); `get` pins the\nexpected record (or its absence); `list` pins the expected page ids + total for a query.",
+    "$defs": {
+        "RecordUnknown": {
+            "type": "object",
+            "properties": {},
+            "unevaluatedProperties": {}
+        }
+    }
+}

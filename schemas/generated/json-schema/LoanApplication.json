@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "LoanApplication.json",
+    "type": "object",
+    "properties": {
+        "applicant": {
+            "type": "string",
+            "description": "The applicant's display name (also the default free-text search field)."
+        },
+        "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Requested principal amount."
+        },
+        "productCode": {
+            "type": "string",
+            "description": "The permit/product code this application is for (a `CodeSet` codeRef in the full model)."
+        },
+        "status": {
+            "$ref": "LoanStatus.json"
+        }
+    },
+    "required": [
+        "applicant",
+        "amount",
+        "productCode",
+        "status"
+    ],
+    "description": "The v1 **reference domain entity** (ADR-0018) — an ordinary business record the store persists,\nlists, queries, and audits. Its persisted shape is schema-defined here; the store validates writes\nagainst this contract at the boundary."
+}

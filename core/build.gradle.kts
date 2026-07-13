@@ -155,6 +155,16 @@ tasks.register<JavaExec>("runFeelVectors") {
     mainClass.set("ai.ichiflow.core.decision.feel.FeelVectorRunner")
 }
 
+// Replay the committed entity-store conformance vectors against the Repository SPI reference binding
+// (build plan 4.1). Writes core/build/entity-store-results.json for the `entity-store` scope's
+// vectors_green / outbox_delivered gates.
+tasks.register<JavaExec>("runEntityStore") {
+    group = "verification"
+    description = "Run the entity-store CRUD/outbox vectors and write core/build/entity-store-results.json."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("ai.ichiflow.core.entity.EntityStoreRunner")
+}
+
 val openApiFile = layout.projectDirectory.file("../schemas/generated/openapi3/openapi.yaml")
 val modelsPackage = "ai.ichiflow.contracts"
 

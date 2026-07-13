@@ -23,6 +23,7 @@ import { contractGateScope } from "../src/verify/scopes/contract-gate.js";
 import { interpreterDeterminismSpikeScope } from "../src/verify/scopes/interpreter-determinism-spike.js";
 import { flowLayerScope } from "../src/verify/scopes/flow-layer.js";
 import { decisionRecordScope } from "../src/verify/scopes/decisionrecord.js";
+import { entityStoreScope } from "../src/verify/scopes/entity-store.js";
 import { readScopeLedger } from "../src/verify/ledger.js";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -1277,6 +1278,155 @@ describe("decisionrecord scope (Phase 3.4)", () => {
       setup(tmp, { results: null });
       const checks = decisionRecordScope.run({ repoRoot: tmp, seed: deriveSeed("f") });
       const present = checks.find((c) => c.id === "decisionrecord.assembly-present")!;
+      expect(present.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("entity-store scope (Phase 4.1)", () => {
+  const validVector = {
+    name: "v0",
+    entityType: "LoanApplication",
+    ops: [
+      {
+        operation: "create",
+        id: "app-1",
+        caseId: "case-1",
+        data: { applicant: "Alice", amount: 1000, productCode: "PERMIT-A", status: "submitted" },
+      },
+      { operation: "get", id: "app-1", expectVersion: 1, expect: { status: "submitted" } },
+    ],
+    expect: {
+      audit: [{ operation: "create", id: "app-1", version: 1 }],
+      outbox: [{ operation: "create", id: "app-1" }],
+      outboxDeliveredAll: true,
+    },
+  };
+  const okOutcome = {
+    name: "v0",
+    entityType: "LoanApplication",
+    pass: true,
+    detail: "ok",
+    outboxSize: 1,
+    delivered: 1,
+  };
+  const results = {
+    vectors: [okOutcome],
+    vectorsGreen: 1,
+    total: 1,
+    outboxDelivered: 1,
+    outboxTotal: 1,
+  };
+  const setup = (root: string, opts: { vectors?: unknown[]; results?: unknown | null } = {}) => {
+    const vdir = join(root, "schemas/entity-store/vectors");
+    mkdirSync(vdir, { recursive: true });
+    const vectors = opts.vectors ?? [validVector];
+    vectors.forEach((v, i) => writeFileSync(join(vdir, `v${i}.vector.json`), JSON.stringify(v)));
+    if (opts.results !== null) {
+      const rp = join(root, "core/build/entity-store-results.json");
+      mkdirSync(dirname(rp), { recursive: true });
+      writeFileSync(rp, JSON.stringify(opts.results ?? results));
+    }
+  };
+
+  it("passes when vectors are DSL-valid, payloads conform, and each round-trips with the outbox delivered", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      setup(tmp);
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      expect(checks.filter((c) => c.status !== "pass")).toEqual([]);
+      const green = checks.find((c) => c.id === "entity-store.vectors-green")!;
+      expect(green.value).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an ill-formed vector via the EntityStoreVector schema", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      // Op is missing the required `operation` discriminator.
+      const bad = { ...validVector, ops: [{ id: "app-1" }] };
+      setup(tmp, { vectors: [bad] });
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      expect(
+        checks.some((c) => c.id.startsWith("entity-store.dsl-valid.") && c.status === "fail"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a payload that violates the schema-defined entity (boundary validation)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      // DSL-valid vector, but the entity payload has a bad status enum + missing fields.
+      const bad = {
+        ...validVector,
+        ops: [{ operation: "create", id: "app-1", data: { applicant: "A", status: "bogus" } }],
+      };
+      setup(tmp, { vectors: [bad] });
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      expect(
+        checks.some((c) => c.id.startsWith("entity-store.entity-valid.") && c.status === "fail"),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails a vector whose round-trip diverges from its pinned oracle", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          vectorsGreen: 0,
+          vectors: [
+            {
+              ...okOutcome,
+              pass: false,
+              detail: "audit[0] expected create/app-1/v1, got update/app-1/v2",
+            },
+          ],
+        },
+      });
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      const failed = checks.filter((c) => c.status !== "pass").map((c) => c.id);
+      expect(failed).toContain("entity-store.round-trip.v0");
+      expect(failed).toContain("entity-store.vectors-green");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails outbox-delivered when the relay leaves records undelivered (transactional-outbox liveness)", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      setup(tmp, {
+        results: {
+          ...results,
+          vectors: [{ ...okOutcome, delivered: 0, outboxSize: 1 }],
+          outboxDelivered: 0,
+          outboxTotal: 1,
+        },
+      });
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      const delivered = checks.find((c) => c.id === "entity-store.outbox-delivered")!;
+      expect(delivered.status).toBe("fail");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("fails visibly when the results artifact is missing", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ichiflow-es-"));
+    try {
+      setup(tmp, { results: null });
+      const checks = entityStoreScope.run({ repoRoot: tmp, seed: deriveSeed("e") });
+      const present = checks.find((c) => c.id === "entity-store.results-present")!;
       expect(present.status).toBe("fail");
     } finally {
       rmSync(tmp, { recursive: true, force: true });

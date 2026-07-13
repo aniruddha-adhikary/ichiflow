@@ -6,4 +6,5 @@ import "./decision-contracts.tsp";
 import "./decision-testing.tsp";
 import "./flow.tsp";
 import "./decisionrecord.tsp";
+import "./entity.tsp";
 import "./service.tsp";

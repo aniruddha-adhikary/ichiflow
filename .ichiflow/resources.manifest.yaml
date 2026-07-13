@@ -200,3 +200,15 @@ resources:
     kind: harness
     path: packages/cli/src/verify/scopes/decisionrecord.ts
     description: DecisionRecord assembler + orphan-event detector gate (build plan 3.4, doc 13 §2.g) — committed case fixtures are DSL-valid and each assembles (pure projection of a FlowResult) to its pinned stitched chain / orphan verdict keyed by case_id, with the detector proven on negative fixtures. Consumes the artifact from `pnpm decisionrecord:assemble`.
+  - id: entity-schema
+    kind: schema
+    path: schemas/entity.tsp
+    description: Canonical domain entity-store contracts (build plan 4.1, ADR-0018/0012, doc 13) — the reference business entity (LoanApplication), entity metadata (id/caseId/entityType/optimistic version/deterministic create-update sequence stamps/soft-delete), append-only audit-log record, transactional-outbox record, query/pagination/search, and the entity-store conformance-vector DSL. TypeSpec authoring; emitted JSON Schema is the contract of record.
+  - id: entity-store-vectors
+    kind: pattern
+    path: schemas/entity-store/vectors
+    description: Entity-store conformance vectors (build plan 4.1, harness-first) — CRUD/query op sequences paired with their pinned audit-log + transactional-outbox oracle (ordered operation/version/id + full delivery); cover create-read round-trip, update+version increment, exact-match filter, free-text search, deterministic pagination, and soft-delete invisibility. Replayed by `pnpm entity:jvm` against a fresh Repository SPI binding per vector.
+  - id: entity-store
+    kind: harness
+    path: packages/cli/src/verify/scopes/entity-store.ts
+    description: Domain entity-store gate (build plan 4.1, doc 13) — committed vectors are DSL-valid, every persisted payload validates against the schema-defined entity (LoanApplication) at the boundary, and each round-trips on the deterministic Repository SPI reference binding to its pinned audit/outbox oracle with the outbox fully delivered by the relay (transactional-outbox liveness). Consumes the artifact from `pnpm entity:jvm`.

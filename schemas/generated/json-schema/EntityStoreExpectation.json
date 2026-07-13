@@ -1,0 +1,31 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityStoreExpectation.json",
+    "type": "object",
+    "properties": {
+        "audit": {
+            "type": "array",
+            "items": {
+                "$ref": "EntityAuditExpectation.json"
+            },
+            "description": "The append-only audit log, in order."
+        },
+        "outbox": {
+            "type": "array",
+            "items": {
+                "$ref": "EntityOutboxExpectation.json"
+            },
+            "description": "The transactional outbox, in order."
+        },
+        "outboxDeliveredAll": {
+            "type": "boolean",
+            "description": "True iff relaying the outbox marks every record delivered (transactional-outbox liveness)."
+        }
+    },
+    "required": [
+        "audit",
+        "outbox",
+        "outboxDeliveredAll"
+    ],
+    "description": "The pinned oracle for an entity-store vector — the exact audit log + outbox the ops must yield."
+}

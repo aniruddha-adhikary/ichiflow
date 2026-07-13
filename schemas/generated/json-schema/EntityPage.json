@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityPage.json",
+    "type": "object",
+    "properties": {
+        "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+        },
+        "ids": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The matching record ids for this page, in the query's deterministic order."
+        }
+    },
+    "required": [
+        "total",
+        "page",
+        "size",
+        "ids"
+    ],
+    "description": "A page of query results — ids in stable order plus the total match count (ADR-0018)."
+}

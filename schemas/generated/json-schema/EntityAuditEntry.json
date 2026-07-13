@@ -1,0 +1,38 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "EntityAuditEntry.json",
+    "type": "object",
+    "properties": {
+        "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic audit sequence number."
+        },
+        "id": {
+            "type": "string"
+        },
+        "entityType": {
+            "type": "string"
+        },
+        "operation": {
+            "$ref": "EntityOp.json"
+        },
+        "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "The resulting version after the mutation."
+        },
+        "caseId": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "seq",
+        "id",
+        "entityType",
+        "operation",
+        "version"
+    ],
+    "description": "One append-only **audit-log** entry (ADR-0018) — who changed which record to which version."
+}
